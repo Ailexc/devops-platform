@@ -1,0 +1,93 @@
+# =============================================================================
+# 发布系统 Demo — Docker Compose 配置
+# 使用 OrbStack 原生路由（dev.orbstack.domains 标签）+ 前端 nginx 反代
+# 域名：frontend.release-system.orb.local / api.release-system.orb.local / executor.release-system.orb.local
+# =============================================================================
+
+# ⚠️ 重要：数据库（db-data 命名卷）与 COMPOSE_PROJECT_NAME 强绑定。
+#   项目改名/目录迁移后，Docker 会创建一个全新的空卷（release-system_db-data），
+#   旧数据留在旧项目卷（release_system_demo_db-data）或仓库 backend/db.sqlite3 中。
+#   历史数据已恢复进当前卷，备份见 .db-backups/。改名时请用 `docker compose --project-name <名> ...`
+#   或在改名后手动把旧卷内容复制到新卷，避免再次"数据丢失"。
+
+services:
+  # ── Backend (Django REST API) ──
+  release-backend:
+    build: ./backend
+    container_name: release-backend
+    command: >
+      sh -c "python wait_for_db.py &&
+             python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - shared-keys:/app/keys
+    environment:
+      - EXECUTOR_URL=http://release-executor:8765
+      - EXECUTOR_PRIVATE_KEY_PATH=/app/keys/executor_private.pem
+      - DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_release
+      # ⚠️ 必须同时包含 frontend 域名：nginx 反代时把 Host 头传给后端
+      - ALLOWED_HOSTS=localhost,api.${COMPOSE_PROJECT_NAME:-release-system}.orb.local,frontend.${COMPOSE_PROJECT_NAME:-release-system}.orb.local,.devops.orb.local
+    labels:
+      - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-release-system}.orb.local"
+    restart: unless-stopped
+    networks:
+      - default
+      - devops-net
+
+  # ── Frontend (React + Nginx) ──
+  release-frontend:
+    build: ./frontend
+    container_name: release-frontend
+    # 容器内置 nginx：/ → SPA 静态文件，/api/ → 反代 release-backend（见 frontend/nginx.conf）
+    labels:
+      - "dev.orbstack.domains=frontend.${COMPOSE_PROJECT_NAME:-release-system}.orb.local"
+    depends_on:
+      - release-backend
+    restart: unless-stopped
+    networks:
+      - default
+      - devops-net
+
+  # ── Executor (FastAPI 执行端) ──
+  release-executor:
+    build: ./executor
+    container_name: release-executor
+    entrypoint: ["/app/entrypoint.sh"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8765"]
+    volumes:
+      - ./demo-apps:/demo-apps
+      - shared-keys:/app/keys
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./executor/entrypoint.sh:/app/entrypoint.sh:ro
+      - ${HOME}/.kube/config:/app/config/kubeconfig:ro
+    environment:
+      - BACKEND_PUBLIC_KEY_PATH=/app/keys/backend_public.pem
+      - KUBECONFIG=/tmp/kubeconfig-fixed
+    labels:
+      - "dev.orbstack.domains=executor.${COMPOSE_PROJECT_NAME:-release-system}.orb.local"
+    restart: unless-stopped
+
+  # ── Init (一次性初始化容器) ──
+  init:
+    build: ./backend
+    container_name: release-init
+    volumes:
+      - shared-keys:/app/keys
+      - ./scripts:/app/scripts
+    environment:
+      - EXECUTOR_PRIVATE_KEY_PATH=/app/keys/executor_private.pem
+      - DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_release
+    command: ["/app/scripts/docker-init.sh"]
+    profiles:
+      - init
+    networks:
+      - default
+      - devops-net
+
+volumes:
+  shared-keys:
+
+networks:
+  default:
+  devops-net:   # 统一基础设施网络（根目录 infra/docker-compose.yml）
+    external: true

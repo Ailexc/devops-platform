@@ -1,0 +1,11 @@
+{
+  "task_id": "ce1e7841-8f22-4386-9672-508bee31f611",
+  "executed_at": "2026-08-01T11:49:27.265435+00:00",
+  "total_batches": 1,
+  "results": [
+    {
+      "batch": 1,
+      "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1010)>"
+    }
+  ]
+}

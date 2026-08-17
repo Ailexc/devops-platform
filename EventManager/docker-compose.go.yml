@@ -1,0 +1,135 @@
+# Go stack Docker Compose
+services:
+  go-postgres:
+    image: postgres:16-alpine
+    container_name: cmdb-event-go-postgres
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${GO_POSTGRES_DB:-eventdb_go}
+      POSTGRES_USER: ${GO_POSTGRES_USER:-eventuser}
+      POSTGRES_PASSWORD: ${GO_POSTGRES_PASSWORD:-eventpass}
+    ports:
+      - "5433:5432"
+    expose:
+      - "5432"
+    volumes:
+      - go-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GO_POSTGRES_USER:-eventuser} -d ${GO_POSTGRES_DB:-eventdb_go}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  go-redis:
+    image: redis:7-alpine
+    container_name: cmdb-event-go-redis
+    ports:
+      - "6380:6379"
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  go-api:
+    build:
+      context: ./backend-go
+      dockerfile: Dockerfile
+    container_name: cmdb-event-go-api
+    command: api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${GO_POSTGRES_USER:-eventuser}:${GO_POSTGRES_PASSWORD:-eventpass}@cmdb-event-go-postgres:5432/${GO_POSTGRES_DB:-eventdb_go}
+      REDIS_URL: redis://cmdb-event-go-redis:6379/0
+      API_PORT: "8000"
+      OUTPUT_DIR: /output
+      DOCS_DIR: /app/docs
+      DEBUG: "false"
+    expose:
+      - "8000"
+    depends_on:
+      go-postgres:
+        condition: service_healthy
+      go-redis:
+        condition: service_healthy
+    volumes:
+      - go-output:/output
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.go-api.rule=Host(`api.go-event-management.orb.local`)"
+      - "traefik.http.services.go-api.loadbalancer.server.port=8000"
+
+  go-worker:
+    build:
+      context: ./backend-go
+      dockerfile: Dockerfile
+    container_name: cmdb-event-go-worker
+    command: worker
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${GO_POSTGRES_USER:-eventuser}:${GO_POSTGRES_PASSWORD:-eventpass}@cmdb-event-go-postgres:5432/${GO_POSTGRES_DB:-eventdb_go}
+      REDIS_URL: redis://cmdb-event-go-redis:6379/0
+      WORKER_CONCURRENCY: "10"
+      OUTPUT_DIR: /output
+    depends_on:
+      go-postgres:
+        condition: service_healthy
+      go-redis:
+        condition: service_healthy
+    volumes:
+      - go-output:/output
+    restart: unless-stopped
+
+  go-seed:
+    build:
+      context: ./backend-go
+      dockerfile: Dockerfile
+    container_name: cmdb-event-go-seed
+    command: seed
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${GO_POSTGRES_USER:-eventuser}:${GO_POSTGRES_PASSWORD:-eventpass}@cmdb-event-go-postgres:5432/${GO_POSTGRES_DB:-eventdb_go}
+      SEED_TOTAL: "1000"
+      SEED_CLEAR: "true"
+    depends_on:
+      go-postgres:
+        condition: service_healthy
+    restart: "no"
+
+  go-frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: cmdb-event-go-frontend
+    environment:
+      VITE_API_BASE_URL: http://api.go-event-management.orb.local/api/v1
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.go-frontend.rule=Host(`frontend.go-event-management.orb.local`)"
+      - "traefik.http.services.go-frontend.loadbalancer.server.port=80"
+
+  traefik:
+    image: traefik:v3.0
+    container_name: cmdb-event-go-traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "8081:80"
+      - "8082:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - go-api
+      - go-frontend
+
+volumes:
+  go-pgdata:
+  go-output:

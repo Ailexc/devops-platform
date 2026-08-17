@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>权限申请流程 Demo - 以能力为中心</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg-card: #141414;
+    --bg-hover: #1a1a1a;
+    --bg-selected: #1a2332;
+    --border: #262626;
+    --border-selected: #3b82f6;
+    --text: #e5e5e5;
+    --text-secondary: #a3a3a3;
+    --text-muted: #737373;
+    --accent: #3b82f6;
+    --accent-light: #60a5fa;
+    --accent-bg: rgba(59, 130, 246, 0.1);
+    --success: #22c55e;
+    --success-bg: rgba(34, 197, 94, 0.1);
+    --warning: #f59e0b;
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --danger: #ef4444;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 24px 20px;
+  }
+
+  /* 头部 */
+  .header {
+    margin-bottom: 32px;
+  }
+  .header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .header .subtitle {
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  /* 进度条 */
+  .progress-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 32px;
+    padding: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .progress-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+  .progress-step .step-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--bg-hover);
+    border: 2px solid var(--border);
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+  .progress-step.active .step-number {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+  .progress-step.completed .step-number {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+  }
+  .progress-step .step-label {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .progress-step.active .step-label {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .progress-step.completed .step-label {
+    color: var(--success);
+  }
+  .progress-divider {
+    flex: 0 0 20px;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* 卡片 */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .card-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  /* 能力卡片网格 */
+  .capability-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .capability-card {
+    padding: 16px;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .capability-card:hover {
+    border-color: var(--text-muted);
+    background: var(--bg-hover);
+  }
+  .capability-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+  .capability-card .cap-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+  .capability-card .cap-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .capability-card .cap-model {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: monospace;
+    background: var(--bg-hover);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .capability-card .cap-ops {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  /* 操作选择 */
+  .operation-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .operation-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .operation-item:hover {
+    border-color: var(--text-muted);
+  }
+  .operation-item.selected {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+  .operation-item .op-method {
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    min-width: 50px;
+    text-align: center;
+  }
+  .operation-item .op-name {
+    flex: 1;
+  }
+  .operation-item .op-name .name {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .operation-item .op-name .desc {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .operation-item .op-scopes {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* 数据范围选择 */
+  .scope-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .scope-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .scope-option:hover {
+    border-color: var(--text-muted);
+  }
+  .scope-option.selected {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+  .scope-option .scope-icon {
+    font-size: 20px;
+  }
+  .scope-option .scope-info {
+    flex: 1;
+  }
+  .scope-option .scope-info .name {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .scope-option .scope-info .desc {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .scope-option .scope-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-hover);
+    color: var(--text-muted);
+  }
+
+  /* 实例选择 */
+  .instance-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .instance-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .instance-item:hover {
+    background: var(--bg-hover);
+  }
+  .instance-item.selected {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+  }
+  .instance-item .checkbox {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--text-muted);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .instance-item.selected .checkbox {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .instance-item.selected .checkbox::after {
+    content: "✓";
+    color: white;
+    font-size: 12px;
+  }
+  .instance-item .inst-info {
+    flex: 1;
+  }
+  .instance-item .inst-info .name {
+    font-size: 13px;
+    font-weight: 500;
+    font-family: monospace;
+  }
+  .instance-item .inst-info .meta {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* 预览卡片 */
+  .preview-card {
+    background: var(--bg-card);
+    border: 2px solid var(--success);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .preview-header {
+    padding: 14px 16px;
+    background: var(--success-bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--success);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .preview-body {
+    padding: 16px;
+  }
+  .preview-row {
+    display: flex;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .preview-row:last-child {
+    border-bottom: none;
+  }
+  .preview-row .label {
+    width: 80px;
+    font-size: 12px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .preview-row .value {
+    font-size: 13px;
+    flex: 1;
+  }
+  .preview-row .value.mono {
+    font-family: monospace;
+    background: var(--bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* 按钮 */
+  .btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover {
+    background: var(--accent-light);
+  }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    background: var(--bg-hover);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover {
+    background: var(--bg-selected);
+  }
+  .btn-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  /* 场景说明 */
+  .scenario-box {
+    background: var(--accent-bg);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .scenario-box .title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--accent-light);
+  }
+
+  /* 隐藏 */
+  .hidden { display: none; }
+
+  /* 动画 */
+  .fade-in {
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* 对比说明 */
+  .compare-section {
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .compare-section h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+  }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .compare-card {
+    padding: 16px;
+    border-radius: var(--radius);
+  }
+  .compare-card.old {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+  .compare-card.new {
+    background: var(--success-bg);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+  }
+  .compare-card .title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .compare-card.old .title { color: var(--danger); }
+  .compare-card.new .title { color: var(--success); }
+  .compare-card .step {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 4px 0;
+  }
+  .compare-card .step::before {
+    content: attr(data-num);
+    display: inline-block;
+    width: 18px;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- 头部 -->
+  <div class="header">
+    <h1>📋 权限申请流程 Demo</h1>
+    <div class="subtitle">以能力为中心，体验"选能力 → 选操作 → 选数据范围"的申请流程</div>
+  </div>
+
+  <!-- 进度条 -->
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-step active" data-step="1">
+      <div class="step-number">1</div>
+      <div class="step-label">选择能力</div>
+    </div>
+    <div class="progress-divider"></div>
+    <div class="progress-step" data-step="2">
+      <div class="step-number">2</div>
+      <div class="step-label">选择操作</div>
+    </div>
+    <div class="progress-divider"></div>
+    <div class="progress-step" data-step="3">
+      <div class="step-number">3</div>
+      <div class="step-label">数据范围</div>
+    </div>
+    <div class="progress-divider"></div>
+    <div class="progress-step" data-step="4">
+      <div class="step-number">4</div>
+      <div class="step-label">确认申请</div>
+    </div>
+  </div>
+
+  <!-- Step 1: 选择能力 -->
+  <div id="step1" class="fade-in">
+    <div class="scenario-box">
+      <div class="title">💡 场景示例</div>
+      假设你是研发一部的鲍勃，需要申请主机管理权限。<br>
+      从权限市场选择需要的能力，系统会自动关联对应的接口权限。
+    </div>
+    <div class="card">
+      <div class="card-title">选择要申请的能力</div>
+      <div class="card-desc">从权限市场已发布的能力中选择，每个能力包含一组相关的操作</div>
+      <div class="capability-grid" id="capabilityGrid"></div>
+    </div>
+  </div>
+
+  <!-- Step 2: 选择操作 -->
+  <div id="step2" class="hidden">
+    <div class="card">
+      <div class="card-title">选择需要的操作</div>
+      <div class="card-desc" id="step2Desc">选择该能力下你需要的具体操作</div>
+      <div class="operation-list" id="operationList"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="goStep(1)">← 上一步</button>
+      <button class="btn btn-primary" id="step2Next" onclick="goStep(3)" disabled>下一步 →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: 数据范围 -->
+  <div id="step3" class="hidden">
+    <div class="card">
+      <div class="card-title">选择数据访问范围</div>
+      <div class="card-desc" id="step3Desc">确定你可以访问哪些数据</div>
+      <div class="scope-options" id="scopeOptions"></div>
+    </div>
+    <!-- 实例选择（仅 instance 时显示） -->
+    <div id="instanceSection" class="card hidden">
+      <div class="card-title">选择具体实例</div>
+      <div class="card-desc">勾选你需要访问的数据实例</div>
+      <div class="instance-list" id="instanceList"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="goStep(2)">← 上一步</button>
+      <button class="btn btn-primary" id="step3Next" onclick="goStep(4)" disabled>下一步 →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: 确认申请 -->
+  <div id="step4" class="hidden">
+    <div class="card">
+      <div class="card-title">申请单预览</div>
+      <div class="card-desc">确认以下信息后提交申请</div>
+      <div id="previewContent"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="goStep(3)">← 上一步</button>
+      <button class="btn btn-primary" onclick="submitRequest()">提交申请</button>
+    </div>
+  </div>
+
+  <!-- 提交成功 -->
+  <div id="stepSuccess" class="hidden">
+    <div class="preview-card">
+      <div class="preview-header">✅ 申请已提交</div>
+      <div class="preview-body">
+        <p style="margin-bottom: 12px;">申请单已创建，等待审批中...</p>
+        <div class="preview-row">
+          <div class="label">申请单号</div>
+          <div class="value mono">#REQ-20260804-001</div>
+        </div>
+        <div class="preview-row">
+          <div class="label">审批链</div>
+          <div class="value">应用 Owner 审批 → 被授权方确认</div>
+        </div>
+        <div class="preview-row">
+          <div class="label">预计时间</div>
+          <div class="value">1-2 个工作日</div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="resetDemo()">重新演示</button>
+    </div>
+  </div>
+
+  <!-- 对比说明 -->
+  <div class="compare-section">
+    <h2>🆚 新旧流程对比</h2>
+    <div class="compare-grid">
+      <div class="compare-card old">
+        <div class="title">❌ 旧流程（分离式）</div>
+        <div class="step" data-num="1.">选择接口权限（cmdb:host:list）</div>
+        <div class="step" data-num="2.">选择数据范围（instance）</div>
+        <div class="step" data-num="3.">选择具体实例</div>
+        <div class="step" data-num="4.">填写理由</div>
+        <div class="step" data-num="5.">提交申请</div>
+        <div style="margin-top: 12px; font-size: 12px; color: var(--danger);">
+          ❌ 用户需要理解"接口权限"概念<br>
+          ❌ 接口和数据分离，体验割裂<br>
+          ❌ 不知道申请了什么
+        </div>
+      </div>
+      <div class="compare-card new">
+        <div class="title">✅ 新流程（能力为中心）</div>
+        <div class="step" data-num="1.">选择能力（主机管理）</div>
+        <div class="step" data-num="2.">选择操作（查看详情）</div>
+        <div class="step" data-num="3.">选择数据范围（选择实例）</div>
+        <div class="step" data-num="4.">确认并提交</div>
+        <div style="margin-top: 12px; font-size: 12px; color: var(--success);">
+          ✅ 用户只需理解业务概念<br>
+          ✅ 能力=接口+数据，一体化<br>
+          ✅ 系统自动关联底层权限
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 模拟数据：能力声明（来自权限市场）
+const capabilities = [
+  {
+    id: 1,
+    name: "主机管理",
+    icon: "🖥️",
+    data_model: "host",
+    description: "主机资源的增删改查能力",
+    status: "published",
+    app_name: "CMDB",
+    operations: [
+      { name: "查看列表", method: "GET", path: "/api/v1/hosts", action: "cmdb:host:list", allowed_scopes: ["all"], default_scope: "all" },
+      { name: "查看详情", method: "GET", path: "/api/v1/hosts/:id", action: "cmdb:host:read", allowed_scopes: ["all", "owner", "dimension", "instance"], default_scope: "all" },
+      { name: "创建主机", method: "POST", path: "/api/v1/hosts", action: "cmdb:host:create", allowed_scopes: ["n/a"], default_scope: "n/a" },
+      { name: "更新主机", method: "PUT", path: "/api/v1/hosts/:id", action: "cmdb:host:update", allowed_scopes: ["owner", "instance"], default_scope: "instance" },
+      { name: "删除主机", method: "DELETE", path: "/api/v1/hosts/:id", action: "cmdb:host:delete", allowed_scopes: ["instance"], default_scope: "instance" }
+    ]
+  },
+  {
+    id: 2,
+    name: "网络管理",
+    icon: "🌐",
+    data_model: "network",
+    description: "网络资源的增删改查能力",
+    status: "published",
+    app_name: "CMDB",
+    operations: [
+      { name: "查看列表", method: "GET", path: "/api/v1/networks", action: "cmdb:network:list", allowed_scopes: ["all"], default_scope: "all" },
+      { name: "查看详情", method: "GET", path: "/api/v1/networks/:id", action: "cmdb:network:read", allowed_scopes: ["all", "owner", "dimension", "instance"], default_scope: "all" },
+      { name: "创建网络", method: "POST", path: "/api/v1/networks", action: "cmdb:network:create", allowed_scopes: ["n/a"], default_scope: "n/a" },
+      { name: "更新网络", method: "PUT", path: "/api/v1/networks/:id", action: "cmdb:network:update", allowed_scopes: ["owner", "instance"], default_scope: "instance" },
+      { name: "删除网络", method: "DELETE", path: "/api/v1/networks/:id", action: "cmdb:network:delete", allowed_scopes: ["instance"], default_scope: "instance" }
+    ]
+  },
+  {
+    id: 3,
+    name: "监控告警",
+    icon: "🔔",
+    data_model: null,
+    description: "监控数据查看与告警配置",
+    status: "published",
+    app_name: "Monitor",
+    operations: [
+      { name: "查看监控", method: "GET", path: "/api/v1/metrics", action: "monitor:metrics:list", allowed_scopes: ["all"], default_scope: "all" },
+      { name: "配置告警", method: "POST", path: "/api/v1/alerts", action: "monitor:alerts:create", allowed_scopes: ["n/a"], default_scope: "n/a" }
+    ]
+  },
+  {
+    id: 4,
+    name: "工单管理",
+    icon: "📋",
+    data_model: "ticket",
+    description: "IT 工单的创建与处理",
+    status: "published",
+    app_name: "ITSM",
+    operations: [
+      { name: "查看工单", method: "GET", path: "/api/v1/tickets", action: "itsm:ticket:list", allowed_scopes: ["all", "owner"], default_scope: "owner" },
+      { name: "创建工单", method: "POST", path: "/api/v1/tickets", action: "itsm:ticket:create", allowed_scopes: ["n/a"], default_scope: "n/a" },
+      { name: "处理工单", method: "PUT", path: "/api/v1/tickets/:id", action: "itsm:ticket:update", allowed_scopes: ["owner", "instance"], default_scope: "owner" }
+    ]
+  }
+];
+
+// 模拟数据：主机实例
+const hostInstances = [
+  { id: 1, name: "web-01", ip: "10.0.1.101", status: "running", owner: "alice" },
+  { id: 2, name: "web-02", ip: "10.0.1.102", status: "running", owner: "alice" },
+  { id: 3, name: "web-03", ip: "10.0.1.103", status: "stopped", owner: "bob" },
+  { id: 4, name: "db-01", ip: "10.0.2.101", status: "running", owner: "bob" },
+  { id: 5, name: "db-02", ip: "10.0.2.102", status: "running", owner: "carol" },
+  { id: 6, name: "cache-01", ip: "10.0.3.101", status: "running", owner: "bob" },
+];
+
+// 状态
+let state = {
+  step: 1,
+  selectedCapability: null,
+  selectedOperation: null,
+  selectedScope: null,
+  selectedInstances: []
+};
+
+// 范围描述
+const scopeDescriptions = {
+  all: { icon: "🌍", name: "所有数据", desc: "可以访问该类型的所有数据，无限制" },
+  owner: { icon: "👤", name: "仅我创建的", desc: "只能访问自己创建/拥有的数据" },
+  dimension: { icon: "🏢", name: "按组织过滤", desc: "只能访问所在组织相关的数据" },
+  instance: { icon: "📌", name: "选择具体实例", desc: "明确指定可以访问哪些数据实例" },
+  "n/a": { icon: "🚫", name: "不适用", desc: "此操作不涉及数据范围（如创建新数据）" }
+};
+
+// 初始化
+function init() {
+  renderCapabilities();
+}
+
+// 渲染能力列表
+function renderCapabilities() {
+  const grid = document.getElementById('capabilityGrid');
+  grid.innerHTML = capabilities
+    .filter(cap => cap.status === 'published')
+    .map(cap => `
+      <div class="capability-card ${state.selectedCapability?.id === cap.id ? 'selected' : ''}" 
+           onclick="selectCapability(${cap.id})">
+        <div class="cap-icon">${cap.icon}</div>
+        <div class="cap-name">${cap.name}</div>
+        <div class="cap-model">${cap.app_name} · ${cap.data_model || '纯接口能力'}</div>
+        <div class="cap-ops">${cap.operations.length} 个操作</div>
+      </div>
+    `).join('');
+}
+
+// 选择能力
+function selectCapability(id) {
+  state.selectedCapability = capabilities.find(c => c.id === id);
+  state.selectedOperation = null;
+  state.selectedScope = null;
+  state.selectedInstances = [];
+  
+  // 自动进入下一步
+  goStep(2);
+}
+
+// 渲染操作列表
+function renderOperations() {
+  const list = document.getElementById('operationList');
+  const ops = state.selectedCapability.operations;
+  
+  document.getElementById('step2Desc').textContent = 
+    `「${state.selectedCapability.name}」包含以下操作，选择你需要的：`;
+  
+  list.innerHTML = ops.map(op => `
+    <div class="operation-item ${state.selectedOperation?.action === op.action ? 'selected' : ''}" 
+         onclick="selectOperation('${op.action}')">
+      <div class="op-method">${op.method}</div>
+      <div class="op-name">
+        <div class="name">${op.name}</div>
+        <div class="desc">${op.path}</div>
+      </div>
+      <div class="op-scopes">支持 ${op.allowed_scopes.length} 种范围</div>
+    </div>
+  `).join('');
+  
+  updateStep2Button();
+}
+
+// 选择操作
+function selectOperation(action) {
+  state.selectedOperation = state.selectedCapability.operations.find(o => o.action === action);
+  state.selectedScope = null;
+  state.selectedInstances = [];
+  renderOperations();
+  updateStep2Button();
+}
+
+// 更新步骤2按钮状态
+function updateStep2Button() {
+  document.getElementById('step2Next').disabled = !state.selectedOperation;
+}
+
+// 渲染数据范围选项
+function renderScopes() {
+  const container = document.getElementById('scopeOptions');
+  const scopes = state.selectedOperation.allowed_scopes;
+  
+  document.getElementById('step3Desc').textContent = 
+    `「${state.selectedOperation.name}」支持以下数据范围，选择适合你的：`;
+  
+  container.innerHTML = scopes.map(scope => {
+    const info = scopeDescriptions[scope];
+    return `
+      <div class="scope-option ${state.selectedScope === scope ? 'selected' : ''}" 
+           onclick="selectScope('${scope}')">
+        <div class="scope-icon">${info.icon}</div>
+        <div class="scope-info">
+          <div class="name">${info.name}</div>
+          <div class="desc">${info.desc}</div>
+        </div>
+        <div class="scope-badge">${scope}</div>
+      </div>
+    `;
+  }).join('');
+  
+  updateStep3Button();
+}
+
+// 选择数据范围
+function selectScope(scope) {
+  state.selectedScope = scope;
+  state.selectedInstances = [];
+  renderScopes();
+  
+  // 显示/隐藏实例选择
+  const instanceSection = document.getElementById('instanceSection');
+  if (scope === 'instance') {
+    instanceSection.classList.remove('hidden');
+    renderInstances();
+  } else {
+    instanceSection.classList.add('hidden');
+  }
+  
+  updateStep3Button();
+}
+
+// 渲染实例列表
+function renderInstances() {
+  const list = document.getElementById('instanceList');
+  const model = state.selectedCapability.data_model;
+  
+  // 根据数据模型显示不同实例
+  let instances = hostInstances;
+  if (model === 'network') {
+    instances = [
+      { id: 1, name: "vpc-01", ip: "10.0.0.0/16", status: "active", owner: "alice" },
+      { id: 2, name: "vpc-02", ip: "10.1.0.0/16", status: "active", owner: "bob" },
+    ];
+  }
+  
+  list.innerHTML = instances.map(inst => `
+    <div class="instance-item ${state.selectedInstances.includes(inst.id) ? 'selected' : ''}" 
+         onclick="toggleInstance(${inst.id})">
+      <div class="checkbox"></div>
+      <div class="inst-info">
+        <div class="name">${inst.name}</div>
+        <div class="meta">${inst.ip} · ${inst.status} · owner: ${inst.owner}</div>
+      </div>
+    </div>
+  `).join('');
+  
+  updateStep3Button();
+}
+
+// 切换实例选择
+function toggleInstance(id) {
+  const idx = state.selectedInstances.indexOf(id);
+  if (idx === -1) {
+    state.selectedInstances.push(id);
+  } else {
+    state.selectedInstances.splice(idx, 1);
+  }
+  renderInstances();
+}
+
+// 更新步骤3按钮状态
+function updateStep3Button() {
+  const btn = document.getElementById('step3Next');
+  if (state.selectedScope === 'instance') {
+    btn.disabled = state.selectedInstances.length === 0;
+  } else {
+    btn.disabled = !state.selectedScope;
+  }
+}
+
+// 渲染预览
+function renderPreview() {
+  const cap = state.selectedCapability;
+  const op = state.selectedOperation;
+  const scope = state.selectedScope;
+  
+  let scopeText = scopeDescriptions[scope].name;
+  if (scope === 'instance' && state.selectedInstances.length > 0) {
+    const model = cap.data_model;
+    let instances = hostInstances;
+    if (model === 'network') {
+      instances = [
+        { id: 1, name: "vpc-01" },
+        { id: 2, name: "vpc-02" },
+      ];
+    }
+    const names = state.selectedInstances.map(id => 
+      instances.find(i => i.id === id)?.name
+    ).filter(Boolean).join('、');
+    scopeText += `（${names}）`;
+  }
+  
+  document.getElementById('previewContent').innerHTML = `
+    <div style="background: var(--bg); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+      <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">能力信息</div>
+      <div class="preview-row">
+        <div class="label">能力</div>
+        <div class="value">${cap.icon} ${cap.name}</div>
+      </div>
+      <div class="preview-row">
+        <div class="label">应用</div>
+        <div class="value">${cap.app_name}</div>
+      </div>
+      <div class="preview-row">
+        <div class="label">数据模型</div>
+        <div class="value mono">${cap.data_model || '无'}</div>
+      </div>
+    </div>
+    
+    <div style="background: var(--bg); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+      <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">操作详情</div>
+      <div class="preview-row">
+        <div class="label">操作</div>
+        <div class="value">${op.name}</div>
+      </div>
+      <div class="preview-row">
+        <div class="label">接口</div>
+        <div class="value mono">${op.method} ${op.path}</div>
+      </div>
+      <div class="preview-row">
+        <div class="label">权限点</div>
+        <div class="value mono">${op.action}</div>
+      </div>
+      <div class="preview-row">
+        <div class="label">数据范围</div>
+        <div class="value">${scopeText}</div>
+      </div>
+    </div>
+    
+    <div style="background: var(--success-bg); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--success);">
+      💡 系统会自动关联 <code>${op.action}</code> 权限，无需手动选择接口权限
+    </div>
+  `;
+}
+
+// 导航到指定步骤
+function goStep(step) {
+  // 隐藏所有步骤
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById(`step${i}`).classList.add('hidden');
+  }
+  document.getElementById('stepSuccess').classList.add('hidden');
+  
+  // 更新进度条
+  const steps = document.querySelectorAll('.progress-step');
+  steps.forEach(s => {
+    const stepNum = parseInt(s.dataset.step);
+    s.classList.remove('active', 'completed');
+    if (stepNum < step) s.classList.add('completed');
+    if (stepNum === step) s.classList.add('active');
+  });
+  
+  // 显示目标步骤
+  state.step = step;
+  const targetEl = document.getElementById(`step${step}`);
+  targetEl.classList.remove('hidden');
+  targetEl.classList.add('fade-in');
+  
+  // 渲染内容
+  switch(step) {
+    case 1:
+      renderCapabilities();
+      break;
+    case 2:
+      renderOperations();
+      break;
+    case 3:
+      renderScopes();
+      break;
+    case 4:
+      renderPreview();
+      break;
+  }
+}
+
+// 提交申请
+function submitRequest() {
+  document.getElementById('step4').classList.add('hidden');
+  document.getElementById('stepSuccess').classList.remove('hidden');
+  document.getElementById('stepSuccess').classList.add('fade-in');
+  
+  // 更新进度条为全部完成
+  document.querySelectorAll('.progress-step').forEach(s => {
+    s.classList.remove('active');
+    s.classList.add('completed');
+  });
+}
+
+// 重置演示
+function resetDemo() {
+  state = {
+    step: 1,
+    selectedCapability: null,
+    selectedOperation: null,
+    selectedScope: null,
+    selectedInstances: []
+  };
+  goStep(1);
+}
+
+// 初始化
+init();
+</script>
+</body>
+</html>

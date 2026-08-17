@@ -1,0 +1,36 @@
+# ============================================================
+# 统一入口网关（Phase 3）
+# Traefik 聚合 7 个系统到统一入口 *.devops.orb.local
+# 说明：
+#   - 网关加入 devops-net，按 Host 规则路由到各系统 frontend 容器
+#   - 各系统 frontend 需加入 devops-net（见各项目 compose），
+#     并保留原项目网络（nginx /api 反代依赖项目内服务名）
+#   - 本地入口（OrbStack 自动 DNS）：
+#       portal.devops.orb.local      → 统一门户
+#       cloud/event/iam/release/cmdb/workflow.devops.orb.local → 各系统
+#       api.auth.devops.orb.local    → 认证 API
+#       traefik.devops.orb.local     → Traefik Dashboard
+#   - 非 OrbStack 环境（ECS 等）：http://<host>:8080 + Host 头
+# ============================================================
+name: devops-gateway
+
+services:
+  traefik:
+    image: traefik:v3.7
+    container_name: devops-gateway
+    restart: unless-stopped
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "8088:80"        # 统一入口（宿主 8088，避免与各项目 8080/80 冲突）
+    volumes:
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic:/etc/traefik/dynamic:ro
+    labels:
+      - "dev.orbstack.domains=devops.orb.local,portal.devops.orb.local,cloud.devops.orb.local,event.devops.orb.local,iam.devops.orb.local,release.devops.orb.local,cmdb.devops.orb.local,workflow.devops.orb.local,api.auth.devops.orb.local,traefik.devops.orb.local"
+    networks:
+      - devops-net
+
+networks:
+  devops-net:
+    external: true

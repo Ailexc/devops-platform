@@ -1,0 +1,102 @@
+# ──────────────────────────────────────────────────────────────────
+# Go Backend — REST API + Worker + Scheduler 服务
+# 作用: 提供与 Python 版等价的 API，支持多 role 部署
+# ──────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-backend
+  namespace: cmdb
+  labels:
+    app: cmdb
+    component: go-backend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: cmdb
+      component: go-backend
+  template:
+    metadata:
+      labels:
+        app: cmdb
+        component: go-backend
+    spec:
+      containers:
+        - name: go-backend
+          image: cmdb-go-backend:latest
+          args: ["--role=all", "--seed"]
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: DB_DSN
+              value: "postgres://cmdb:cmdb_dev@cmdb-postgres:5432/cmdb_go?sslmode=disable"
+            - name: REDIS_ADDR
+              value: "cmdb-redis:6379"
+            - name: REDIS_DB
+              value: "1"
+            - name: CMDB_ROLE
+              value: "all"
+            - name: PORT
+              value: "8080"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-backend
+  namespace: cmdb
+spec:
+  selector:
+    app: cmdb
+    component: go-backend
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+---
+# Ingress 路由（Go 后端可选路径前缀 /go/ 或独立域名）
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: go-backend
+  namespace: cmdb
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: cmdb.local
+      http:
+        paths:
+          - path: /go-api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: go-backend
+                port:
+                  number: 8080

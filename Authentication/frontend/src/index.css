@@ -1,0 +1,220 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: #f0f2f5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- 登录页 ---- */
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0b1e4b 0%, #123a8f 45%, #1d5fd6 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-wrapper::before,
+.login-wrapper::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.35;
+}
+.login-wrapper::before {
+  width: 420px;
+  height: 420px;
+  background: #3b82f6;
+  top: -120px;
+  left: -80px;
+}
+.login-wrapper::after {
+  width: 360px;
+  height: 360px;
+  background: #8b5cf6;
+  bottom: -100px;
+  right: -60px;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  padding: 40px 36px 32px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 20, 60, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.login-logo .anticon {
+  font-size: 44px;
+  color: #1d5fd6;
+}
+.login-title {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #101828;
+  margin: 8px 0 4px;
+}
+.login-subtitle {
+  text-align: center;
+  font-size: 13px;
+  color: #667085;
+  margin-bottom: 28px;
+}
+.login-footer {
+  text-align: center;
+  font-size: 12px;
+  color: #98a2b3;
+  margin-top: 24px;
+  line-height: 1.8;
+}
+
+/* ---- 门户页 ---- */
+.portal-container {
+  min-height: 100vh;
+  background: #f0f2f5;
+}
+.portal-header {
+  background: linear-gradient(90deg, #0b1e4b, #123a8f);
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(11, 30, 75, 0.25);
+}
+.portal-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.portal-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.portal-brand .anticon {
+  font-size: 22px;
+  color: #7aa2ff;
+}
+.portal-header-nav {
+  display: flex;
+  gap: 20px;
+}
+.portal-header-nav span {
+  color: #cbd5f5;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 2px;
+  transition: color 0.15s;
+}
+.portal-header-nav span:hover {
+  color: #fff;
+}
+
+.welcome-banner {
+  max-width: 1200px;
+  margin: 24px auto 0;
+  padding: 24px 28px;
+  background: linear-gradient(120deg, #1d5fd6, #4f8cff);
+  border-radius: 14px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.welcome-banner h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+.welcome-banner p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.app-grid {
+  max-width: 1200px;
+  margin: 24px auto 48px;
+  padding: 0 8px;
+}
+.app-card {
+  height: 100%;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.app-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(16, 24, 40, 0.14);
+}
+.app-card .app-icon {
+  font-size: 30px;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.app-card h3 {
+  margin: 14px 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #101828;
+}
+.app-card p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  min-height: 40px;
+}
+
+/* ---- 个人中心 ---- */
+.profile-container {
+  max-width: 880px;
+  margin: 24px auto 48px;
+  padding: 0 16px;
+}
+
+@media (max-width: 576px) {
+  .login-card {
+    padding: 32px 24px 24px;
+  }
+  .welcome-banner {
+    padding: 18px;
+  }
+}

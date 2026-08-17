@@ -1,0 +1,22 @@
+# ──────────────────────────────────────────────────────────────────
+# Kustomize — 将多个 K8s 清单文件组合为一个整体
+# 使用 kubectl apply -k k8s/ 即可一键部署全部资源
+# ──────────────────────────────────────────────────────────────────
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cmdb
+
+resources:
+  - 00-namespace.yaml
+  - 01-configmap.yaml
+  - 02-secret.yaml
+  - 03-pvc.yaml
+  - 10-redis.yaml
+  - 11-postgres.yaml
+  - 12-backend.yaml
+  - 13-celery-worker.yaml
+  - 14-celery-beat.yaml
+  - 15-frontend.yaml
+  - 20-ingress.yaml
+  - 30-hpa.yaml

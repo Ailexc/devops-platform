@@ -1,0 +1,60 @@
+# ──────────────────────────────────────────────────────────────────
+# Celery Worker — 异步任务执行器
+# 作用: 消费队列中的同步任务（aws/connector/inspection）
+# 消费的队列: aws, connector, inspection, default
+# ──────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: cmdb
+  labels:
+    app: cmdb
+    component: celery-worker
+spec:
+  replicas: 2              # 2 个 Worker 并发处理任务
+  selector:
+    matchLabels:
+      app: cmdb
+      component: celery-worker
+  template:
+    metadata:
+      labels:
+        app: cmdb
+        component: celery-worker
+    spec:
+      containers:
+        - name: worker
+          image: cmdb-backend:latest   # 和 backend 使用同一个镜像
+          command:
+            - celery
+            - -A
+            - config
+            - worker
+            - -l
+            - info
+            - -Q
+            - aws,connector,inspection,default
+            - --concurrency=4          # 每个 Worker 进程同时处理 4 个任务
+          envFrom:
+            - configMapRef:
+                name: cmdb-config
+            - secretRef:
+                name: cmdb-secret
+          resources:
+            requests:
+              cpu: "0.5"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          # Worker 不需要 ReadinessProbe，因为它不接收 HTTP 流量
+          livenessProbe:
+            exec:
+              command:
+                - celery
+                - -A
+                - config
+                - status
+            initialDelaySeconds: 30
+            periodSeconds: 30

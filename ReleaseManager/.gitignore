@@ -1,0 +1,26 @@
+# ── 初始化标记 ──────────────────────────────────────────────
+.initialized
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# ── 服务间认证密钥（不入库）───────────────────────────
+backend/config/executor_private.pem
+executor/config/backend_public.pem
+
+# ── 数据库 ──────────────────────────────────────────────
+backend/db.sqlite3
+
+# ── Node / 前端 ─────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+*.local
+
+# ── Docker ─────────────────────────────────────────────
+.docker/
+
+# ── 系统 / 编辑器 ───────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>OrbStack 部署架构总结</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif; color: #333; line-height: 1.6; margin: 0; }
+h1 { font-size: 22px; border-bottom: 2px solid #1677ff; padding-bottom: 8px; }
+h2 { font-size: 18px; color: #1677ff; margin-top: 28px; }
+h3 { font-size: 15px; color: #333; margin-top: 20px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+th, td { border: 1px solid #e2e5f0; padding: 8px 12px; text-align: left; }
+th { background: #f6f8fa; font-weight: 600; }
+code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 12px; color: #d46b08; }
+.tip { background: #e6f4ff; border: 1px solid #91caff; border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+.tip strong { color: #1677ff; }
+.warn { background: #fff7e6; border: 1px solid #ffd591; border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+.warn strong { color: #d46b08; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin: 2px; }
+.tag-docker { background: #e6f7ff; color: #1677ff; }
+.tag-k8s { background: #f6ffed; color: #52c41a; }
+.tag-orb { background: #fff7e6; color: #d46b08; }
+.tag-key { background: #f9f0ff; color: #722ed1; }
+.flow-step { display: flex; align-items: flex-start; gap: 12px; margin: 10px 0; }
+.flow-num { width: 26px; height: 26px; border-radius: 50%; background: #1677ff; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; flex-shrink: 0; margin-top: 2px; }
+.arch-svg { width: 100%; max-width: 800px; margin: 16px auto; display: block; }
+.svg-caption { font-size: 12px; color: #999; text-align: center; margin-top: 8px; }
+.summary-box { background: linear-gradient(135deg, #e6f7ff 0%, #f6ffed 100%); border-radius: 12px; padding: 20px; margin: 16px 0; }
+.summary-box ul { padding-left: 20px; margin: 8px 0; }
+.summary-box li { margin-bottom: 6px; font-size: 14px; }
+
+/* ===== 文章自包含导航 ===== */
+[id] { scroll-margin-top: 14px; }
+.doc-layout { display: flex; gap: 28px; align-items: flex-start; }
+.doc-toc {
+  width: 220px; flex-shrink: 0; box-sizing: border-box;
+  position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+  padding: 8px 4px 24px 0; border-right: 1px solid #eef0f6;
+}
+.doc-toc.is-hidden { display: none; }
+.doc-toc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 10px 10px; font-size: 13px; font-weight: 700; color: #4a5568;
+}
+.doc-toc-hide {
+  cursor: pointer; border: none; background: transparent; color: #a0aec0;
+  font-size: 14px; padding: 2px 6px; border-radius: 4px;
+}
+.doc-toc-hide:hover { color: #1a202c; background: #f1f5f9; }
+.doc-toc-nav { display: flex; flex-direction: column; gap: 1px; }
+.doc-toc-nav a {
+  display: block; padding: 6px 10px; border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0; color: #4a5568; text-decoration: none;
+  font-size: 13px; line-height: 1.5; transition: all .15s;
+}
+.doc-toc-nav a:hover { color: #1677ff; background: #f0f6ff; }
+.doc-toc-nav a.active {
+  color: #1677ff; background: #e6f4ff; border-left-color: #1677ff; font-weight: 600;
+}
+.doc-toc-show {
+  display: none; position: sticky; top: 8px; z-index: 30;
+  border: 1px solid #c7d7f5; background: #fff; color: #1677ff;
+  font-size: 13px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(22,119,255,.15);
+}
+.doc-toc-show.is-visible { display: inline-block; }
+.doc-main { flex: 1; min-width: 0; }
+@media (max-width: 820px) {
+  .doc-layout { flex-direction: column; gap: 12px; }
+  .doc-toc { position: static; width: 100%; max-height: 220px; border-right: none; border-bottom: 1px solid #eef0f6; }
+}
+</style>
+</head>
+<body>
+
+<div class="doc-toc-show" id="doc-toc-show">📑 目录</div>
+
+<div class="doc-layout">
+<!-- ===== 左侧目录 ===== -->
+<aside class="doc-toc" id="doc-toc">
+  <div class="doc-toc-head">
+    <span>📑 本文章节</span>
+    <button class="doc-toc-hide" id="doc-toc-hide">✕</button>
+  </div>
+  <nav class="doc-toc-nav">
+    <a href="#section-1">1. 整体架构</a>
+    <a href="#section-2">2. 组件职责</a>
+    <a href="#section-3">3. 发布核心链路</a>
+    <a href="#section-4">4. Docker vs K8s</a>
+    <a href="#section-5">5. Executor 挂载</a>
+    <a href="#section-6">6. 域名规划</a>
+    <a href="#section-7">7. 两种运行模式</a>
+    <a href="#section-8">8. 总结</a>
+  </nav>
+</aside>
+
+<!-- ===== 主体内容 ===== -->
+<main class="doc-main">
+
+<h1>🏗️ OrbStack 部署架构总结</h1>
+<p style="color:#666;font-size:13px;margin-bottom:24px">发布系统 Demo 的整体部署架构、容器编排与 K8s 集成方案 · 2026-08-01</p>
+
+<!-- 1. 整体架构 -->
+<h2 id="section-1">1. 整体架构</h2>
+
+<div style="background:#f6f8fa;padding:16px;border-radius:8px;text-align:center;margin:12px 0">
+<svg class="arch-svg" viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="10" width="780" height="400" rx="16" fill="#f0f5ff" stroke="#1677ff" stroke-width="2"/>
+  <text x="400" y="38" text-anchor="middle" font-size="16" font-weight="bold" fill="#1677ff">OrbStack 环境</text>
+
+  <rect x="30" y="55" width="350" height="180" rx="10" fill="#fff" stroke="#1677ff" stroke-width="1.5"/>
+  <text x="205" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#1677ff">Docker 容器 (docker-compose)</text>
+
+  <rect x="50" y="95" width="95" height="45" rx="8" fill="#1677ff"/>
+  <text x="97" y="122" text-anchor="middle" font-size="11" fill="#fff" font-weight="bold">Backend</text>
+  <text x="97" y="150" text-anchor="middle" font-size="9" fill="#666">Django :8000</text>
+
+  <rect x="160" y="95" width="95" height="45" rx="8" fill="#52c41a"/>
+  <text x="207" y="122" text-anchor="middle" font-size="11" fill="#fff" font-weight="bold">Frontend</text>
+  <text x="207" y="150" text-anchor="middle" font-size="9" fill="#666">Nginx :80</text>
+
+  <rect x="270" y="95" width="95" height="45" rx="8" fill="#722ed1"/>
+  <text x="317" y="122" text-anchor="middle" font-size="11" fill="#fff" font-weight="bold">Executor</text>
+  <text x="317" y="150" text-anchor="middle" font-size="9" fill="#666">FastAPI :8765</text>
+
+  <rect x="50" y="170" width="140" height="30" rx="6" fill="#f6ffed" stroke="#52c41a" stroke-width="1"/>
+  <text x="120" y="190" text-anchor="middle" font-size="10" fill="#333">SQLite + Keys</text>
+  <rect x="210" y="170" width="140" height="30" rx="6" fill="#fff7e6" stroke="#d46b08" stroke-width="1"/>
+  <text x="280" y="190" text-anchor="middle" font-size="10" fill="#333">demo-apps/</text>
+
+  <rect x="420" y="55" width="350" height="180" rx="10" fill="#fff" stroke="#52c41a" stroke-width="1.5"/>
+  <text x="595" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#52c41a">K8s 集群 (OrbStack 内置)</text>
+
+  <rect x="440" y="95" width="100" height="35" rx="6" fill="#f6ffed" stroke="#52c41a"/>
+  <text x="490" y="117" text-anchor="middle" font-size="10" fill="#333">dev ns</text>
+  <rect x="555" y="95" width="100" height="35" rx="6" fill="#fff7e6" stroke="#d46b08"/>
+  <text x="605" y="117" text-anchor="middle" font-size="10" fill="#333">test ns</text>
+  <rect x="670" y="95" width="85" height="35" rx="6" fill="#fff1f0" stroke="#ff4d4f"/>
+  <text x="712" y="117" text-anchor="middle" font-size="10" fill="#333">prod ns</text>
+
+  <rect x="440" y="145" width="315" height="75" rx="6" fill="#f9f0ff" stroke="#722ed1" stroke-dasharray="4"/>
+  <text x="597" y="165" text-anchor="middle" font-size="11" fill="#722ed1" font-weight="bold">应用 Pods</text>
+  <rect x="455" y="178" width="60" height="24" rx="4" fill="#1677ff"/>
+  <text x="485" y="194" text-anchor="middle" font-size="9" fill="#fff">go-app</text>
+  <rect x="525" y="178" width="80" height="24" rx="4" fill="#52c41a"/>
+  <text x="565" y="194" text-anchor="middle" font-size="9" fill="#fff">python-app</text>
+  <rect x="615" y="178" width="80" height="24" rx="4" fill="#faad14"/>
+  <text x="655" y="194" text-anchor="middle" font-size="9" fill="#fff">node-app</text>
+
+  <line x1="365" y1="117" x2="440" y2="117" stroke="#722ed1" stroke-width="2" stroke-dasharray="6"/>
+  <text x="402" y="110" text-anchor="middle" font-size="9" fill="#722ed1">kubeconfig</text>
+
+  <rect x="420" y="260" width="350" height="50" rx="8" fill="#e6f7ff" stroke="#1677ff" stroke-width="1.5"/>
+  <text x="595" y="282" text-anchor="middle" font-size="12" font-weight="bold" fill="#1677ff">Traefik 网关 :80</text>
+  <text x="595" y="300" text-anchor="middle" font-size="10" fill="#666">release.local → Frontend | release-api.local → Backend</text>
+
+  <line x1="207" y1="140" x2="207" y2="260" stroke="#1677ff" stroke-width="1.5" stroke-dasharray="4"/>
+  <line x1="595" y1="260" x2="207" y2="260" stroke="#1677ff" stroke-width="1" stroke-dasharray="3"/>
+
+  <text x="400" y="340" text-anchor="middle" font-size="10" fill="#666">executor 挂载: docker.sock (构建镜像) + kubeconfig (部署应用)</text>
+  <text x="400" y="358" text-anchor="middle" font-size="10" fill="#666">Traefik 域名: release.local | release-api.local | release-executor.local</text>
+  <text x="400" y="376" text-anchor="middle" font-size="10" fill="#666">共享网络: local-net (Docker Compose + Traefik + K8s 共用)</text>
+</svg>
+<div class="svg-caption">图 1：OrbStack 部署架构全景</div>
+</div>
+
+<!-- 2. 组件职责 -->
+<h2 id="section-2">2. 组件职责</h2>
+
+<table>
+  <tr><th>组件</th><th>技术栈</th><th>职责</th><th>访问方式</th></tr>
+  <tr><td><strong>Backend</strong></td><td><span class="tag tag-docker">Django</span> <span class="tag tag-docker">DRF</span></td><td>REST API、JWT 认证、权限校验、业务逻辑</td><td><code>release-api.local</code></td></tr>
+  <tr><td><strong>Frontend</strong></td><td><span class="tag tag-docker">React</span> <span class="tag tag-docker">Nginx</span></td><td>SPA 前端 + API 反向代理</td><td><code>release.local</code></td></tr>
+  <tr><td><strong>Executor</strong></td><td><span class="tag tag-docker">FastAPI</span> <span class="tag tag-key">Docker CLI</span></td><td>CI 构建 (docker build)、CD 部署 (kubectl apply)</td><td><code>release-executor.local</code></td></tr>
+  <tr><td><strong>Traefik</strong></td><td><span class="tag tag-orb">Traefik v3</span></td><td>HTTP 路由、域名解析、反向代理</td><td><code>traefik.local:8080</code></td></tr>
+  <tr><td><strong>K8s 集群</strong></td><td><span class="tag tag-k8s">OrbStack K8s</span></td><td>运行用户应用 Pods（go-app, python-app, node-app）</td><td><code>kubectl</code></td></tr>
+</table>
+
+<!-- 3. 发布核心链路 -->
+<h2 id="section-3">3. 发布核心链路</h2>
+
+<div class="flow-step">
+  <div class="flow-num">1</div>
+  <div><strong>用户提交发布单</strong><br><span style="font-size:13px;color:#666">前端 → Backend API → 创建 Release 记录 → 自动创建 Approval 记录</span></div>
+</div>
+<div class="flow-step">
+  <div class="flow-num">2</div>
+  <div><strong>审批通过</strong><br><span style="font-size:13px;color:#666">审批人点击通过 → Backend 更新 Release 状态 → 触发执行</span></div>
+</div>
+<div class="flow-step">
+  <div class="flow-num">3</div>
+  <div><strong>CI 构建 (docker build)</strong><br><span style="font-size:13px;color:#666">Backend → Executor API → <code>docker build -t {app}:{version}</code> → 镜像存入本地 Docker</span></div>
+</div>
+<div class="flow-step">
+  <div class="flow-num">4</div>
+  <div><strong>CD 部署 (kubectl apply)</strong><br><span style="font-size:13px;color:#666">Executor → 生成 deployment.yaml → <code>kubectl apply -f</code> → 部署到 OrbStack K8s 集群</span></div>
+</div>
+<div class="flow-step">
+  <div class="flow-num">5</div>
+  <div><strong>验证 & 完成</strong><br><span style="font-size:13px;color:#666">Executor → <code>kubectl get pods</code> 检查状态 → 更新 Deployment 历史 → 通知用户</span></div>
+</div>
+
+<!-- 4. Docker vs K8s -->
+<h2 id="section-4">4. Docker 容器 vs K8s 集群</h2>
+
+<table>
+  <tr><th>维度</th><th>Docker 容器 (发布系统自身)</th><th>K8s 集群 (用户应用)</th></tr>
+  <tr><td><strong>编排方式</strong></td><td>Docker Compose</td><td>Kubernetes (OrbStack 内置)</td></tr>
+  <tr><td><strong>网络</strong></td><td><code>local-net</code> 共享网络</td><td>K8s Service / ClusterIP</td></tr>
+  <tr><td><strong>域名</strong></td><td>Traefik <code>*.local</code> 路由</td><td>通过 NodePort 或 Ingress</td></tr>
+  <tr><td><strong>存储</strong></td><td>Docker Volume (SQLite)</td><td>K8s PV/PVC 或 emptyDir</td></tr>
+  <tr><td><strong>生命周期</strong></td><td>随 <code>docker compose</code> 启停</td><td>Deployment 管理，可滚动更新</td></tr>
+  <tr><td><strong>镜像来源</strong></td><td>Dockerfile 构建</td><td><code>docker build</code> → K8s 拉取本地镜像</td></tr>
+</table>
+
+<div class="tip">
+  <strong>💡 关键点：</strong>OrbStack 的 Docker 和 K8s 共享同一个镜像存储。executor 用 <code>docker build</code> 构建的镜像，K8s 集群可以直接使用（无需推送到远程 Registry）。
+</div>
+
+<!-- 5. Executor 挂载 -->
+<h2 id="section-5">5. Executor 的关键挂载</h2>
+
+<p>executor 容器是连接 Docker 和 K8s 的桥梁，通过挂载实现两种能力：</p>
+
+<table>
+  <tr><th>挂载路径</th><th>来源</th><th>用途</th></tr>
+  <tr><td><code>/var/run/docker.sock</code></td><td>宿主机 Docker socket</td><td>让 executor 能执行 <code>docker build</code>、<code>docker tag</code> 等命令</td></tr>
+  <tr><td><code>/app/config/kubeconfig</code></td><td><code>~/.kube/config</code></td><td>让 executor 能执行 <code>kubectl apply</code>、<code>kubectl get pods</code> 等命令</td></tr>
+  <tr><td><code>/demo-apps</code></td><td>项目 <code>demo-apps/</code> 目录</td><td>提供应用源码（含 Dockerfile），供 <code>docker build</code> 使用</td></tr>
+</table>
+
+<div class="warn">
+  <strong>⚠️ 注意：</strong><code>docker.sock</code> 挂载等同于授予容器完整的 Docker 控制权。这在本地开发环境是安全的，但在生产环境中需要严格限制权限（如使用 <code>docker-socket-proxy</code>）。
+</div>
+
+<!-- 6. 域名规划 -->
+<h2 id="section-6">6. 域名规划</h2>
+
+<table>
+  <tr><th>域名</th><th>目标</th><th>说明</th></tr>
+  <tr><td><code>release.local</code></td><td>Frontend (Nginx)</td><td>用户访问入口，Nginx 同时反代 <code>/api/</code> 到 Backend</td></tr>
+  <tr><td><code>release-api.local</code></td><td>Backend (Django)</td><td>直接访问 API（调试用）</td></tr>
+  <tr><td><code>release-executor.local</code></td><td>Executor (FastAPI)</td><td>查看 API 文档 <code>/docs</code></td></tr>
+  <tr><td><code>traefik.local</code></td><td>Traefik Dashboard</td><td>查看路由规则和健康状态</td></tr>
+</table>
+
+<div class="tip">
+  <strong>💡 OrbStack DNS：</strong>所有 <code>*.local</code> 域名由 OrbStack 自动解析到 Traefik 网关，无需修改 <code>/etc/hosts</code>。只需在 Traefik 容器的 <code>dev.orbstack.domains</code> label 中注册即可。
+</div>
+
+<!-- 7. 两种运行模式 -->
+<h2 id="section-7">7. 两种运行模式对比</h2>
+
+<table>
+  <tr><th>维度</th><th>本地开发 (dev.sh)</th><th>Docker 部署 (docker-compose)</th></tr>
+  <tr><td><strong>启动方式</strong></td><td><code>./dev.sh</code></td><td><code>docker compose up -d</code></td></tr>
+  <tr><td><strong>首次启动</strong></td><td>⚡ 快（直接运行）</td><td>🐢 需构建镜像</td></tr>
+  <tr><td><strong>代码热更新</strong></td><td>✅ Vite HMR 即时生效</td><td>❌ 需重新构建镜像</td></tr>
+  <tr><td><strong>环境隔离</strong></td><td>⚠️ 依赖本地 Python/Node</td><td>✅ 容器自包含</td></tr>
+  <tr><td><strong>适用场景</strong></td><td>日常开发、调试</td><td>演示、测试、标准化部署</td></tr>
+</table>
+
+<!-- 8. 总结 -->
+<h2 id="section-8">8. 总结</h2>
+
+<div class="summary-box">
+  <p style="font-size:15px;font-weight:600;margin-bottom:8px">本系统采用 <strong>Docker Compose + OrbStack K8s</strong> 的混合架构：</p>
+  <ul>
+    <li><strong>发布系统自身</strong>运行在 Docker 容器中，由 Docker Compose 管理</li>
+    <li><strong>用户应用</strong>部署到 OrbStack 内置的 K8s 集群，由 Deployment 管理</li>
+    <li><strong>executor</strong> 作为桥梁，通过 <code>docker.sock</code> 构建镜像，通过 <code>kubeconfig</code> 部署应用</li>
+    <li><strong>Traefik</strong> 提供统一的 HTTP 入口，基于 Host 头路由到不同服务</li>
+    <li>所有组件共享 <code>local-net</code> 网络，Docker 和 K8s 共享镜像存储</li>
+  </ul>
+  <p style="font-size:13px;margin-top:12px;color:#666">这种设计既保证了本地开发的便捷性（dev.sh 快速迭代），又提供了标准化的部署能力（docker-compose 一键启动），同时保留了真实的 CI/CD 链路（docker build → kubectl apply）。</p>
+</div>
+
+<hr>
+<p style="text-align:center;color:#999;font-size:12px">文档版本: v1.0 · 最后更新: 2026-08-01</p>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var toc = document.getElementById('doc-toc');
+  var showBtn = document.getElementById('doc-toc-show');
+  var hideBtn = document.getElementById('doc-toc-hide');
+  var links = Array.prototype.slice.call(
+    document.querySelectorAll('.doc-toc-nav a[href^="#"]')
+  );
+  var items = links.map(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    return el ? { id: id, el: el, a: a } : null;
+  }).filter(Boolean);
+  if (!items.length) { return; }
+
+  function highlight() {
+    var pos = window.scrollY + 120;
+    var active = null;
+    for (var i = 0; i < items.length; i++) {
+      var top = items[i].el.getBoundingClientRect().top + window.scrollY;
+      if (top <= pos) { active = items[i].id; }
+    }
+    var activeEl = active ? items.filter(function (x) { return x.id === active; })[0].a : null;
+    items.forEach(function (x) {
+      x.a.classList.toggle('active', x.a === activeEl);
+    });
+  }
+  window.setInterval(highlight, 150);
+  window.addEventListener('scroll', highlight, { passive: true });
+  window.addEventListener('resize', highlight, { passive: true });
+  highlight();
+
+  links.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) el.scrollIntoView(true);
+    });
+  });
+
+  if (hideBtn && toc) {
+    hideBtn.addEventListener('click', function () {
+      toc.classList.add('is-hidden');
+      if (showBtn) showBtn.classList.add('is-visible');
+    });
+  }
+  if (showBtn) {
+    showBtn.addEventListener('click', function () {
+      if (toc) toc.classList.remove('is-hidden');
+      showBtn.classList.remove('is-visible');
+    });
+  }
+})();
+</script>
+</body>
+</html>

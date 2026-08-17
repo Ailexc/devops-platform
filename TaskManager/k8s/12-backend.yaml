@@ -1,0 +1,81 @@
+# ──────────────────────────────────────────────────────────────────
+# Django Backend — REST API 服务
+# 作用: 提供大盘统计、任务管理、配置管理、历史记录等 API
+# ──────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: cmdb
+  labels:
+    app: cmdb
+    component: backend
+spec:
+  replicas: 2              # 2 个副本，保证高可用
+  strategy:
+    type: RollingUpdate    # 滚动更新，分批替换旧版本
+    rollingUpdate:
+      maxSurge: 1          # 更新时最多额外启动 1 个新 Pod
+      maxUnavailable: 0    # 更新时不允许中断已有服务
+  selector:
+    matchLabels:
+      app: cmdb
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: cmdb
+        component: backend
+    spec:
+      # 初始化容器——在正式容器启动前先跑数据库迁移
+      initContainers:
+        - name: migrate
+          image: cmdb-backend:latest
+          command: ["python", "manage.py", "migrate", "--noinput"]
+          envFrom:
+            - configMapRef:
+                name: cmdb-config
+            - secretRef:
+                name: cmdb-secret
+      containers:
+        - name: django
+          image: cmdb-backend:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: cmdb-config
+            - secretRef:
+                name: cmdb-secret
+          resources:
+            requests:
+              cpu: "0.3"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /api/v1/dashboard/stats
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/dashboard/stats
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: cmdb
+spec:
+  selector:
+    app: cmdb
+    component: backend
+  ports:
+    - port: 8000
+      targetPort: 8000

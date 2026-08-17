@@ -1,0 +1,41 @@
+# Traefik 动态配置：mock-cmdb 公共 API 走 forwardAuth → iam-server 网关回调（PEP→PDP）
+# 中间件链：pep-token（注入共享密钥）→ iam-authz（forwardAuth，2xx 放行 / 非 2xx 拦截）
+http:
+  middlewares:
+    # PEP→PDP 信任：给转发到 PDP 的请求注入共享密钥（防绕过网关直连）
+    pep-token:
+      headers:
+        customRequestHeaders:
+          X-PEP-Token: "pep-shared-secret"
+
+    # 鉴权：把原始请求整体转发到 PDP 网关端点
+    # 原始 method/path 经 X-Forwarded-Method / X-Forwarded-Uri 传递，PDP 侧完成"请求→action 映射"
+    iam-authz:
+      forwardAuth:
+        address: "http://iam-server:8080/v1/gateway/check"
+        trustForwardHeader: true
+        authRequestHeaders:
+          - "X-User"
+          - "X-App"
+          - "X-PEP-Token" # 需放行 pep-token 中间件注入的共享密钥，否则会被白名单过滤
+          - "X-Resource-Type" # 统一查询入口（/api/v1/entities）资源类型，放行到 PEP 解析
+
+    protected-cmdb:
+      chain:
+        middlewares:
+          - pep-token
+          - iam-authz
+
+  routers:
+    cmdb:
+      rule: "PathPrefix(`/api/v1`)"
+      middlewares:
+        - protected-cmdb
+      service: cmdb-svc
+      priority: 10
+
+  services:
+    cmdb-svc:
+      loadBalancer:
+        servers:
+          - url: "http://mock-cmdb:8090"

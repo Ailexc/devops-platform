@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发布系统重构规划 — Per-Environment 模型 + CI/CD 双面板</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --card: #fff;
+    --border: #e4e7ed;
+    --primary: #4f46e5;
+    --primary-light: #eef2ff;
+    --success: #10b981;
+    --success-light: #ecfdf5;
+    --warning: #f59e0b;
+    --warning-light: #fffbeb;
+    --danger: #ef4444;
+    --danger-light: #fef2f2;
+    --text: #1f2937;
+    --text-secondary: #6b7280;
+    --text-muted: #9ca3af;
+    --mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+    --radius: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.7; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+  /* ── 导航 ── */
+  .nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 0; }
+  .nav-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; gap: 8px; overflow-x: auto; }
+  .nav a { white-space: nowrap; padding: 6px 14px; border-radius: 6px; font-size: 13px; color: var(--text-secondary); text-decoration: none; transition: .15s; }
+  .nav a:hover, .nav a.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+  /* ── 标题区 ── */
+  .hero { text-align: center; padding: 60px 0 40px; }
+  .hero h1 { font-size: 32px; font-weight: 800; background: linear-gradient(135deg, var(--primary), #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero .sub { color: var(--text-secondary); margin-top: 8px; font-size: 15px; }
+
+  /* ── 卡片 ── */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 32px; margin-bottom: 24px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 20px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .card h3 { font-size: 16px; font-weight: 600; margin: 20px 0 10px; color: var(--text); }
+  .card p, .card li { color: var(--text-secondary); font-size: 14px; }
+  .card ul { padding-left: 20px; margin: 8px 0; }
+  .card li { margin: 4px 0; }
+
+  /* ── Badge ── */
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .badge-new { background: var(--primary-light); color: var(--primary); }
+  .badge-change { background: var(--warning-light); color: #b45309; }
+  .badge-keep { background: var(--success-light); color: #047857; }
+  .badge-delete { background: var(--danger-light); color: var(--danger); }
+
+  /* ── 架构图 ── */
+  .arch { background: #1e1e2e; color: #cdd6f4; border-radius: var(--radius); padding: 24px 28px; font-family: var(--mono); font-size: 12px; line-height: 1.6; overflow-x: auto; white-space: pre; margin: 16px 0; }
+  .arch .hl { color: #89b4fa; font-weight: 600; }
+  .arch .grn { color: #a6e3a1; }
+  .arch .yel { color: #f9e2af; }
+  .arch .red { color: #f38ba8; }
+  .arch .pur { color: #cba6f7; }
+
+  /* ── 数据流图 ── */
+  .flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+  .flow-node { background: var(--primary-light); border: 2px solid var(--primary); border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 600; color: var(--primary); text-align: center; }
+  .flow-arrow { font-size: 20px; color: var(--text-muted); margin: 0 4px; }
+  .flow-node.env { border-color: var(--success); color: var(--success); background: var(--success-light); }
+  .flow-node.cd { border-color: var(--warning); color: #b45309; background: var(--warning-light); }
+
+  /* ── 表格 ── */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: #f9fafb; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 2px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+  tr:hover td { background: #f9fafb; }
+  code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: var(--mono); font-size: 12px; color: #e11d48; }
+
+  /* ── 阶段卡片 ── */
+  .phase { border-left: 4px solid var(--primary); padding: 16px 20px; margin: 16px 0; background: #fafbfc; border-radius: 0 8px 8px 0; }
+  .phase h4 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .phase p { font-size: 13px; }
+
+  /* ── 原型 ── */
+  .proto { border: 2px dashed var(--primary); border-radius: var(--radius); overflow: hidden; margin: 20px 0; }
+  .proto-header { background: var(--primary); color: #fff; padding: 12px 20px; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .proto-body { padding: 0; }
+
+  /* ── 发布列表原型 ── */
+  .release-list { padding: 0; }
+  .release-list .toolbar { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .release-list .filter { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: #fff; }
+  .release-list .btn { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
+  .release-list .btn-primary { background: var(--primary); color: #fff; }
+  .release-list table { margin: 0; }
+  .release-list th { padding: 10px 16px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+  .release-list td { padding: 14px 16px; vertical-align: middle; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .status-dot.success { background: var(--success); }
+  .status-dot.running { background: var(--warning); animation: pulse 1.5s infinite; }
+  .status-dot.pending { background: var(--text-muted); }
+  .status-dot.failed { background: var(--danger); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+  .stage-label { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 600; }
+  .stage-label.ci { background: #ede9fe; color: #7c3aed; }
+  .stage-label.cd { background: #fef3c7; color: #b45309; }
+  .stage-label.success { background: #ecfdf5; color: #047857; }
+  .stage-label.running { background: #eff6ff; color: #2563eb; }
+  .stage-label.pending { background: #f3f4f6; color: #6b7280; }
+  .stage-label.failed { background: #fef2f2; color: #dc2626; }
+
+  /* ── 新建发布抽屉原型 ── */
+  .drawer-proto { position: relative; min-height: 400px; }
+  .drawer { position: absolute; right: 0; top: 0; bottom: 0; width: 420px; background: #fff; box-shadow: var(--shadow-lg); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+  .drawer-title { padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+  .drawer-close { cursor: pointer; font-size: 18px; color: var(--text-muted); }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+  .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .form-input, .form-select { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  .form-input:focus, .form-select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(79,70,229,.1); }
+  .drawer-footer { padding: 16px 20px; border-top: 1px solid var(--border); text-align: right; }
+  .drawer-footer .btn { padding: 8px 24px; }
+  .radio-group { display: flex; flex-direction: column; gap: 8px; }
+  .radio-item { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; transition: .15s; }
+  .radio-item:hover { border-color: var(--primary); background: var(--primary-light); }
+  .radio-item.active { border-color: var(--primary); background: var(--primary-light); font-weight: 600; }
+  .radio-item input { accent-color: var(--primary); }
+  .checkbox-group { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .checkbox-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 13px; border-radius: 4px; }
+  .checkbox-item:hover { background: #f3f4f6; }
+  .strategy-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .strategy-tag.rolling { background: #ecfdf5; color: #047857; }
+  .strategy-tag.canary { background: #fff7ed; color: #c2410c; }
+  .strategy-tag.blue_green { background: #eff6ff; color: #1d4ed8; }
+
+  /* ── 日志面板原型 ── */
+  .log-panel { font-family: var(--mono); font-size: 12px; line-height: 1.8; }
+  .log-section { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: 12px 0; }
+  .log-section-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; font-family: var(--font); font-size: 13px; font-weight: 600; }
+  .log-section-header .icon { font-size: 16px; margin-right: 8px; }
+  .log-section-header .status { font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+  .log-section.ci .log-section-header { background: #faf5ff; border-bottom: 1px solid #e9d5ff; color: #7c3aed; }
+  .log-section.ci .log-section-header .status { background: #ede9fe; color: #7c3aed; }
+  .log-section.cd .log-section-header { background: #fffbeb; border-bottom: 1px solid #fde68a; color: #b45309; }
+  .log-section.cd .log-section-header .status { background: #fef3c7; color: #b45309; }
+  .log-body { background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; max-height: 240px; overflow-y: auto; }
+  .log-line { white-space: pre-wrap; word-break: break-all; }
+  .log-line .ts { color: #6c7086; }
+  .log-line .info { color: #89b4fa; }
+  .log-line .warn { color: #f9e2af; }
+  .log-line .err { color: #f38ba8; }
+  .log-line .ok { color: #a6e3a1; font-weight: 600; }
+  .log-line .step { color: #cba6f7; }
+  .log-divider { text-align: center; padding: 8px 0; font-size: 12px; color: var(--primary); font-weight: 600; font-family: var(--font); background: var(--primary-light); border-top: 1px dashed var(--primary); border-bottom: 1px dashed var(--primary); }
+
+  /* ── 面试建议 ── */
+  .talk { background: linear-gradient(135deg, #faf5ff, #eff6ff); border: 1px solid #c7d2fe; border-radius: var(--radius); padding: 20px 24px; margin: 12px 0; }
+  .talk .label { font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .talk p { font-size: 14px; color: var(--text); line-height: 1.8; }
+  .talk code { background: rgba(79,70,229,.1); color: var(--primary); }
+
+  /* ── 时间线 ── */
+  .timeline { position: relative; padding-left: 32px; }
+  .timeline::before { content: ''; position: absolute; left: 12px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+  .timeline-item { position: relative; margin-bottom: 24px; }
+  .timeline-item::before { content: ''; position: absolute; left: -24px; top: 6px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--primary); background: #fff; }
+  .timeline-item.done::before { background: var(--primary); }
+  .timeline-item h4 { font-size: 14px; font-weight: 600; }
+  .timeline-item p { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* ── 对比表 ── */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  .compare-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .compare-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .compare-card.old { border-color: #fca5a5; background: #fef2f2; }
+  .compare-card.new { border-color: #86efac; background: #ecfdf5; }
+
+  /* ── 响应式 ── */
+  @media (max-width: 768px) {
+    .compare { grid-template-columns: 1fr; }
+    .drawer { width: 100%; }
+    .container { padding: 16px 12px; }
+  }
+
+  /* ── 锚点偏移 ── */
+  [id] { scroll-margin-top: 60px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════ 导航 ═══════ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#overview">架构总览</a>
+    <a href="#compare">模型对比</a>
+    <a href="#data-model">数据模型</a>
+    <a href="#api">API 设计</a>
+    <a href="#executor">Executor 改造</a>
+    <a href="#proto-list">📋 发布列表</a>
+    <a href="#proto-create">📝 新建发布</a>
+    <a href="#proto-detail">🖥️ 日志面板</a>
+    <a href="#plan">实施计划</a>
+    <a href="#interview">面试叙述</a>
+  </div>
+</nav>
+
+<div class="container">
+
+<!-- ═══════ Hero ═══════ -->
+<div class="hero">
+  <h1>发布系统重构规划</h1>
+  <p class="sub">Per-Environment 发布模型 · CI/CD 双面板日志 · 还原真实 Spug 架构</p>
+</div>
+
+<!-- ═══════ 1. 架构总览 ═══════ -->
+<div class="card" id="overview">
+  <h2>📐 1. 架构总览</h2>
+  <p>从 <strong>Per-Pipeline</strong>（11 步跨环境）改为 <strong>Per-Environment</strong>（单环境 + CI/CD 两阶段），对齐真实 Spug 架构。</p>
+
+  <div class="arch"><span class="hl">┌─────────────────────────────────────────────────────────────────┐</span>
+<span class="hl">│</span>                    <span class="yel">Web UI (React + Ant Design)</span>                    <span class="hl">│</span>
+<span class="hl">│</span>  发布列表 <span class="yel">→</span> 筛选环境 <span class="yel">→</span> 新建发布(抽屉) <span class="yel">→</span> CI/CD 双面板日志          <span class="hl">│</span>
+<span class="hl">└──────────────────────────────┬──────────────────────────────────┘</span>
+                               │ JWT Auth
+<span class="hl">┌──────────────────────────────▼──────────────────────────────────┐</span>
+<span class="hl">│</span>               <span class="yel">API Server (Django + DRF)</span>                        <span class="hl">│</span>
+<span class="hl">│</span>                                                                  <span class="hl">│</span>
+<span class="hl">│</span>  <span class="grn">发布管理</span>: 创建发布单(单环境) → CI/CD 两阶段状态机               <span class="hl">│</span>
+<span class="hl">│</span>  <span class="grn">GitLab 配置</span>: 拼路径拉取 YAML → 首次/后续部署判断                <span class="hl">│</span>
+<span class="hl">│</span>  <span class="grn">Pod 管理</span>: 查询 Pod 列表 → Deployment/StatefulSet 区分          <span class="hl">│</span>
+<span class="hl">│</span>                                                                  <span class="hl">│</span>
+<span class="hl">│</span>  ┌──────────────────────────────────────────────────────┐        <span class="hl">│</span>
+<span class="hl">│</span>  │  <span class="pur">executor_client</span> (签名 → 提交 → SSE 日志流消费)      │        <span class="hl">│</span>
+<span class="hl">│</span>  └──────────────────────────┬───────────────────────────┘        <span class="hl">│</span>
+<span class="hl">└─────────────────────────────┼────────────────────────────────────┘</span>
+                              │ EdDSA JWT (方案B)
+<span class="hl">┌─────────────────────────────▼────────────────────────────────────┐</span>
+<span class="hl">│</span>               <span class="yel">release-executor (FastAPI :8765)</span>                   <span class="hl">│</span>
+<span class="hl">│</span>                                                                  <span class="hl">│</span>
+<span class="hl">│</span>  <span class="grn">op=build</span>  → 创建临时 Pod → 编译 → 构建镜像 → push → 清理 Pod   <span class="hl">│</span>
+<span class="hl">│</span>  <span class="grn">op=deploy</span> → kubectl apply(首次) / set image(后续)              <span class="hl">│</span>
+<span class="hl">│</span>  <span class="grn">op=pods</span>   → 查询 Pod 列表 → 返回给前端展示                     <span class="hl">│</span>
+<span class="hl">│</span>                                                                  <span class="hl">│</span>
+<span class="hl">│</span>  每条操作实时写日志 → SSE 推送到 backend → 写入 TaskLog           <span class="hl">│</span>
+<span class="hl">└─────────────────────────────┬────────────────────────────────────┘</span>
+                              │ kubeconfig
+<span class="hl">┌─────────────────────────────▼────────────────────────────────────┐</span>
+<span class="hl">│</span>                <span class="yel">EKS / kind 集群</span>                                   <span class="hl">│</span>
+<span class="hl">│</span>  Deployment / StatefulSet → Pod → 运行                           <span class="hl">│</span>
+<span class="hl">└──────────────────────────────────────────────────────────────────┘</span></div>
+
+  <h3>发布数据流</h3>
+  <div class="flow">
+    <div class="flow-node">用户选应用+环境</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">创建发布单</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node cd">CI 构建面板</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node cd">CD 部署面板</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node env">完成 ✅</div>
+  </div>
+</div>
+
+<!-- ═══════ 2. 模型对比 ═══════ -->
+<div class="card" id="compare">
+  <h2>🔄 2. 模型对比：Per-Pipeline vs Per-Environment</h2>
+
+  <div class="compare">
+    <div class="compare-card old">
+      <h4>❌ 当前模型（Per-Pipeline）</h4>
+      <ul>
+        <li>一个发布单跨所有环境（dev→test→staging→prod）</li>
+        <li>11 个步骤：构建→部署→验证×4环境→审批→灰度→全量</li>
+        <li>每个步骤手动点"执行"</li>
+        <li>和真实 Spug 不一致</li>
+      </ul>
+    </div>
+    <div class="compare-card new">
+      <h4>✅ 目标模型（Per-Environment）</h4>
+      <ul>
+        <li>一个发布单 = 单个环境</li>
+        <li>CI + CD 两阶段，全自动串行</li>
+        <li>点「发布」后自动跑，只看日志</li>
+        <li>还原真实 Spug 架构</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>核心变化</h3>
+  <table>
+    <tr><th>维度</th><th>旧（Per-Pipeline）</th><th>新（Per-Environment）</th></tr>
+    <tr><td>发布单粒度</td><td>跨所有环境</td><td><strong>单个环境</strong></td></tr>
+    <tr><td>Pipeline 步骤</td><td>11 步</td><td><strong>2 步（CI + CD）</strong></td></tr>
+    <tr><td>用户操作</td><td>每步手动执行</td><td><strong>点发布后自动跑</strong></td></tr>
+    <tr><td>日志展示</td><td>散落在各步骤</td><td><strong>双面板（CI + CD）</strong></td></tr>
+    <tr><td>部署策略</td><td>创建时选择</td><td>保持，但默认滚动</td></tr>
+    <tr><td>环境选择</td><td>Pipeline 隐含</td><td><strong>创建时明确选择</strong></td></tr>
+  </table>
+</div>
+
+<!-- ═══════ 3. 数据模型 ═══════ -->
+<div class="card" id="data-model">
+  <h2>🗄️ 3. 数据模型改造</h2>
+
+  <h3>Release 模型 <span class="badge badge-change">微调</span></h3>
+  <p>当前 Release 已有 <code>environment</code> 和 <code>env_config</code> 字段，数据模型基本不变。主要变化：</p>
+  <table>
+    <tr><th>字段</th><th>当前</th><th>改造后</th><th>说明</th></tr>
+    <tr><td><code>status</code></td><td>pending/approved/running/...</td><td><span class="badge badge-change">简化</span> pending/running/ci_success/cd_success/failed/rolled_back</td><td>CI/CD 两阶段状态</td></tr>
+    <tr><td><code>current_stage</code></td><td>11 种 stage 值</td><td><span class="badge badge-change">简化</span> ci / cd / done</td><td>只有两个阶段</td></tr>
+    <tr><td><code>deploy_strategy</code></td><td>rolling/canary/blue_green</td><td><span class="badge badge-keep">保持</span></td><td>面试加分项</td></tr>
+    <tr><td><code>deploy_mode</code></td><td>k8s/ec2</td><td><span class="badge badge-keep">保持</span></td><td></td></tr>
+  </table>
+
+  <h3>ReleaseTask 模型 <span class="badge badge-change">大改</span></h3>
+  <p>从 11 步简化为固定 2 步：</p>
+  <table>
+    <tr><th>阶段</th><th>含义</th><th>执行方式</th><th>Executor 参与</th></tr>
+    <tr><td><code>ci</code></td><td>CI 构建</td><td>executor op=build（模拟 Pod 构建）</td><td>✅</td></tr>
+    <tr><td><code>cd</code></td><td>CD 部署</td><td>executor op=deploy（apply/set image）</td><td>✅</td></tr>
+  </table>
+  <p style="margin-top:12px"><strong>自动串行</strong>：CI 完成后 backend 自动触发 CD，无需用户手动操作。</p>
+
+  <h3>新增/调整的字段</h3>
+  <table>
+    <tr><th>模型</th><th>字段</th><th>类型</th><th>说明</th></tr>
+    <tr><td><code>Release</code></td><td><code>is_first_deploy</code></td><td>BooleanField</td><td>首次部署标志：true→apply YAML，false→set image</td></tr>
+    <tr><td><code>Release</code></td><td><code>selected_pods</code></td><td>JSONField</td><td>StatefulSet 可选 Pod 发布时的 Pod 列表</td></tr>
+    <tr><td><code>Release</code></td><td><code>workload_type</code></td><td>CharField</td><td>deployment / statefulset（从 GitLab YAML 解析）</td></tr>
+  </table>
+
+  <h3>废弃/移除</h3>
+  <ul>
+    <li><code>ReleaseTask.STAGES</code> 从 11 种简化为 <code>['ci', 'cd']</code></li>
+    <li>前端 Pipeline 组件不再使用 Steps 组件，改为 CI/CD 双面板</li>
+    <li><code>backend/utils/k8s_client.py</code> 可删除（能力已迁移到 executor）</li>
+  </ul>
+</div>
+
+<!-- ═══════ 4. API 设计 ═══════ -->
+<div class="card" id="api">
+  <h2>🔌 4. API 设计</h2>
+
+  <h3>新增/变更端点</h3>
+  <table>
+    <tr><th>方法</th><th>路径</th><th>说明</th><th>状态</th></tr>
+    <tr><td><code>POST</code></td><td><code>/releases/</code></td><td>创建发布单（单环境，自动触发 CI）</td><td><span class="badge badge-change">改造</span></td></tr>
+    <tr><td><code>GET</code></td><td><code>/releases/?env=dev</code></td><td>按环境筛选发布列表</td><td><span class="badge badge-change">改造</span></td></tr>
+    <tr><td><code>GET</code></td><td><code>/releases/{id}/</code></td><td>发布详情（含 ci_status + cd_status）</td><td><span class="badge badge-change">改造</span></td></tr>
+    <tr><td><code>GET</code></td><td><code>/releases/{id}/logs/ci</code></td><td>CI 阶段日志（轮询）</td><td><span class="badge badge-new">新增</span></td></tr>
+    <tr><td><code>GET</code></td><td><code>/releases/{id}/logs/cd</code></td><td>CD 阶段日志（轮询）</td><td><span class="badge badge-new">新增</span></td></tr>
+    <tr><td><code>GET</code></td><td><code>/apps/{id}/gitlab/config?env=dev</code></td><td>从 GitLab 拉取 YAML 配置</td><td><span class="badge badge-new">新增</span></td></tr>
+    <tr><td><code>GET</code></td><td><code>/apps/{id}/pods?env=dev</code></td><td>查询 Pod 列表（供选择发布目标）</td><td><span class="badge badge-new">新增</span></td></tr>
+    <tr><td><code>POST</code></td><td><code>/releases/{id}/rollback</code></td><td>回滚</td><td><span class="badge badge-keep">保持</span></td></tr>
+  </table>
+
+  <h3>创建发布单流程</h3>
+  <div class="arch">POST /api/v1/releases/
+{
+  "application": 1,           <span class="yel">// 应用 ID</span>
+  "environment": 2,           <span class="yel">// 环境 ID（单个）</span>
+  "version": "1.2.1",
+  "branch": "main",
+  "commit_id": "abc1234",
+  "deploy_strategy": "rolling" <span class="yel">// 默认滚动</span>
+}
+
+<span class="grn">→ 后端自动：</span>
+  1. 创建 Release (status=pending)
+  2. 创建 ReleaseTask(ci) + ReleaseTask(cd)
+  3. 触发 CI：提交 executor op=build
+  4. CI 完成 → 自动触发 CD：提交 executor op=deploy
+  5. 返回 { release_id, ci_status, cd_status }</div>
+</div>
+
+<!-- ═══════ 5. Executor 改造 ═══════ -->
+<div class="card" id="executor">
+  <h2>⚙️ 5. Executor 改造</h2>
+
+  <h3>新增 op=build（模拟 Pod 构建）</h3>
+  <div class="arch"><span class="hl">executor 收到 op=build 请求</span>
+  │
+  ├─ <span class="yel">[模拟] 创建构建 Pod: builder-{language}:latest</span>
+  │   namespace=build, 临时 Pod
+  │
+  ├─ <span class="yel">[模拟] git clone → checkout {branch}</span>
+  │   commit: {commit_id}
+  │
+  ├─ <span class="yel">[模拟] 编译/打包</span>
+  │   Python:  pip install → python -m build
+  │   Go:      go build -o /app
+  │   Node:    npm install → npm run build
+  │
+  ├─ <span class="yel">[模拟] COPY 产物 → 应用基础镜像</span>
+  │   构建镜像: {app_code}:{version}
+  │
+  ├─ <span class="yel">[模拟] docker push → ECR</span>
+  │   registry: 123456789.dkr.ecr.us-east-1.amazonaws.com
+  │
+  └─ <span class="yel">[模拟] 清理构建 Pod</span></div>
+
+  <h3>变更 op=deploy</h3>
+  <table>
+    <tr><th>场景</th><th>判断依据</th><th>执行动作</th></tr>
+    <tr><td>首次部署</td><td><code>is_first_deploy=true</code></td><td><code>kubectl apply -f deployment.yaml</code>（从 GitLab 拉取）</td></tr>
+    <tr><td>后续部署</td><td><code>is_first_deploy=false</code></td><td><code>kubectl set image deployment/{name} {name}={image}</code></td></tr>
+    <tr><td>StatefulSet</td><td><code>workload_type=statefulset</code></td><td>根据 selected_pods 选择性更新</td></tr>
+  </table>
+
+  <h3>新增 op=pods</h3>
+  <p>查询指定应用在目标环境的 Pod 列表，返回给前端供用户选择发布目标。区分 Deployment（全部 Pod）和 StatefulSet（可选 Pod）。</p>
+</div>
+
+<!-- ═══════ 6. 前端原型：发布列表 ═══════ -->
+<div class="card" id="proto-list">
+  <h2>📋 6. 前端原型 — 发布列表</h2>
+  <p>按环境筛选，每行显示应用、版本、CI 状态、CD 状态、操作。</p>
+
+  <div class="proto">
+    <div class="proto-header">
+      <span>📋</span> 发布管理 · payment-api
+    </div>
+    <div class="release-list">
+      <div class="toolbar">
+        <select class="filter">
+          <option>全部环境</option>
+          <option selected>Dev 开发环境</option>
+          <option>Test 测试环境</option>
+          <option>Staging 预发环境</option>
+          <option>Prod 生产环境</option>
+        </select>
+        <select class="filter">
+          <option>全部状态</option>
+          <option>已完成</option>
+          <option>进行中</option>
+          <option>失败</option>
+        </select>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" onclick="document.getElementById('proto-create').scrollIntoView({behavior:'smooth'})">+ 新建发布</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>发布单号</th>
+            <th>版本</th>
+            <th>环境</th>
+            <th>CI</th>
+            <th>CD</th>
+            <th>策略</th>
+            <th>创建人</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>REL-20260731-0042</code></td>
+            <td><strong>v1.2.1</strong></td>
+            <td>Dev</td>
+            <td><span class="stage-label ci success">✅ CI 成功</span></td>
+            <td><span class="stage-label cd success">✅ CD 成功</span></td>
+            <td><span class="strategy-tag rolling">滚动</span></td>
+            <td>张三</td>
+            <td><a href="#proto-detail" style="color:var(--primary);text-decoration:none;font-size:13px">查看日志</a></td>
+          </tr>
+          <tr>
+            <td><code>REL-20260731-0043</code></td>
+            <td><strong>v1.2.2</strong></td>
+            <td>Dev</td>
+            <td><span class="stage-label ci running">🔄 构建中</span></td>
+            <td><span class="stage-label cd pending">⏳ 等待</span></td>
+            <td><span class="strategy-tag rolling">滚动</span></td>
+            <td>李四</td>
+            <td><a href="#proto-detail" style="color:var(--primary);text-decoration:none;font-size:13px">查看日志</a></td>
+          </tr>
+          <tr>
+            <td><code>REL-20260731-0044</code></td>
+            <td><strong>v1.2.0</strong></td>
+            <td>Prod</td>
+            <td><span class="stage-label ci success">✅ CI 成功</span></td>
+            <td><span class="stage-label cd running">🔄 部署中</span></td>
+            <td><span class="strategy-tag canary">灰度</span></td>
+            <td>张三</td>
+            <td><a href="#proto-detail" style="color:var(--primary);text-decoration:none;font-size:13px">查看日志</a></td>
+          </tr>
+          <tr>
+            <td><code>REL-20260731-0040</code></td>
+            <td><strong>v1.1.9</strong></td>
+            <td>Staging</td>
+            <td><span class="stage-label ci success">✅ CI 成功</span></td>
+            <td><span class="stage-label cd failed">❌ 失败</span></td>
+            <td><span class="strategy-tag rolling">滚动</span></td>
+            <td>王五</td>
+            <td><a href="#proto-detail" style="color:var(--primary);text-decoration:none;font-size:13px">查看日志</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 7. 前端原型：新建发布 ═══════ -->
+<div class="card" id="proto-create">
+  <h2>📝 7. 前端原型 — 新建发布（侧边抽屉）</h2>
+  <p>点击「新建发布」滑出右侧抽屉。核心字段：应用（已选）、环境、分支、Commit、版本、部署策略。</p>
+  <p style="margin-top:8px">如果是 <strong>StatefulSet</strong>，还会显示 Pod 选择器（全部发布 / 选择 Pod）。</p>
+
+  <div class="proto drawer-proto">
+    <div style="padding:40px 20px; color:var(--text-muted)">
+      <p>← 发布列表区域（左侧被遮挡）</p>
+    </div>
+    <div class="drawer">
+      <div class="drawer-title">
+        新建发布
+        <span class="drawer-close">✕</span>
+      </div>
+      <div class="drawer-body">
+        <div class="form-group">
+          <label class="form-label">应用</label>
+          <input class="form-input" value="payment-api" disabled style="background:#f9fafb">
+        </div>
+        <div class="form-group">
+          <label class="form-label">目标环境 <span style="color:var(--danger)">*</span></label>
+          <select class="form-select">
+            <option>Dev 开发环境</option>
+            <option>Test 测试环境</option>
+            <option>Staging 预发环境</option>
+            <option>Prod 生产环境</option>
+          </select>
+          <div class="form-hint">每个发布单对应一个目标环境</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">分支</label>
+          <select class="form-select">
+            <option>main</option>
+            <option>develop</option>
+            <option>release/v1.2</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Commit</label>
+          <select class="form-select">
+            <option>abc1234 - fix: update payment handler</option>
+            <option>def5678 - feat: add retry logic</option>
+            <option>ghi9012 - chore: bump version</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">版本号</label>
+          <input class="form-input" value="1.2.1" placeholder="例如: 1.2.1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">部署策略</label>
+          <div class="radio-group">
+            <label class="radio-item active">
+              <input type="radio" name="strategy" checked> 滚动更新 <span class="strategy-tag rolling" style="margin-left:auto">默认</span>
+            </label>
+            <label class="radio-item">
+              <input type="radio" name="strategy"> 灰度发布 <span class="strategy-tag canary" style="margin-left:auto">Demo 扩展</span>
+            </label>
+            <label class="radio-item">
+              <input type="radio" name="strategy"> 蓝绿部署 <span class="strategy-tag blue_green" style="margin-left:auto">Demo 扩展</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" style="background:#faf5ff;border:1px dashed #c084fc;border-radius:8px;padding:14px;margin-top:20px">
+          <label class="form-label" style="color:#7c3aed">📦 Pod 发布方式</label>
+          <div class="form-hint" style="margin-top:0">检测到 Workload 类型: <strong>StatefulSet</strong></div>
+          <div class="radio-group" style="margin-top:10px">
+            <label class="radio-item active">
+              <input type="radio" name="pod" checked> 全部 Pod 发布
+            </label>
+            <label class="radio-item">
+              <input type="radio" name="pod"> 选择 Pod 发布
+            </label>
+          </div>
+          <div class="checkbox-group" style="margin-left:20px">
+            <label class="checkbox-item"><input type="checkbox" checked disabled> payment-api-0</label>
+            <label class="checkbox-item"><input type="checkbox" checked disabled> payment-api-1</label>
+            <label class="checkbox-item"><input type="checkbox" checked disabled> payment-api-2</label>
+          </div>
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn" style="background:#f3f4f6;margin-right:8px">取消</button>
+        <button class="btn btn-primary">提交发布</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 8. 前端原型：CI/CD 日志面板 ═══════ -->
+<div class="card" id="proto-detail">
+  <h2>🖥️ 8. 前端原型 — CI/CD 双面板日志</h2>
+  <p>点击「发布」后自动打开此面板。CI 跑完自动触发 CD。日志实时滚动。</p>
+
+  <div class="proto">
+    <div class="proto-header">
+      <span>🚀</span> REL-20260731-0042 · payment-api v1.2.1 · Dev
+      <span style="margin-left:auto;font-size:12px;opacity:.8">CI ✅ → CD 🔄 进行中</span>
+    </div>
+    <div class="proto-body" style="padding:16px 20px">
+
+      <!-- CI 面板 -->
+      <div class="log-section ci">
+        <div class="log-section-header">
+          <div><span class="icon">📦</span> CI 构建</div>
+          <span class="status">✅ 构建成功 · 42s</span>
+        </div>
+        <div class="log-body">
+<div class="log-line"><span class="ts">[12:01:03]</span> <span class="info">[CI]</span> 收到构建请求 op=build</div>
+<div class="log-line"><span class="ts">[12:01:03]</span> <span class="step">[CI]</span> 创建构建 Pod: builder-python:3.11</div>
+<div class="log-line"><span class="ts">[12:01:04]</span> <span class="info">[CI]</span> git clone https://github.com/team/payment-api.git</div>
+<div class="log-line"><span class="ts">[12:01:05]</span> <span class="info">[CI]</span> git checkout main → abc1234</div>
+<div class="log-line"><span class="ts">[12:01:05]</span> <span class="step">[CI]</span> pip install -r requirements.txt ...</div>
+<div class="log-line"><span class="ts">[12:01:18]</span> <span class="info">[CI]</span> python -m build → dist/payment-api-1.2.1.tar.gz</div>
+<div class="log-line"><span class="ts">[12:01:19]</span> <span class="step">[CI]</span> COPY 产物 → 应用基础镜像 python:3.11-slim</div>
+<div class="log-line"><span class="ts">[12:01:22]</span> <span class="info">[CI]</span> 构建镜像: 123456789.dkr.ecr.us-east-1.amazonaws.com/payment-api:1.2.1</div>
+<div class="log-line"><span class="ts">[12:01:38]</span> <span class="info">[CI]</span> docker push → ECR (12.3MB)</div>
+<div class="log-line"><span class="ts">[12:01:42]</span> <span class="step">[CI]</span> 清理构建 Pod: builder-python:3.11</div>
+<div class="log-line"><span class="ts">[12:01:45]</span> <span class="ok">[CI] ✅ 构建完成</span></div>
+        </div>
+      </div>
+
+      <!-- 分割线 -->
+      <div class="log-divider">── CI 完成，自动触发 CD ──</div>
+
+      <!-- CD 面板 -->
+      <div class="log-section cd">
+        <div class="log-section-header">
+          <div><span class="icon">🚀</span> CD 部署 · Dev · 滚动更新</div>
+          <span class="status">🔄 部署中</span>
+        </div>
+        <div class="log-body">
+<div class="log-line"><span class="ts">[12:01:46]</span> <span class="info">[CD]</span> 收到部署请求 op=deploy</div>
+<div class="log-line"><span class="ts">[12:01:46]</span> <span class="info">[CD]</span> 连接 EKS 集群 (us-east-1)</div>
+<div class="log-line"><span class="ts">[12:01:47]</span> <span class="step">[CD]</span> 检测到现有 Deployment: payment-api</div>
+<div class="log-line"><span class="ts">[12:01:47]</span> <span class="info">[CD]</span> 执行: kubectl set image deployment/payment-api payment-api=payment-api:1.2.1</div>
+<div class="log-line"><span class="ts">[12:01:48]</span> <span class="step">[CD]</span> Pod payment-api-0 镜像更新中...</div>
+<div class="log-line"><span class="ts">[12:01:55]</span> <span class="ok">[CD]</span> Pod payment-api-0 Ready ✅</div>
+<div class="log-line"><span class="ts">[12:01:56]</span> <span class="step">[CD]</span> Pod payment-api-1 镜像更新中...</div>
+<div class="log-line"><span class="ts">[12:02:03]</span> <span class="ok">[CD]</span> Pod payment-api-1 Ready ✅</div>
+<div class="log-line"><span class="ts">[12:02:04]</span> <span class="step">[CD]</span> Pod payment-api-2 镜像更新中...</div>
+<div class="log-line"><span class="ts">[12:02:11]</span> <span class="ok">[CD]</span> Pod payment-api-2 Ready ✅</div>
+<div class="log-line"><span class="ts">[12:02:12]</span> <span class="ok">[CD] 🚀 部署完成 · 3/3 Pod Ready</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <h3 style="margin-top:20px">灰度发布版本（部署策略=灰度时）</h3>
+  <div class="proto">
+    <div class="proto-header" style="background:#c2410c">
+      <span>🦢</span> REL-20260731-0044 · payment-api v1.2.0 · Prod
+      <span style="margin-left:auto;font-size:12px;opacity:.8">CI ✅ → CD 🔄 灰度中 (10%)</span>
+    </div>
+    <div class="proto-body" style="padding:16px 20px">
+      <div class="log-section cd">
+        <div class="log-section-header" style="background:#fff7ed;border-bottom-color:#fed7aa;color:#c2410c">
+          <div><span class="icon">🦢</span> CD 部署 · Prod · 灰度发布 10%</div>
+          <span class="status" style="background:#ffedd5;color:#c2410c">🔄 灰度中</span>
+        </div>
+        <div class="log-body">
+<div class="log-line"><span class="ts">[14:30:01]</span> <span class="info">[CD]</span> 收到灰度部署请求 op=canary</div>
+<div class="log-line"><span class="ts">[14:30:02]</span> <span class="step">[CD]</span> 创建金丝雀 Deployment: payment-api-canary</div>
+<div class="log-line"><span class="ts">[14:30:03]</span> <span class="info">[CD]</span> 金丝雀副本数: 1 (总副本数 10, 流量占比 10%)</div>
+<div class="log-line"><span class="ts">[14:30:08]</span> <span class="ok">[CD]</span> 金丝雀 Pod Ready ✅</div>
+<div class="log-line"><span class="ts">[14:30:09]</span> <span class="info">[CD]</span> 等待灰度验证 (手动确认后全量发布) ...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 9. 实施计划 ═══════ -->
+<div class="card" id="plan">
+  <h2>🗓️ 9. 实施计划</h2>
+
+  <div class="timeline">
+    <div class="timeline-item done">
+      <h4>Phase 1: 数据模型 + 后端改造</h4>
+      <p>
+        ✅ ReleaseTask.STAGES 从 11 种简化为 <code>['ci', 'cd']</code><br>
+        ✅ Release 新增 <code>is_first_deploy</code> / <code>selected_pods</code> / <code>workload_type</code><br>
+        ✅ Migration + 种子数据适配<br>
+        ✅ 创建发布单后自动触发 CI（不再需要用户手动点"执行"）
+      </p>
+    </div>
+
+    <div class="timeline-item">
+      <h4>Phase 2: Executor 改造</h4>
+      <p>
+        🔄 新增 <code>op=build</code>（模拟 Pod 构建全链路：clone → compile → build image → push → cleanup）<br>
+        🔄 <code>op=deploy</code> 支持首次部署（apply YAML）和后续部署（set image）<br>
+        🔄 新增 <code>op=pods</code>（查询 Pod 列表，区分 Deployment/StatefulSet）<br>
+        🔄 新增 <code>op=canary</code> / <code>op=blue_green</code>（灰度/蓝绿模拟）
+      </p>
+    </div>
+
+    <div class="timeline-item">
+      <h4>Phase 3: API 端点</h4>
+      <p>
+        📋 <code>GET /releases/{id}/logs/ci</code> — CI 阶段日志<br>
+        📋 <code>GET /releases/{id}/logs/cd</code> — CD 阶段日志<br>
+        📋 <code>GET /apps/{id}/pods?env=dev</code> — Pod 列表查询<br>
+        📋 创建发布单接口改造（单环境 + 自动触发 CI）
+      </p>
+    </div>
+
+    <div class="timeline-item">
+      <h4>Phase 4: 前端改造</h4>
+      <p>
+        🎨 发布列表页：按环境筛选 + CI/CD 双状态列<br>
+        🎨 新建发布：侧边抽屉 + 环境选择 + 部署策略 + Pod 选择器<br>
+        🎨 发布详情：CI/CD 双面板日志（替代 Steps 组件）<br>
+        🎨 自动串行：CI 完成后自动触发 CD，用户只看日志
+      </p>
+    </div>
+
+    <div class="timeline-item">
+      <h4>Phase 5: 端到端测试 + 面试准备</h4>
+      <p>
+        ✅ 完整链路：登录 → 选择环境 → 创建发布 → CI 自动跑 → CD 自动跑 → 完成<br>
+        📝 整理面试叙述稿<br>
+        📝 录制演示视频 / 准备面试话术
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 10. 面试叙述建议 ═══════ -->
+<div class="card" id="interview">
+  <h2>🎤 10. 面试叙述建议</h2>
+
+  <h3>核心故事线（Per-Environment 模型）</h3>
+  <div class="talk">
+    <div class="label">💡 开场叙述</div>
+    <p>"我们的发布系统是按 <strong>应用+环境</strong> 粒度管理的。每次发布对应一个目标环境，流程分为 <strong>CI 构建</strong> 和 <strong>CD 部署</strong> 两个阶段，全自动串行。用户点「发布」后，系统自动拉起构建 Pod 编译打包，构建完成后自动触发集群部署。整个过程通过两个实时日志面板展示——上方 CI 日志，下方 CD 日志。"</p>
+  </div>
+
+  <div class="talk">
+    <div class="label">🔧 CI 阶段叙述</div>
+    <p>"CI 阶段由 Lambda 拉起一个临时 Pod，使用<strong>环境基础镜像</strong>（含编译器/运行时）作为构建环境。Pod 内执行 git clone → 编译 → 打包，然后把产物 COPY 进<strong>应用基础镜像</strong>构建最终镜像，推送到 ECR。构建完成后 Pod 自动销毁。这样每个环境都有独立的构建产物。"</p>
+  </div>
+
+  <div class="talk">
+    <div class="label">🚀 CD 阶段叙述</div>
+    <p>"CD 阶段分两种情况：<strong>首次部署</strong>时，系统从 GitLab 拉取预先申请好的 YAML 配置（由工单系统调用运维原子任务生成），执行 kubectl apply 创建全新 Deployment。<strong>后续发布</strong>时，Deployment 已经在集群里了，只需要 kubectl set image 修改镜像字段，K8s 自动执行滚动更新。对于 StatefulSet，还支持选择特定 Pod 进行发布。"</p>
+  </div>
+
+  <div class="talk">
+    <div class="label">🏗️ 两层架构叙述</div>
+    <p>"由于安全要求，后端不能直接操作 AWS 资源。所有集群操作通过 <strong>API Gateway → Lambda</strong> 这个安全代理层执行。后端负责用户鉴权和权限校验，Lambda 只需要验证请求确实来自后端（通过<strong>公私钥签名</strong>）。这确保了即使后端被攻破，攻击者也无法直接操作集群。"</p>
+  </div>
+
+  <div class="talk">
+    <div class="label">🎯 部署策略叙述（诚实 + 扩展）</div>
+    <p>"我们线上系统只做了<strong>滚动更新</strong>，因为是内部系统，发布频率不高，滚动更新完全够用。灰度和蓝绿我们调研过但当时评估 ROI 不高——灰度需要 Service Mesh 或 Ingress 做流量拆分，蓝绿需要双倍资源。不过我在 demo 系统里把这几种策略都实现了，主要是想展示我对 K8s 部署策略的理解。"</p>
+  </div>
+
+  <div class="talk">
+    <div class="label">🔑 面试加分点总结</div>
+    <p>
+      1. <strong>Per-Environment 模型</strong>：理解发布粒度的设计取舍<br>
+      2. <strong>CI/CD 两阶段</strong>：知道构建和部署的职责边界<br>
+      3. <strong>两层安全架构</strong>：公私钥签名 + 请求内容绑定<br>
+      4. <strong>首次 vs 后续部署</strong>：kubectl apply vs set image 的区别<br>
+      5. <strong>Deployment vs StatefulSet</strong>：有状态服务的发布差异<br>
+      6. <strong>双镜像策略</strong>：编译镜像 vs 运行镜像的分离<br>
+      7. <strong>工程判断力</strong>：知道什么场景用什么方案，不做过度设计
+    </p>
+  </div>
+</div>
+
+<!-- ═══════ Footer ═══════ -->
+<div style="text-align:center; padding:40px 0 20px; color:var(--text-muted); font-size:13px;">
+  <p>发布系统重构规划 · 2026-07-31 · Per-Environment Model</p>
+  <p style="margin-top:4px">后端 Django · 前端 React · 执行端 FastAPI · 认证 EdDSA 签名</p>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// 高亮导航当前锚点
+const sections = document.querySelectorAll('[id]');
+const navLinks = document.querySelectorAll('.nav a');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector(`.nav a[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-60px 0px -70% 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

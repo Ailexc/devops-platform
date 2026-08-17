@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 B · 深色 Linear 风（参考 Linear / Vercel / GitHub Dark）</title>
+<style>
+/* ============================================================
+   方案 B — 深色 Linear 风
+   参考: Linear / Vercel / GitHub Dark
+   定位: 高级 · 专注 · 技术感 · 深色优先
+   ============================================================ */
+:root {
+  /* 主色板 — 紫蓝点缀 */
+  --brand: #7c6cf0;
+  --brand-strong: #9d8cff;
+  --brand-soft: rgba(124, 108, 240, .12);
+  --brand-border: rgba(124, 108, 240, .35);
+
+  /* 中性色（深色） */
+  --bg: #0b0e13;
+  --bg-elev: #11151c;
+  --bg-card: #141922;
+  --bg-hover: #1a202b;
+  --bg-inset: #0e1218;
+  --text: #e8ebf2;
+  --text-secondary: #9aa4b5;
+  --text-tertiary: #5f6b7d;
+  --border: #232a36;
+  --border-strong: #343e4f;
+
+  /* 语义色 */
+  --success: #3ddc97;  --success-bg: rgba(61,220,151,.12);
+  --warning: #f5b14c;  --warning-bg: rgba(245,177,76,.12);
+  --danger:  #f25c6b;  --danger-bg:  rgba(242,92,107,.12);
+  --info:    #4cc2ff;  --info-bg:    rgba(76,194,255,.12);
+
+  /* 效果 */
+  --radius: 8px;
+  --radius-sm: 5px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-md: 0 6px 20px rgba(0,0,0,.45);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,.55);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC', sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', 'Cascadia Code', Menlo, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { text-decoration: none; color: inherit; }
+::selection { background: var(--brand); color: #fff; }
+
+/* ---- 布局 ---- */
+.layout { display: flex; min-height: 100vh; }
+
+/* ---- 侧边栏 ---- */
+.sidebar {
+  width: 232px; flex-shrink: 0;
+  background: var(--bg-elev);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.brand-logo {
+  width: 30px; height: 30px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--brand), #5b4bd6);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 12px; letter-spacing: .02em;
+  box-shadow: 0 0 0 1px rgba(124,108,240,.4), 0 4px 14px rgba(124,108,240,.35);
+}
+.brand-name { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+.brand-sub { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono); }
+
+.nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
+.nav-section { font-size: 10px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .12em; padding: 16px 12px 6px; font-family: var(--font-mono); }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 12px; margin: 1px 0; border-radius: 6px;
+  font-size: 13px; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.nav-item svg { flex-shrink: 0; opacity: .7; }
+.nav-item:hover { background: var(--bg-hover); color: var(--text); }
+.nav-item.active { background: var(--brand-soft); color: var(--brand-strong); }
+.nav-item.active svg { stroke: var(--brand-strong); opacity: 1; }
+.nav-item .dot { margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 8px var(--brand); }
+
+.sidebar-foot { padding: 12px; border-top: 1px solid var(--border); }
+.user-chip { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 6px; cursor: pointer; }
+.user-chip:hover { background: var(--bg-hover); }
+.avatar { width: 28px; height: 28px; border-radius: 6px; background: linear-gradient(135deg, #5b4bd6, var(--brand)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+
+/* ---- 主区域 ---- */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar { height: 54px; background: rgba(17,21,28,.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; position: sticky; top: 0; z-index: 10; }
+.crumb { font-size: 13px; color: var(--text-tertiary); }
+.crumb b { color: var(--text); font-weight: 600; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px;
+  border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid transparent; transition: all .15s;
+}
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-strong); box-shadow: 0 4px 16px rgba(124,108,240,.4); }
+.btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border-strong); }
+.btn-ghost:hover { background: var(--bg-hover); color: var(--text); }
+
+.content { padding: 24px; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+/* ---- 页面头 ---- */
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+.page-title { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+.page-desc { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+
+/* ---- 统计卡片 ---- */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; gap: 14px; align-items: center; transition: border-color .2s, transform .2s, background .2s; cursor: pointer; }
+.stat-card:hover { border-color: var(--brand-border); transform: translateY(-1px); background: var(--bg-hover); }
+.stat-icon { width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid var(--border-strong); }
+.stat-icon.blue  { background: var(--brand-soft); color: var(--brand-strong); border-color: var(--brand-border); }
+.stat-icon.green { background: var(--success-bg); color: var(--success); }
+.stat-icon.amber { background: var(--warning-bg); color: var(--warning); }
+.stat-icon.violet{ background: rgba(168,85,247,.12); color: #c084fc; border-color: rgba(168,85,247,.3); }
+.stat-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; letter-spacing: -.01em; }
+.stat-label { font-size: 12px; color: var(--text-tertiary); }
+
+/* ---- 面板 ---- */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; border-bottom: 1px solid var(--border); }
+.panel-title { font-size: 13px; font-weight: 600; }
+.panel-link { font-size: 12px; color: var(--brand-strong); font-weight: 500; }
+.panel-link:hover { text-decoration: underline; }
+.panel-body { padding: 6px; }
+.row { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 6px; cursor: pointer; transition: background .12s; }
+.row:hover { background: var(--bg-hover); }
+.row-main { display: flex; align-items: center; gap: 10px; }
+.mono { font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary); }
+.tag { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.tag-green { background: var(--success-bg); color: var(--success); }
+.tag-red   { background: var(--danger-bg);  color: var(--danger); }
+.tag-gray  { background: var(--bg-inset);    color: var(--text-tertiary); border: 1px solid var(--border); }
+.tag-blue  { background: var(--brand-soft);  color: var(--brand-strong); }
+
+/* ---- 权限市场 ---- */
+.mkt-section { margin-top: 24px; }
+.mkt-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.mkt-title { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.mkt-sub { font-size: 12px; color: var(--text-tertiary); }
+.filter-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; flex-wrap: wrap; }
+.search { flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; background: var(--bg-inset); border: 1px solid var(--border); border-radius: 6px; color: var(--text-tertiary); font-size: 13px; }
+.chip { display: inline-flex; align-items: center; height: 26px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--bg-inset); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; transition: all .15s; }
+.chip:hover { border-color: var(--brand-border); color: var(--brand-strong); }
+.chip.on { background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand-strong); }
+
+.mkt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.cap-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; transition: border-color .2s, transform .2s, background .2s; cursor: pointer; }
+.cap-card:hover { border-color: var(--border-strong); background: var(--bg-hover); transform: translateY(-1px); }
+.cap-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.cap-icon { width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid var(--border-strong); }
+.cap-icon.blue  { background: var(--brand-soft); color: var(--brand-strong); border-color: var(--brand-border); }
+.cap-icon.cyan  { background: var(--info-bg);    color: var(--info); }
+.cap-icon.amber { background: var(--warning-bg); color: var(--warning); }
+.cap-name { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.cap-app { font-size: 12px; color: var(--text-tertiary); display: flex; align-items: center; gap: 6px; }
+.cap-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.cap-meta { display: flex; align-items: center; justify-content: space-between; }
+.cap-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.cap-badge { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 5px; font-size: 11px; font-weight: 500; }
+.cap-badge.gray { background: var(--bg-inset); color: var(--text-tertiary); border: 1px solid var(--border); }
+.cap-badge.green{ background: var(--success-bg); color: var(--success); }
+.cap-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.methods { display: flex; gap: 5px; }
+.method { font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+.method.get { background: var(--info-bg); color: var(--info); }
+.method.post{ background: var(--success-bg); color: var(--success); }
+.method.more{ background: var(--bg-inset); color: var(--text-tertiary); border: 1px solid var(--border); }
+.btn-sm { height: 28px; padding: 0 12px; font-size: 12px; }
+
+/* ---- 通知条 ---- */
+.notice { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--radius); background: var(--brand-soft); border: 1px solid var(--brand-border); color: var(--brand-strong); font-size: 13px; margin-bottom: 16px; }
+
+@media (max-width: 900px) { .stats { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } .sidebar { display: none; } }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">PC</div>
+      <div>
+        <div class="brand-name">Permission Center</div>
+        <div class="brand-sub">~/permission-center</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">总览</div>
+      <a class="nav-item active" href="#">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        工作台
+      </a>
+      <div class="nav-section">个人权限</div>
+      <a class="nav-item" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>我的权限</a>
+      <a class="nav-item" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>权限申请<span class="dot"></span></a>
+      <div class="nav-section">组织权限</div>
+      <a class="nav-item" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z"/></svg>组织 / 组</a>
+      <div class="nav-section">应用权限</div>
+      <a class="nav-item" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>应用管理</a>
+      <a class="nav-item" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>策略管理</a>
+      <a class="nav-item" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>权限中心</a>
+      <div class="nav-section">审计中心</div>
+      <a class="nav-item" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8"/></svg>申请 / 审批 / 发布</a>
+      <div class="nav-section">系统观测</div>
+      <a class="nav-item" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>鉴权链路追踪</a>
+      <a class="nav-item" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>PEP 解析工作台</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-chip">
+        <div class="avatar">爱</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;">爱丽丝</div>
+          <div style="font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);">alice</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 主区域 -->
+  <main class="main">
+    <div class="topbar">
+      <span class="crumb">工作台 / <b>总览</b></span>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          暗色
+        </button>
+        <button class="btn btn-primary">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          申请权限
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 通知条 -->
+      <div class="notice">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        你有 <b style="margin:0 2px;">2</b> 条待审批申请 · <b style="margin:0 2px;">3</b> 条进行中的权限申请
+      </div>
+
+      <!-- 页面头 -->
+      <div class="page-head">
+        <div>
+          <div class="page-title">工作台</div>
+          <div class="page-desc">以"我"为中心 —— 所有卡片均可点击跳转</div>
+        </div>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-icon blue"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <div><div class="stat-value">12</div><div class="stat-label">组织权限</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <div><div class="stat-value">8</div><div class="stat-label">个人权限</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+          <div><div class="stat-value">5</div><div class="stat-label">自建组权限</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon violet"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+          <div><div class="stat-value">3</div><div class="stat-label">负责应用</div></div>
+        </div>
+      </div>
+
+      <!-- 面板 -->
+      <div class="grid">
+        <section class="panel">
+          <div class="panel-head"><span class="panel-title">待办事项</span><a class="panel-link" href="#">全部 →</a></div>
+          <div class="panel-body">
+            <div class="row"><span class="row-main">待我审批</span><span class="tag tag-blue">2</span></div>
+            <div class="row"><span class="row-main">进行中的申请</span><span class="tag" style="background:var(--warning-bg);color:var(--warning);">3</span></div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><span class="panel-title">我的应用</span><a class="panel-link" href="#">管理 →</a></div>
+          <div class="panel-body">
+            <div class="row"><span class="row-main"><span class="mono">cmdb</span> 配置管理数据库</span><span class="tag tag-green">active</span></div>
+            <div class="row"><span class="row-main"><span class="mono">monitor</span> 监控告警中心</span><span class="tag tag-green">active</span></div>
+            <div class="row"><span class="row-main"><span class="mono">itsm</span> IT 服务管理</span><span class="tag tag-gray">disabled</span></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 权限市场 -->
+      <section class="mkt-section">
+        <div class="mkt-head">
+          <div>
+            <div class="mkt-title">权限中心 · 已发布能力</div>
+            <div class="mkt-sub">浏览已发布能力目录，按能力包申请权限：权限组合 · 数据范围 · 条件表达式 · 审批流</div>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <span class="search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            搜索能力名称、描述、应用…
+          </span>
+          <span class="chip on">全部应用</span>
+          <span class="chip">cmdb</span>
+          <span class="chip">monitor</span>
+          <span class="chip">itsm</span>
+          <span class="chip">cloudportal</span>
+        </div>
+
+        <div class="mkt-grid">
+          <div class="cap-card">
+            <div class="cap-top">
+              <div class="cap-icon blue"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg></div>
+              <div>
+                <div class="cap-name">主机管理</div>
+                <div class="cap-app">配置管理数据库 · <span class="mono">cmdb</span></div>
+              </div>
+            </div>
+            <div class="cap-desc">主机资源的增删改查能力（OpenAPI 推断初值，owner 已确认）</div>
+            <div class="cap-meta">
+              <div class="cap-tags">
+                <span class="cap-badge gray">host</span>
+                <span class="cap-badge green">只读查看</span>
+                <span class="cap-badge gray">运维操作</span>
+              </div>
+              <span class="tag tag-green">已发布 · v1</span>
+            </div>
+            <div class="cap-foot">
+              <div class="methods"><span class="method get">GET</span><span class="method get">GET</span><span class="method post">POST</span><span class="method more">+2</span></div>
+              <button class="btn btn-primary btn-sm">申请此能力</button>
+            </div>
+          </div>
+
+          <div class="cap-card">
+            <div class="cap-top">
+              <div class="cap-icon cyan"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+              <div>
+                <div class="cap-name">主机管理</div>
+                <div class="cap-app">监控告警中心 · <span class="mono">monitor</span></div>
+              </div>
+            </div>
+            <div class="cap-desc">主机资源的增删改查能力（OpenAPI 推断初值，owner 已确认）</div>
+            <div class="cap-meta">
+              <div class="cap-tags">
+                <span class="cap-badge gray">host</span>
+                <span class="cap-badge green">只读查看</span>
+                <span class="cap-badge gray">运维操作</span>
+              </div>
+              <span class="tag tag-green">已发布 · v1</span>
+            </div>
+            <div class="cap-foot">
+              <div class="methods"><span class="method get">GET</span><span class="method get">GET</span><span class="method post">POST</span><span class="method more">+2</span></div>
+              <button class="btn btn-primary btn-sm">申请此能力</button>
+            </div>
+          </div>
+
+          <div class="cap-card">
+            <div class="cap-top">
+              <div class="cap-icon amber"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+              <div>
+                <div class="cap-name">公共资源池</div>
+                <div class="cap-app">公共资源池 · <span class="mono">cloudportal</span></div>
+              </div>
+            </div>
+            <div class="cap-desc">公共云资源管理（按云账号 / 标签 / 实例过滤）</div>
+            <div class="cap-meta">
+              <div class="cap-tags">
+                <span class="cap-badge gray">public_resource</span>
+                <span class="cap-badge green">资源查看</span>
+                <span class="cap-badge gray">资源管理</span>
+              </div>
+              <span class="tag tag-green">已发布 · v1</span>
+            </div>
+            <div class="cap-foot">
+              <div class="methods"><span class="method get">GET</span><span class="method get">GET</span><span class="method post">POST</span><span class="method more">+1</span></div>
+              <button class="btn btn-primary btn-sm">申请此能力</button>
+            </div>
+          </div>
+
+          <div class="cap-card">
+            <div class="cap-top">
+              <div class="cap-icon blue"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-7"/></svg></div>
+              <div>
+                <div class="cap-name">主机管理</div>
+                <div class="cap-app">IT 服务管理 · <span class="mono">itsm</span></div>
+              </div>
+            </div>
+            <div class="cap-desc">主机资源的增删改查能力（OpenAPI 推断初值，owner 已确认）</div>
+            <div class="cap-meta">
+              <div class="cap-tags">
+                <span class="cap-badge gray">host</span>
+                <span class="cap-badge green">只读查看</span>
+              </div>
+              <span class="tag tag-green">已发布 · v1</span>
+            </div>
+            <div class="cap-foot">
+              <div class="methods"><span class="method get">GET</span><span class="method get">GET</span><span class="method more">+1</span></div>
+              <button class="btn btn-primary btn-sm">申请此能力</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</body>
+</html>

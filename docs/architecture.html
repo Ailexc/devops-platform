@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DevOps 平台 · 整体架构设计</title>
+<style>
+  /* ============ 设计系统 ============ */
+  :root{
+    --bg:#0a0e1a;
+    --bg2:#0d1226;
+    --surface:#121a30;
+    --surface2:#182138;
+    --surface3:#1f2b47;
+    --border:#243049;
+    --border2:#2e3d5e;
+    --text:#e2e8f0;
+    --muted:#94a3b8;
+    --dim:#64748b;
+    --primary:#38bdf8;
+    --primary2:#6366f1;
+    --accent:#22d3ee;
+    --success:#34d399;
+    --warning:#f59e0b;
+    --danger:#f87171;
+    --grad:linear-gradient(135deg,#38bdf8 0%,#6366f1 60%,#a855f7 100%);
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:'Inter','PingFang SC','Hiragino Sans GB','Microsoft YaHei',system-ui,-apple-system,sans-serif;
+    --radius:14px;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;scroll-padding-top:70px}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--primary);text-decoration:none}
+  a:hover{text-decoration:underline}
+  ::selection{background:rgba(56,189,248,.3)}
+
+  /* 背景网格装饰 */
+  .bg-glow{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+  .bg-glow::before{content:"";position:absolute;top:-20%;left:-10%;width:60%;height:60%;background:radial-gradient(circle,rgba(99,102,241,.14),transparent 65%)}
+  .bg-glow::after{content:"";position:absolute;bottom:-20%;right:-10%;width:60%;height:60%;background:radial-gradient(circle,rgba(56,189,248,.12),transparent 65%)}
+
+  /* ============ 导航 ============ */
+  nav{
+    position:sticky;top:0;z-index:50;
+    background:rgba(10,14,26,.82);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);
+  }
+  .nav-inner{
+    max-width:1200px;margin:0 auto;padding:0 24px;
+    display:flex;align-items:center;justify-content:space-between;height:60px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px}
+  .brand .logo{
+    width:30px;height:30px;border-radius:8px;background:var(--grad);
+    display:grid;place-items:center;color:#fff;font-size:15px;
+  }
+  .nav-links{display:flex;gap:6px;list-style:none;flex-wrap:wrap}
+  .nav-links a{
+    color:var(--muted);font-size:13.5px;padding:6px 10px;border-radius:8px;
+    transition:.2s;white-space:nowrap;
+  }
+  .nav-links a:hover{color:var(--text);background:var(--surface2);text-decoration:none}
+  .nav-links a.active{color:var(--primary);background:rgba(56,189,248,.12)}
+
+  /* ============ 布局 ============ */
+  main{max-width:1200px;margin:0 auto;padding:0 24px}
+  section{margin:72px 0;scroll-margin-top:80px}
+  .sec-head{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+  .sec-no{
+    flex:none;width:40px;height:40px;border-radius:11px;background:var(--grad);
+    display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;
+    box-shadow:0 6px 16px rgba(99,102,241,.35);
+  }
+  .sec-head h2{font-size:26px;font-weight:800;letter-spacing:.3px}
+  .sec-head .sub{color:var(--dim);font-size:14px;margin-top:2px}
+  .sec-desc{color:var(--muted);max-width:820px;margin-bottom:28px;font-size:15px}
+
+  /* ============ Hero ============ */
+  .hero{padding:64px 0 20px;text-align:center}
+  .hero .kicker{
+    display:inline-block;font-size:12.5px;letter-spacing:2px;color:var(--accent);
+    border:1px solid rgba(34,211,238,.3);padding:5px 14px;border-radius:999px;
+    background:rgba(34,211,238,.06);margin-bottom:20px;
+  }
+  .hero h1{font-size:44px;font-weight:900;letter-spacing:.5px;line-height:1.2}
+  .hero h1 em{
+    font-style:normal;background:var(--grad);-webkit-background-clip:text;
+    background-clip:text;color:transparent;
+  }
+  .hero p{color:var(--muted);max-width:720px;margin:18px auto 0;font-size:17px}
+  .hero .stats{
+    display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:38px;
+  }
+  .stat{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:18px 26px;min-width:150px;transition:.25s;cursor:default;
+  }
+  .stat:hover{transform:translateY(-4px);border-color:var(--border2);box-shadow:var(--shadow)}
+  .stat b{display:block;font-size:32px;font-weight:900;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat span{color:var(--muted);font-size:13px}
+
+  /* ============ 分层架构图 ============ */
+  .stack{display:flex;flex-direction:column;gap:14px}
+  .layer{
+    border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;
+    background:var(--surface);transition:.25s;
+  }
+  .layer:hover{border-color:var(--primary);box-shadow:var(--shadow)}
+  .layer-head{
+    display:flex;align-items:center;gap:12px;padding:16px 22px;
+    border-bottom:1px solid var(--border);cursor:pointer;user-select:none;
+  }
+  .layer-head .tag{
+    font-size:11px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:6px;
+    background:rgba(56,189,248,.12);color:var(--primary);flex:none;
+  }
+  .layer-head h3{font-size:17px;font-weight:700}
+  .layer-head .desc{color:var(--dim);font-size:13px;margin-left:auto;text-align:right}
+  .layer-body{padding:20px 22px}
+  .layer.tech{background:linear-gradient(180deg,var(--surface),var(--surface2))}
+
+  .grid{display:grid;gap:14px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .g6{grid-template-columns:repeat(6,1fr)}
+
+  /* 系统卡片 */
+  .sys{
+    background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+    padding:16px;transition:.22s;cursor:pointer;position:relative;overflow:hidden;
+  }
+  .sys::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:var(--grad);opacity:0;transition:.22s;
+  }
+  .sys:hover{transform:translateY(-3px);border-color:var(--border2);box-shadow:var(--shadow)}
+  .sys:hover::before{opacity:1}
+  .sys .ico{
+    width:36px;height:36px;border-radius:9px;background:var(--surface3);
+    display:grid;place-items:center;font-size:18px;margin-bottom:10px;
+  }
+  .sys h4{font-size:15px;font-weight:700;margin-bottom:4px}
+  .sys .en{color:var(--dim);font-size:11.5px;font-family:var(--mono)}
+  .sys p{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.6}
+  .sys .meta{
+    margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;font-size:11px;
+    font-family:var(--mono);
+  }
+  .sys .meta i{
+    font-style:normal;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);
+    color:var(--primary);padding:2px 7px;border-radius:5px;
+  }
+  .sys .meta i.g{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.22);color:var(--success)}
+  .sys .meta i.o{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.22);color:var(--warning)}
+
+  /* 基础组件卡 */
+  .base{
+    background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+    padding:18px;transition:.22s;
+  }
+  .base:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:var(--shadow)}
+  .base .ico{font-size:24px;margin-bottom:10px}
+  .base h4{font-size:15px;font-weight:700}
+  .base .en{color:var(--dim);font-size:11.5px;font-family:var(--mono)}
+  .base ul{list-style:none;margin-top:10px}
+  .base li{color:var(--muted);font-size:13px;padding:3px 0;position:relative;padding-left:16px}
+  .base li::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+
+  /* ============ 表格 ============ */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+  th,td{padding:11px 16px;text-align:left;border-bottom:1px solid var(--border)}
+  th{background:var(--surface2);color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.5px}
+  tbody tr{transition:.15s}
+  tbody tr:hover{background:rgba(56,189,248,.05)}
+  tbody tr:last-child td{border-bottom:none}
+  td code,td .mono{font-family:var(--mono);font-size:12px;color:var(--accent)}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;white-space:nowrap}
+  .pill.b{background:rgba(56,189,248,.12);color:var(--primary)}
+  .pill.g{background:rgba(52,211,153,.12);color:var(--success)}
+  .pill.o{background:rgba(245,158,11,.12);color:var(--warning)}
+  .pill.p{background:rgba(168,85,247,.14);color:#c084fc}
+
+  /* ============ 命令/代码 ============ */
+  .cmd-grid{display:grid;gap:12px;grid-template-columns:repeat(2,1fr)}
+  .cmd{
+    background:var(--surface2);border:1px solid var(--border);border-radius:11px;
+    padding:14px 16px;transition:.2s;
+  }
+  .cmd:hover{border-color:var(--primary)}
+  .cmd code{font-family:var(--mono);font-size:13px;color:var(--accent);display:block;margin-bottom:4px}
+  .cmd span{color:var(--muted);font-size:12.5px}
+
+  /* ============ 折叠面板 ============ */
+  details{
+    background:var(--surface);border:1px solid var(--border);border-radius:11px;
+    margin-bottom:10px;overflow:hidden;
+  }
+  details summary{
+    cursor:pointer;padding:14px 18px;font-weight:600;font-size:14.5px;
+    display:flex;align-items:center;gap:10px;transition:.2s;list-style:none;
+  }
+  details summary::-webkit-details-marker{display:none}
+  details summary:hover{background:var(--surface2)}
+  details summary::before{content:"+";color:var(--primary);font-weight:700;font-size:16px;transition:.2s}
+  details[open] summary::before{transform:rotate(45deg)}
+  details .body{padding:4px 18px 16px;color:var(--muted);font-size:14px}
+
+  /* ============ 数据流 ============ */
+  .flow{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
+  .flow-node{
+    background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+    padding:12px 16px;min-width:150px;flex:1;text-align:center;transition:.2s;
+  }
+  .flow-node:hover{border-color:var(--primary);transform:translateY(-2px)}
+  .flow-node b{display:block;font-size:13.5px;color:var(--text)}
+  .flow-node span{color:var(--dim);font-size:11.5px;font-family:var(--mono)}
+  .flow-arrow{align-self:center;color:var(--primary);font-size:20px;flex:none}
+
+  /* ============ 要点 ============ */
+  .points{display:grid;gap:14px;grid-template-columns:repeat(2,1fr)}
+  .point{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:18px 20px;transition:.2s;
+  }
+  .point:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .point h4{font-size:15px;font-weight:700;margin-bottom:6px;color:var(--accent)}
+  .point p{color:var(--muted);font-size:13.5px}
+
+  footer{
+    border-top:1px solid var(--border);margin-top:80px;padding:30px 24px 40px;
+    text-align:center;color:var(--dim);font-size:13px;
+  }
+
+  /* ============ 响应式 ============ */
+  @media(max-width:960px){
+    .g3,.g4,.g6{grid-template-columns:repeat(2,1fr)}
+    .cmd-grid,.points{grid-template-columns:1fr}
+    .hero h1{font-size:34px}
+  }
+  @media(max-width:600px){
+    .g3,.g4,.g6{grid-template-columns:1fr}
+    .nav-links{display:none}
+    .layer-head .desc{display:none}
+    .flow-arrow{transform:rotate(90deg)}
+  }
+
+  /* 打印 */
+  @media print{
+    nav,.bg-glow{display:none}
+    body{background:#fff;color:#111}
+    .layer,.sys,.base,.point,details{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="bg-glow"></div>
+
+<!-- ============ 导航 ============ -->
+<nav>
+  <div class="nav-inner">
+    <div class="brand"><span class="logo">⚙</span> DevOps 平台 · 架构设计</div>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#overview" class="active">总览</a></li>
+      <li><a href="#infra">基础设施</a></li>
+      <li><a href="#gateway">统一网关</a></li>
+      <li><a href="#apps">应用层</a></li>
+      <li><a href="#manage">统一管理</a></li>
+      <li><a href="#flow">数据流</a></li>
+      <li><a href="#insight">设计要点</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ============ Hero ============ -->
+  <header class="hero" id="overview">
+    <span class="kicker">SINGLE PLATFORM · UNIFIED ARCHITECTURE</span>
+    <h1>一个平台，<em>七套业务系统</em>，统一编排</h1>
+    <p>以「统一基础设施 + 统一网关 + 统一管理编排」为底座，聚合认证、多云、事件、权限、发布、任务、工作流七个子系统，
+      实现一套数据层、一套消息中间件、一套入口、一套命令的全栈管理。</p>
+    <div class="stats">
+      <div class="stat"><b>7</b><span>业务子系统</span></div>
+      <div class="stat"><b>3</b><span>统一基础组件</span></div>
+      <div class="stat"><b>10</b><span>业务数据库</span></div>
+      <div class="stat"><b>1</b><span>统一入口网关</span></div>
+      <div class="stat"><b>1</b><span>统一管理命令</span></div>
+    </div>
+  </header>
+
+  <!-- ============ 分层总览 ============ -->
+  <section id="layers">
+    <div class="sec-head">
+      <div class="sec-no">0</div>
+      <div><h2>架构分层总览</h2><div class="sub">自顶向下：入口 → 网关 → 应用 → 基础设施 → 编排</div></div>
+    </div>
+    <div class="stack">
+
+      <div class="layer tech">
+        <div class="layer-head">
+          <span class="tag">L0</span><h3>接入 / 入口层</h3>
+          <span class="desc">作品集展示 → 统一门户 → 各系统</span>
+        </div>
+        <div class="layer-body">
+          <div class="flow">
+            <div class="flow-node"><b>Showcase 作品集</b><span>showcase/index.html</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node"><b>统一门户 Portal</b><span>portal.devops.orb.local</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node"><b>统一网关</b><span>Traefik · 8088</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node"><b>7 个业务系统</b><span>*.devops.orb.local</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="layer-head">
+          <span class="tag">L1</span><h3>统一网关层 · Traefik</h3>
+          <span class="desc">按 Host 路由，一处收敛全部域名</span>
+        </div>
+        <div class="layer-body">
+          <p style="color:var(--muted);font-size:14px">单一 Traefik 实例（<code style="font-family:var(--mono);color:var(--accent)">devops-gateway</code>）作为所有系统的统一入口，通过 Host 规则把请求分发到各系统前端容器，前端 nginx 再同源反代到各自后端。</p>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="layer-head">
+          <span class="tag">L2</span><h3>应用层 · 7 个业务系统</h3>
+          <span class="desc">各自独立 Compose 工程，均接入 devops-net</span>
+        </div>
+        <div class="layer-body">
+          <div class="grid g3">
+            <div class="sys"><div class="ico">🔐</div><h4>统一认证中心</h4><div class="en">Authentication</div><p>SSO 单点登录 · 统一门户</p></div>
+            <div class="sys"><div class="ico">☁️</div><h4>多云管理平台</h4><div class="en">CloudManager</div><p>多云资源 · 成本优化</p></div>
+            <div class="sys"><div class="ico">🚨</div><h4>事件管理平台</h4><div class="en">EventManager</div><p>告警事件 · 双栈处理</p></div>
+            <div class="sys"><div class="ico">🛡️</div><h4>权限中心</h4><div class="en">PermissionCenter</div><p>IAM · RBAC/ABAC · PEP</p></div>
+            <div class="sys"><div class="ico">🚀</div><h4>发布管理平台</h4><div class="en">ReleaseManager</div><p>发布流程 · K8s 部署</p></div>
+            <div class="sys"><div class="ico">🗂️</div><h4>任务 / CMDB 平台</h4><div class="en">TaskManager</div><p>资产采集 · 任务编排</p></div>
+            <div class="sys" style="grid-column:span 1"><div class="ico">🔗</div><h4>工作流平台</h4><div class="en">WorkFlowCenter</div><p>流程编排 · 审批 · 知识库</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="layer-head">
+          <span class="tag">L3</span><h3>统一基础设施层</h3>
+          <span class="desc">PostgreSQL + Redis + RabbitMQ（一实例，多租户隔离）</span>
+        </div>
+        <div class="layer-body">
+          <div class="grid g3">
+            <div class="base"><div class="ico">🐘</div><h4>PostgreSQL 16</h4><div class="en">devops-postgres · 25432</div><ul><li>一实例多库（10 个业务库）</li><li>统一数据存储层</li></ul></div>
+            <div class="base"><div class="ico">🔴</div><h4>Redis 7</h4><div class="en">devops-redis · 26379</div><ul><li>缓存 + Celery 结果存储</li><li>db index 隔离（0~8）</li></ul></div>
+            <div class="base"><div class="ico">🐰</div><h4>RabbitMQ 3</h4><div class="en">devops-rabbitmq · 25672</div><ul><li>统一消息队列（AMQP）</li><li>Celery broker · 队列隔离</li></ul></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="layer-head">
+          <span class="tag">L4</span><h3>统一管理编排层</h3>
+          <span class="desc">根 Makefile + scripts · 一套命令管理全部</span>
+        </div>
+        <div class="layer-body">
+          <div class="flow">
+            <div class="flow-node"><b>make bootstrap</b><span>拉起基础设施</span></div>
+            <div class="flow-arrow">·</div>
+            <div class="flow-node"><b>make start</b><span>全量/单系统启动</span></div>
+            <div class="flow-arrow">·</div>
+            <div class="flow-node"><b>make reset</b><span>出厂态重置</span></div>
+            <div class="flow-arrow">·</div>
+            <div class="flow-node"><b>make backup</b><span>统一备份</span></div>
+            <div class="flow-arrow">·</div>
+            <div class="flow-node"><b>make gateway-up</b><span>统一网关</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ 基础设施 ============ -->
+  <section id="infra">
+    <div class="sec-head">
+      <div class="sec-no">1</div>
+      <div><h2>统一基础设施层</h2><div class="sub">一个 Compose 工程，三个基础组件，多租户隔离</div></div>
+    </div>
+    <p class="sec-desc">所有业务项目不再自带数据库 / 缓存 / 消息队列，全部收敛到 <code style="font-family:var(--mono);color:var(--accent)">infra/docker-compose.yml</code>。
+      通过「一实例多库 / db index / 队列」三种隔离维度，让 7 个系统安全共享同一套基础组件，显著降低资源占用与运维成本。</p>
+
+    <div class="grid g3" style="margin-bottom:24px">
+      <div class="base"><div class="ico">🐘</div><h4>PostgreSQL</h4><div class="en">postgres:16-alpine</div>
+        <ul><li>容器 <code style="font-family:var(--mono);color:var(--accent)">devops-postgres</code></li><li>一实例多库，10 个业务库</li><li>宿主调试口 25432</li></ul></div>
+      <div class="base"><div class="ico">🔴</div><h4>Redis</h4><div class="en">redis:7-alpine</div>
+        <ul><li>容器 <code style="font-family:var(--mono);color:var(--accent)">devops-redis</code></li><li>db 0~8 隔离：缓存 + Celery 结果</li><li>宿主调试口 26379 · AOF 持久化</li></ul></div>
+      <div class="base"><div class="ico">🐰</div><h4>RabbitMQ</h4><div class="en">rabbitmq:3-management-alpine</div>
+        <ul><li>容器 <code style="font-family:var(--mono);color:var(--accent)">devops-rabbitmq</code></li><li>统一 AMQP 消息队列（Celery broker）</li><li>宿主 25672 · 管理台 25673 · 持久卷</li></ul></div>
+    </div>
+
+    <h3 style="font-size:18px;font-weight:700;margin:30px 0 14px">① 数据库归属（一实例多库）</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>系统</th><th>数据库</th><th>说明</th><th>Redis db</th><th>消息队列</th></tr></thead>
+        <tbody>
+          <tr><td>Authentication</td><td class="mono">devops_auth</td><td>用户 / 应用注册表 / 审计</td><td class="mono">0</td><td>—</td></tr>
+          <tr><td>CloudManager</td><td class="mono">devops_cloud</td><td>云资源 / 成本 / 知识库</td><td class="mono">1</td><td>—</td></tr>
+          <tr><td>EventManager</td><td class="mono">devops_event · devops_event_go</td><td>事件（Python）· 事件（Go 双栈）</td><td class="mono">2 / 8</td><td><span class="pill b">event</span></td></tr>
+          <tr><td>PermissionCenter</td><td class="mono">devops_iam · devops_openfga</td><td>IAM 业务 · 关系型权限引擎</td><td class="mono">3</td><td>—</td></tr>
+          <tr><td>ReleaseManager</td><td class="mono">devops_release</td><td>发布 / 审批 / 制件</td><td class="mono">4</td><td>—</td></tr>
+          <tr><td>TaskManager</td><td class="mono">devops_cmdb · devops_cmdb_go</td><td>CMDB（Python）· 采集（Go）</td><td class="mono">5 / 7</td><td><span class="pill b">aws · connector · inspection · default</span></td></tr>
+          <tr><td>WorkFlowCenter</td><td class="mono">devops_workflow</td><td>流程 / 审批 / 知识库</td><td class="mono">6</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:18px;font-weight:700;margin:30px 0 14px">② 统一消息队列（RabbitMQ 收编）</h3>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">原 EventManager 用 RabbitMQ、TaskManager 用 Redis 两套 broker，已统一收敛到 RabbitMQ：<b style="color:var(--text)">broker 统一、Worker 独立、队列隔离</b>。</p>
+    <div class="grid g3">
+      <div class="base"><div class="ico">🚨</div><h4>EventManager Worker</h4><div class="en">-Q event</div><ul><li>Python Celery worker</li><li>专属队列 <code style="font-family:var(--mono);color:var(--accent)">event</code></li></ul></div>
+      <div class="base"><div class="ico">🗂️</div><h4>TaskManager Worker</h4><div class="en">-Q aws,connector,inspection,default</div><ul><li>Python Celery worker + beat</li><li>专属队列集合，互不干扰</li></ul></div>
+      <div class="base"><div class="ico">🐰</div><h4>统一 RabbitMQ</h4><div class="en">devops-rabbitmq</div><ul><li>所有任务经统一 broker 分发</li><li>结果存 Redis，按 task_id 可查</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ============ 网关 ============ -->
+  <section id="gateway">
+    <div class="sec-head">
+      <div class="sec-no">2</div>
+      <div><h2>统一网关层 · Traefik</h2><div class="sub">一个入口，收敛全部域名</div></div>
+    </div>
+    <p class="sec-desc">统一网关 <code style="font-family:var(--mono);color:var(--accent)">devops-gateway</code>（Traefik v3.7）聚合 7 个系统到 <code style="font-family:var(--mono);color:var(--accent)">*.devops.orb.local</code>。
+      按 Host 规则把请求转发到各系统前端容器，前端 nginx 再同源反代到各自后端（无跨域）。本工程不依赖 OrbStack 特性，可平滑迁移到云端单机部署。</p>
+
+    <h3 style="font-size:18px;font-weight:700;margin:24px 0 14px">统一入口路由表</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>统一入口</th><th>目标</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">portal.devops.orb.local</td><td>authentication-portal</td><td>统一认证门户（应用广场）</td></tr>
+          <tr><td class="mono">cloud.devops.orb.local</td><td>cloud_manager_nginx</td><td>CloudManager 前端</td></tr>
+          <tr><td class="mono">event.devops.orb.local</td><td>cmdb-event-frontend</td><td>EventManager 前端</td></tr>
+          <tr><td class="mono">iam.devops.orb.local</td><td>permission-center-frontend</td><td>PermissionCenter 前端</td></tr>
+          <tr><td class="mono">release.devops.orb.local</td><td>release-frontend</td><td>ReleaseManager 前端</td></tr>
+          <tr><td class="mono">cmdb.devops.orb.local</td><td>cmdb-task-frontend</td><td>TaskManager 前端</td></tr>
+          <tr><td class="mono">workflow.devops.orb.local</td><td>workflow-frontend</td><td>WorkFlowCenter 前端</td></tr>
+          <tr><td class="mono">api.auth.devops.orb.local</td><td>authentication-auth-backend</td><td>认证 API 直连</td></tr>
+          <tr><td class="mono">traefik.devops.orb.local</td><td>Traefik Dashboard</td><td>网关监控面板</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:22px" class="grid g3">
+      <div class="base"><div class="ico">🧭</div><h4>Host 路由</h4><ul><li>file provider 动态配置</li><li>按域名分发，互不干扰</li></ul></div>
+      <div class="base"><div class="ico">🔌</div><h4>零跨域</h4><ul><li>前端 nginx 同源反代 /api</li><li>网关只做 Host 转发</li></ul></div>
+      <div class="base"><div class="ico">🌐</div><h4>云端复用</h4><ul><li>纯 Traefik 实现</li><li>ECS 上 DNS 泛解析即可</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ============ 应用层 ============ -->
+  <section id="apps">
+    <div class="sec-head">
+      <div class="sec-no">3</div>
+      <div><h2>应用层 · 7 个业务系统</h2><div class="sub">各自独立、可独立部署，共享统一底座</div></div>
+    </div>
+    <p class="sec-desc">每个子系统都是独立完整的 Compose 工程（前端 + 后端 + 附加组件），通过 <code style="font-family:var(--mono);color:var(--accent)">devops-net</code> 接入统一基础设施，通过统一网关暴露。技术栈涵盖 Python/FastAPI、Python/Django、Go/Gin、Vue、React 等，体现多语言工程能力。</p>
+
+    <div class="grid g3">
+      <div class="sys"><div class="ico">🔐</div><h4>统一认证中心</h4><div class="en">Authentication</div><p>SSO 单点登录与统一门户</p>
+        <div class="meta"><i>FastAPI</i><i>Vue3</i><i>OpenLDAP</i><i class="g">JWT/JWKS</i></div>
+        <details><summary>组件与能力</summary><div class="body">auth-backend（身份源降级链 local/LDAP）· portal（应用广场）· openldap · Traefik 网关（forwardAuth 保护演示应用）· mock/direct/pilot/oidc 四类接入示例。提供 SSO 跳转 <code style="font-family:var(--mono);color:var(--accent)">home_url?token=JWT</code>。</div></details></div>
+
+      <div class="sys"><div class="ico">☁️</div><h4>多云管理平台</h4><div class="en">CloudManager</div><p>多云资源管理与成本优化</p>
+        <div class="meta"><i>Django5</i><i>DRF</i><i>Vue3</i><i class="g">成本引擎</i></div>
+        <details><summary>组件与能力</summary><div class="body">backend（资源/CMDB/成本/知识库/工单/场景模块）· nginx（同源反代）。多云账号模拟、成本优化报告、部门预算、资源健康巡检。</div></details></div>
+
+      <div class="sys"><div class="ico">🚨</div><h4>事件管理平台</h4><div class="en">EventManager</div><p>告警事件与实时处理（双栈）</p>
+        <div class="meta"><i>Django5</i><i>Celery</i><i class="g">Go/Gin</i><i>RabbitMQ</i></div>
+        <details><summary>组件与能力</summary><div class="body">api + worker（<code style="font-family:var(--mono);color:var(--accent)">-Q event</code>）+ Go 双栈（go-api/go-worker）+ nginx。Python/Go 双实现对比、事件分级、告警处理、任务可视化。</div></details></div>
+
+      <div class="sys"><div class="ico">🛡️</div><h4>权限中心</h4><div class="en">PermissionCenter</div><p>IAM 权限管控（RBAC/ABAC）</p>
+        <div class="meta"><i>Go</i><i>OpenFGA</i><i>Traefik PEP</i><i class="g">PDP Agent</i></div>
+        <details><summary>组件与能力</summary><div class="body">iam-server（PDP/管理 API）· OpenFGA（Zanzibar 关系权限）· Traefik PEP（forwardAuth 网关）· mock-cmdb/identity · iam-agent（本地决策 sidecar）· 前端。</div></details></div>
+
+      <div class="sys"><div class="ico">🚀</div><h4>发布管理平台</h4><div class="en">ReleaseManager</div><p>应用发布与 K8s 部署</p>
+        <div class="meta"><i>Django5</i><i>React</i><i>FastAPI</i><i class="g">K8s</i></div>
+        <details><summary>组件与能力</summary><div class="body">backend（发布/审批/权限模型/配置中心）· frontend · executor（FastAPI 执行端，连 Docker/K8s）· init 容器。Demo 应用 go/node/python 三种部署。</div></details></div>
+
+      <div class="sys"><div class="ico">🗂️</div><h4>任务 / CMDB 平台</h4><div class="en">TaskManager</div><p>云资产采集与任务编排</p>
+        <div class="meta"><i>Django5</i><i>Celery</i><i class="g">Go/Gin</i><i>Redis</i></div>
+        <details><summary>组件与能力</summary><div class="body">backend + celery_worker（<code style="font-family:var(--mono);color:var(--accent)">-Q aws,connector,inspection,default</code>）+ celery_beat（DatabaseScheduler）+ go_backend + 前端。云账号资源采集、任务编排、健康巡检、CMDB 图谱。</div></details></div>
+
+      <div class="sys"><div class="ico">🔗</div><h4>工作流平台</h4><div class="en">WorkFlowCenter</div><p>流程编排与审批中心</p>
+        <div class="meta"><i>Django5</i><i>DRF</i><i>Vue3</i><i class="g">AI 表单</i></div>
+        <details><summary>组件与能力</summary><div class="body">api + frontend + 知识库。流程定义/实例/审批、工单、任务平台、能力注册、事件总线、AI 表单生成（SSE 流式）。</div></details></div>
+    </div>
+  </section>
+
+  <!-- ============ 统一管理 ============ -->
+  <section id="manage">
+    <div class="sec-head">
+      <div class="sec-no">4</div>
+      <div><h2>统一管理编排层</h2><div class="sub">一套命令，管理全部系统</div></div>
+    </div>
+    <p class="sec-desc">根目录 <code style="font-family:var(--mono);color:var(--accent)">Makefile</code> + <code style="font-family:var(--mono);color:var(--accent)">scripts/</code> 提供统一编排，覆盖基础设施、构建、启动、数据重置、备份、网关的全生命周期，并统一处理各项目 compose 文件路径差异。</p>
+
+    <h3 style="font-size:18px;font-weight:700;margin:24px 0 14px">核心命令</h3>
+    <div class="cmd-grid">
+      <div class="cmd"><code>make bootstrap</code><span>拉起统一基础设施（PG/Redis/RabbitMQ）并创建 10 个业务库</span></div>
+      <div class="cmd"><code>make start [P=xxx]</code><span>统一启动入口；<code style="font-family:var(--mono);color:var(--accent)">RESET_ON_START=true</code> 先重置出厂态再启动</span></div>
+      <div class="cmd"><code>make reset [P=xxx]</code><span>数据重置回出厂态（drop schema → migrate → 幂等种子）</span></div>
+      <div class="cmd"><code>make backup</code><span>统一备份（SQLite 文件 + PG dump + MySQL dump）</span></div>
+      <div class="cmd"><code>make gateway-up</code><span>启动统一网关（Traefik，入口 *.devops.orb.local）</span></div>
+      <div class="cmd"><code>make status / logs / portal</code><span>状态总览 · 单系统日志 · 打开门户</span></div>
+    </div>
+
+    <h3 style="font-size:18px;font-weight:700;margin:30px 0 14px">数据可靠性设计</h3>
+    <div class="points">
+      <div class="point"><h4>一键重置不搞坏</h4><p>每个系统重置前先 <code style="font-family:var(--mono);color:var(--accent)">DROP SCHEMA</code> 清空统一库再重建种子（双保险），全量重置还会重建 openfga / cmdb-go 等 sidecar。</p></div>
+      <div class="point"><h4>保守迁移</h4><p>统一化迁移全程保留旧数据容器/卷，确认无误后才清理；每个阶段都有备份兜底。</p></div>
+      <div class="point"><h4>环境变量可覆盖</h4><p>门户应用跳转地址支持 <code style="font-family:var(--mono);color:var(--accent)">APP_URL_*</code> 覆盖，云端部署不改代码。</p></div>
+      <div class="point"><h4>健康检查</h4><p>统一基础设施全部配置 healthcheck，bootstrap 等待就绪后才建库，避免竞态。</p></div>
+    </div>
+  </section>
+
+  <!-- ============ 数据流 ============ -->
+  <section id="flow">
+    <div class="sec-head">
+      <div class="sec-no">5</div>
+      <div><h2>关键数据流</h2><div class="sub">两个代表性的链路</div></div>
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;margin-bottom:14px">① SSO 统一登录 → 门户 → 系统跳转</h3>
+    <div class="flow" style="margin-bottom:34px">
+      <div class="flow-node"><b>统一门户</b><span>portal.…orb.local</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>认证中心登录</b><span>auth-backend /login</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>签发统一 JWT</b><span>RS256 + JWKS</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>点应用</b><span>sso-url 接口</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>跳转目标系统</b><span>home_url?token=JWT</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>统一网关分发</b><span>Traefik Host 路由</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>业务系统验签</b><span>JWKS 公钥 / forwardAuth</span></div>
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;margin-bottom:14px">② 异步任务链路（统一消息队列）</h3>
+    <div class="flow">
+      <div class="flow-node"><b>业务 API</b><span>Django 发布任务</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>统一 RabbitMQ</b><span>devops-rabbitmq</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>专属队列</b><span>event / task.*</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>各系统 Worker</b><span>-Q 消费</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>执行任务</b><span>采集 / 处理 / 编排</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node"><b>状态写回</b><span>Redis / DB 按 task_id 查</span></div>
+    </div>
+  </section>
+
+  <!-- ============ 设计要点 ============ -->
+  <section id="insight">
+    <div class="sec-head">
+      <div class="sec-no">6</div>
+      <div><h2>架构设计要点 · 面试叙事</h2><div class="sub">为什么这样设计</div></div>
+    </div>
+    <div class="points">
+      <div class="point"><h4>一套架构，标准统一</h4><p>7 个系统共享统一数据层 + 统一消息中间件 + 统一网关，杜绝"一个小组维护多套架构"——符合企业内实际工程组织方式。</p></div>
+      <div class="point"><h4>多租户隔离思想</h4><p>PG 一实例多库、Redis db index、RabbitMQ 队列，用最轻量的方式实现资源隔离，兼顾成本与安全边界。</p></div>
+      <div class="point"><h4>职责清晰的分层</h4><p>入口 / 网关 / 应用 / 基础设施 / 编排五层解耦：网关只做路由、前端同源反代、后端无状态可扩容、基础设施独立演进。</p></div>
+      <div class="point"><h4>统一消息中间件</h4><p>RabbitMQ 统一 Celery broker，各系统 Worker 独立可扩容，队列命名规范隔离任务来源——微服务化异步架构的标准形态。</p></div>
+      <div class="point"><h4>数据可靠性优先</h4><p>一键重置双保险、保守迁移、统一备份、RESET_ON_START——把"演示数据可靠性"作为第一原则。</p></div>
+      <div class="point"><h4>本地 ↔ 云端平滑</h4><p>统一网关纯 Traefik 实现，本地 OrbStack 用 *.orb.local，云端 DNS 泛解析即可复用，为 ECS 部署预留通道。</p></div>
+    </div>
+  </section>
+
+  <footer>
+    DevOps 平台全家桶 · 整体架构设计文档<br/>
+    <span style="font-family:var(--mono)">infra + gateway + 7 apps · Unified DevOps Platform</span>
+  </footer>
+</main>
+
+<script>
+  // 导航滚动高亮
+  const links = document.querySelectorAll('#navLinks a');
+  const sections = [...document.querySelectorAll('main section, header.hero')];
+  const spy = () => {
+    const pos = window.scrollY + 90;
+    let cur = sections[0];
+    for (const s of sections) if (s.offsetTop <= pos) cur = s;
+    links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + cur.id));
+  };
+  document.addEventListener('scroll', spy, {passive:true});
+  spy();
+</script>
+</body>
+</html>

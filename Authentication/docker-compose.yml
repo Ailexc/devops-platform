@@ -1,0 +1,149 @@
+# 统一认证中心 - 全栈编排（OrbStack 原生路由 + Traefik forwardAuth 演示）
+# 服务：认证中心(api) / 统一门户(portal) / OpenLDAP / 统一网关(traefik) / 演示应用(mock-app)
+
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    # 可选服务：演示 LDAP 身份源时启用（docker compose --profile ldap up -d）
+    # 默认全栈不依赖它；bitnami 镜像在本镜像源 403，故用 osixia
+    profiles: ["ldap"]
+    container_name: authentication-openldap
+    environment:
+      - LDAP_ORGANISATION=DevOps
+      - LDAP_DOMAIN=devops.com
+      - LDAP_ADMIN_PASSWORD=${LDAP_ADMIN_PASSWORD:-adminpass}
+      - LDAP_BASE_DN=dc=devops,dc=com
+    ports:
+      - "389:389"
+    volumes:
+      # 将 seed.ldif 通过 entrypoint 复制进容器层 custom 目录（osixia 初始化后会删除
+      # custom 目录，故不能用 bind mount 直接挂载 custom）
+      - ./ldap:/seed:ro
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mkdir -p /container/service/slapd/assets/config/bootstrap/ldif/custom
+        cp /seed/seed.ldif /container/service/slapd/assets/config/bootstrap/ldif/custom/50-seed.ldif
+        exec /container/tool/run --copy-service
+    labels:
+      - "dev.orbstack.domains=ldap.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -b dc=devops,dc=com -D cn=admin,dc=devops,dc=com -w $$LDAP_ADMIN_PASSWORD '(&)' | grep -q 'dc=devops,dc=com'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  auth-backend:
+    build: ./backend
+    container_name: authentication-auth-backend
+    restart: unless-stopped
+    command: >
+      sh -c "python /srv/auth/app/wait_for_db.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    environment:
+      # 统一 PostgreSQL（devops-net 网络，一实例多库 devops_auth）
+      - DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_auth
+      - AUTH_PROVIDER_ORDER=${AUTH_PROVIDER_ORDER:-local}
+      - AUTH_PROVIDER_LOCAL_ENABLED=${AUTH_PROVIDER_LOCAL_ENABLED:-true}
+      - AUTH_PROVIDER_LDAP_ENABLED=${AUTH_PROVIDER_LDAP_ENABLED:-false}
+      - LDAP_SERVER_URI=ldap://openldap:389
+      - LDAP_BIND_DN=cn=admin,dc=devops,dc=com
+      - LDAP_BIND_PASSWORD=${LDAP_ADMIN_PASSWORD:-adminpass}
+      - LDAP_USER_SEARCH_BASE=ou=people,dc=devops,dc=com
+      - LDAP_USER_SEARCH_FILTER=(uid={username})
+      - PORTAL_URL=http://portal.${COMPOSE_PROJECT_NAME:-authentication}.orb.local
+    ports:
+      - "8002:8000"
+    volumes:
+      - auth-keys:/srv/auth/.jwt_keys
+    networks:
+      - default
+      - devops-net
+    labels:
+      - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+
+  portal:
+    build: ./frontend
+    container_name: authentication-portal
+    ports:
+      - "5175:80"
+    depends_on:
+      - auth-backend
+    labels:
+      - "dev.orbstack.domains=portal.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    networks:
+      - default
+      - devops-net
+
+  mock-app:
+    build: ./mock-app
+    container_name: authentication-mock-app
+    # 不对外暴露端口，只能经 Traefik 网关访问（体现「受保护业务系统」）
+    depends_on:
+      - auth-backend
+
+  direct-app:
+    build: ./direct-app
+    container_name: authentication-direct-app
+    # 直连模式示例：不经统一网关，业务自身用 JWKS 公钥本地验签统一 JWT
+    environment:
+      - AUTH_JWKS_URL=http://auth-backend:8000/.well-known/jwks.json
+      - PORT=8003
+    ports:
+      - "8003:8003"
+    depends_on:
+      - auth-backend
+    labels:
+      - "dev.orbstack.domains=direct.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+
+  pilot-app:
+    build: ./pilot-app
+    container_name: authentication-pilot-app
+    # 试点接入示例：经统一网关访问（不对外直接暴露），模拟真实业务系统接入后
+    depends_on:
+      - auth-backend
+
+  oidc-demo:
+    build: ./oidc-demo
+    container_name: authentication-oidc-demo
+    # OIDC 授权码模式演示应用：client_secret 只在应用后端用于换 token
+    environment:
+      - CLIENT_ID=oidc-demo-app
+      - CLIENT_SECRET=oidc-demo-secret-123456
+      - REDIRECT_URI=http://localhost:8005/callback
+      - AUTH_AUTHORIZE_URL=http://localhost:8002/oauth/authorize
+      - AUTH_TOKEN_URL=http://auth-backend:8000/oauth/token
+      - AUTH_USERINFO_URL=http://auth-backend:8000/oauth/userinfo
+    ports:
+      - "8005:8005"
+    depends_on:
+      - auth-backend
+
+  traefik:
+    image: traefik:v3.2
+    container_name: authentication-gateway
+    ports:
+      - "8001:80"    # 统一网关入口（forwardAuth 保护 mock-app）
+      - "8004:8004"  # 试点应用入口（forwardAuth 保护 pilot-app）
+      - "8080:8080"  # Traefik Dashboard
+    volumes:
+      - ./gateway:/etc/traefik:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - auth-backend
+      - mock-app
+    labels:
+      - "dev.orbstack.domains=mock.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,traefik.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+
+volumes:
+  ldap-data:
+  ldap-config:
+  auth-keys:
+
+networks:
+  default:
+  # 统一基础设施网络（由根目录 infra/docker-compose.yml 创建）
+  devops-net:
+    external: true

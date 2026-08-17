@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>OrbStack 部署问题排查复盘</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif; color: #333; line-height: 1.6; margin: 0; }
+h1 { font-size: 22px; border-bottom: 2px solid #1677ff; padding-bottom: 8px; }
+h2 { font-size: 18px; color: #1677ff; margin-top: 28px; }
+h3 { font-size: 15px; color: #333; margin-top: 20px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+th, td { border: 1px solid #e2e5f0; padding: 8px 12px; text-align: left; }
+th { background: #f6f8fa; font-weight: 600; }
+code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 12px; color: #d46b08; }
+pre { background: #1e1e2e; color: #cdd6f4; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 12px 0; }
+pre code { background: none; color: inherit; padding: 0; }
+.tip { background: #e6f4ff; border: 1px solid #91caff; border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+.tip strong { color: #1677ff; }
+.warn { background: #fff7e6; border: 1px solid #ffd591; border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+.warn strong { color: #d46b08; }
+.bad { background: #fff1f0; border: 1px solid #ffa39e; border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+.bad strong { color: #cf1322; }
+.good { background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+.good strong { color: #389e0d; }
+.timeline { border-left: 3px solid #1677ff; padding-left: 20px; margin: 16px 0; }
+.timeline-item { position: relative; margin-bottom: 20px; }
+.timeline-item::before { content: ''; position: absolute; left: -26px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #1677ff; }
+.timeline-item.fail::before { background: #ff4d4f; }
+.timeline-item.fix::before { background: #52c41a; }
+.timeline-time { font-size: 12px; color: #999; font-weight: 600; }
+.timeline-title { font-weight: 600; margin: 4px 0; }
+.timeline-desc { font-size: 13px; color: #666; }
+.root-cause { background: #f9f0ff; border: 2px solid #722ed1; border-radius: 8px; padding: 16px; margin: 16px 0; }
+.root-cause h3 { color: #722ed1; margin-top: 0; }
+.lesson { display: flex; gap: 12px; margin: 12px 0; align-items: flex-start; }
+.lesson-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+.lesson-icon.red { background: #fff1f0; color: #cf1322; }
+.lesson-icon.green { background: #f6ffed; color: #389e0d; }
+.lesson-icon.blue { background: #e6f4ff; color: #1677ff; }
+.summary-box { background: linear-gradient(135deg, #f9f0ff 0%, #e6f4ff 100%); border-radius: 12px; padding: 20px; margin: 16px 0; }
+
+/* 文章自包含导航 */
+[id] { scroll-margin-top: 14px; }
+.doc-layout { display: flex; gap: 28px; align-items: flex-start; }
+.doc-toc { width: 220px; flex-shrink: 0; box-sizing: border-box; position: sticky; top: 0; max-height: 100vh; overflow-y: auto; padding: 8px 4px 24px 0; border-right: 1px solid #eef0f6; }
+.doc-toc.is-hidden { display: none; }
+.doc-toc-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px 10px; font-size: 13px; font-weight: 700; color: #4a5568; }
+.doc-toc-hide { cursor: pointer; border: none; background: transparent; color: #a0aec0; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
+.doc-toc-hide:hover { color: #1a202c; background: #f1f5f9; }
+.doc-toc-nav { display: flex; flex-direction: column; gap: 1px; }
+.doc-toc-nav a { display: block; padding: 6px 10px; border-left: 3px solid transparent; border-radius: 0 6px 6px 0; color: #4a5568; text-decoration: none; font-size: 13px; line-height: 1.5; transition: all .15s; }
+.doc-toc-nav a:hover { color: #1677ff; background: #f0f6ff; }
+.doc-toc-nav a.active { color: #1677ff; background: #e6f4ff; border-left-color: #1677ff; font-weight: 600; }
+.doc-toc-show { display: none; position: sticky; top: 8px; z-index: 30; border: 1px solid #c7d7f5; background: #fff; color: #1677ff; font-size: 13px; border-radius: 8px; padding: 6px 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(22,119,255,.15); }
+.doc-toc-show.is-visible { display: inline-block; }
+.doc-main { flex: 1; min-width: 0; }
+@media (max-width: 820px) {
+  .doc-layout { flex-direction: column; gap: 12px; }
+  .doc-toc { position: static; width: 100%; max-height: 220px; border-right: none; border-bottom: 1px solid #eef0f6; }
+}
+</style>
+</head>
+<body>
+
+<div class="doc-toc-show" id="doc-toc-show">📑 目录</div>
+
+<div class="doc-layout">
+<aside class="doc-toc" id="doc-toc">
+  <div class="doc-toc-head">
+    <span>📑 本文章节</span>
+    <button class="doc-toc-hide" id="doc-toc-hide">✕</button>
+  </div>
+  <nav class="doc-toc-nav">
+    <a href="#s1">1. 问题背景</a>
+    <a href="#s2">2. 问题时间线</a>
+    <a href="#s3">3. 根因分析</a>
+    <a href="#s4">4. Entrypoint 机制解析</a>
+    <a href="#s5">5. 修复方案</a>
+    <a href="#s6">6. 经验教训</a>
+    <a href="#s7">7. 知识沉淀</a>
+  </nav>
+</aside>
+
+<main class="doc-main">
+
+<h1>🔍 OrbStack 部署问题排查复盘</h1>
+<p style="color:#666;font-size:13px;margin-bottom:24px">从 CI/CD 链路故障到根因定位的完整复盘 · 2026-08-01</p>
+
+<!-- 1. 问题背景 -->
+<h2 id="s1">1. 问题背景</h2>
+
+<p>发布系统 Demo 从本地开发（dev.sh）迁移到 OrbStack Docker 部署后，<strong>CI 构建阶段（docker build）</strong>已成功修复，但 <strong>CD 部署阶段（kubectl apply）</strong>持续失败。</p>
+
+<table>
+  <tr><th>阶段</th><th>操作</th><th>状态</th><th>错误</th></tr>
+  <tr><td>CI</td><td><code>docker build -t python-app:v1.0.0</code></td><td style="color:#52c41a">✅ 成功</td><td>-</td></tr>
+  <tr><td>CD</td><td><code>kubectl apply -f deployment.yaml</code></td><td style="color:#ff4d4f">❌ 失败</td><td>连接被拒绝 / 递归引用</td></tr>
+</table>
+
+<p>错误表现经历了多个阶段：</p>
+<ul>
+  <li><code>[Errno 2] No such file or directory: 'docker'</code> — 容器内无 Docker CLI</li>
+  <li><code>[Errno 2] No such file or directory: 'kubectl'</code> — 容器内无 kubectl</li>
+  <li><code>connection refused 127.0.0.1:26443</code> — kubeconfig 地址不可达</li>
+  <li><code>Argument list too long</code> — <strong>kubectl 递归引用（最终根因）</strong></li>
+</ul>
+
+<!-- 2. 问题时间线 -->
+<h2 id="s2">2. 问题时间线</h2>
+
+<div class="timeline">
+  <div class="timeline-item fail">
+    <div class="timeline-time">Round 1</div>
+    <div class="timeline-title">Docker CLI 缺失</div>
+    <div class="timeline-desc">executor 容器尝试 <code>docker build</code>，但容器内未安装 Docker。修复：在 Dockerfile 中安装 <code>docker-ce-cli</code>。</div>
+  </div>
+
+  <div class="timeline-item fail">
+    <div class="timeline-time">Round 2</div>
+    <div class="timeline-title">kubectl 缺失</div>
+    <div class="timeline-desc">安装 Docker 后，<code>kubectl apply</code> 报错 No such file。修复：在 Dockerfile 中下载 kubectl 二进制。</div>
+  </div>
+
+  <div class="timeline-item fail">
+    <div class="timeline-time">Round 3</div>
+    <div class="timeline-title">kubeconfig server 地址不可达</div>
+    <div class="timeline-desc">kubeconfig 中 <code>127.0.0.1:26443</code> 在容器内指向自身而非宿主机。修复：entrypoint.sh 用 sed 替换为 <code>host.docker.internal</code>。</div>
+  </div>
+
+  <div class="timeline-item fail">
+    <div class="timeline-time">Round 4</div>
+    <div class="timeline-title">TLS 证书验证失败</div>
+    <div class="timeline-desc">OrbStack K8s 证书不包含 <code>host.docker.internal</code>。修复：创建 kubectl wrapper 添加 <code>--insecure-skip-tls-verify</code>。</div>
+  </div>
+
+  <div class="timeline-item fail">
+    <div class="timeline-time">Round 5</div>
+    <div class="timeline-title">Argument list too long（最终根因）</div>
+    <div class="timeline-desc">kubectl 和 kubectl.real 都是 75 字节的 wrapper 脚本，互相引用导致无限递归。<strong>卡住数小时。</strong></div>
+  </div>
+
+  <div class="timeline-item fix">
+    <div class="timeline-time">Round 6</div>
+    <div class="timeline-title">暂停修复，写分析报告</div>
+    <div class="timeline-desc">停止盲目尝试，全面分析代码逻辑，定位 entrypoint.sh 的覆盖问题，制定方案 B（Dockerfile 内完成 wrapper），一次性修复。</div>
+  </div>
+</div>
+
+<!-- 3. 根因分析 -->
+<h2 id="s3">3. 根因分析</h2>
+
+<div class="root-cause">
+  <h3>🎯 核心问题：entrypoint.sh 在容器重启时覆盖了 kubectl 二进制</h3>
+  <p style="margin-bottom:12px">Dockerfile 构建时正确创建了 wrapper，但 entrypoint.sh 每次容器启动都重新执行，第二次执行时 kubectl 已经是 wrapper 而非真实二进制。</p>
+</div>
+
+<h3>3.1 kubectl 文件状态变化</h3>
+
+<table>
+  <tr><th>时机</th><th>kubectl</th><th>kubectl.real</th><th>结果</th></tr>
+  <tr>
+    <td>Dockerfile 构建后</td>
+    <td>wrapper (75B)</td>
+    <td style="color:#52c41a">真实二进制 (55MB)</td>
+    <td style="color:#52c41a">✅ 正常</td>
+  </tr>
+  <tr>
+    <td>首次 entrypoint 执行后</td>
+    <td>新 wrapper (75B)</td>
+    <td style="color:#52c41a">从 kubectl 备份 (55MB)</td>
+    <td style="color:#52c41a">✅ 正常</td>
+  </tr>
+  <tr>
+    <td>容器 restart 后</td>
+    <td>新 wrapper (75B)</td>
+    <td style="color:#ff4d4f">从 wrapper 备份 (75B) ❌</td>
+    <td style="color:#ff4d4f">❌ 递归引用</td>
+  </tr>
+</table>
+
+<h3>3.2 递归调用链</h3>
+
+<pre><code>kubectl (75B wrapper)
+  └─ exec kubectl.real --insecure-skip-tls-verify "$@"
+       └─ kubectl.real (75B 也是 wrapper!)
+            └─ exec kubectl.real --insecure-skip-tls-verify "$@"
+                 └─ kubectl.real (同一个文件!)
+                      └─ exec kubectl.real ...
+                           └─ ... 无限递归 → Argument list too long</code></pre>
+
+<h3>3.3 entrypoint.sh 的致命逻辑</h3>
+
+<pre><code># 这段代码在容器重启时会出错：
+if [ -f /usr/local/bin/kubectl ] && ! [ -L /usr/local/bin/kubectl ]; then
+    # 第一次：kubectl 是真实二进制 → 备份正确
+    # 第二次：kubectl 是 wrapper (75B) → 备份了 wrapper！
+    cp /usr/local/bin/kubectl /usr/local/bin/kubectl.real
+fi</code></pre>
+
+<!-- 4. Entrypoint 机制解析 -->
+<h2 id="s4">4. Entrypoint 机制解析</h2>
+
+<h3>4.1 什么是 Entrypoint？</h3>
+
+<p><code>ENTRYPOINT</code> 是 Docker 容器的入口点，定义了容器启动时执行的命令。配合 <code>CMD</code> 使用时，ENTRYPOINT 是主命令，CMD 是默认参数。</p>
+
+<pre><code># Dockerfile 中
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8765"]
+
+# 实际执行：/app/entrypoint.sh uvicorn app.main:app --host 0.0.0.0 --port 8765</code></pre>
+
+<h3>4.2 执行时序</h3>
+
+<table>
+  <tr><th>阶段</th><th>执行次数</th><th>负责</th><th>适合做什么</th></tr>
+  <tr>
+    <td><strong>Dockerfile RUN</strong></td>
+    <td>构建时执行一次</td>
+    <td>Docker BuildKit</td>
+    <td>安装软件、下载文件、编译代码</td>
+  </tr>
+  <tr>
+    <td><strong>ENTRYPOINT</strong></td>
+    <td><span style="color:#ff4d4f">每次启动都执行</span></td>
+    <td>Docker Engine</td>
+    <td>环境变量注入、配置文件修复、数据库迁移</td>
+  </tr>
+  <tr>
+    <td><strong>CMD / 应用进程</strong></td>
+    <td>一次（前台运行）</td>
+    <td>应用本身</td>
+    <td>运行应用</td>
+  </tr>
+</table>
+
+<div class="warn">
+  <strong>⚠️ 关键理解：</strong>entrypoint 在容器 restart、docker compose restart 时都会重新执行。如果 entrypoint 修改了 Dockerfile 构建的文件，重启后文件状态已经改变，可能导致意外结果。
+</div>
+
+<h3>4.3 Entrypoint 是否必须？</h3>
+
+<table>
+  <tr><th>场景</th><th>是否需要 entrypoint</th><th>原因</th></tr>
+  <tr><td>应用无需启动前初始化</td><td style="color:#52c41a">❌ 不需要</td><td>直接用 CMD 即可</td></tr>
+  <tr><td>需要在启动时注入环境变量</td><td style="color:#1677ff">✅ 需要</td><td>如从 vault 拉取密钥</td></tr>
+  <tr><td>需要在启动时修改挂载的配置文件</td><td style="color:#1677ff">✅ 需要</td><td>如我们的 kubeconfig 地址替换</td></tr>
+  <tr><td>需要等待依赖服务就绪</td><td style="color:#1677ff">✅ 需要</td><td>如等待数据库启动</td></tr>
+  <tr><td>需要运行数据库迁移</td><td style="color:#1677ff">✅ 需要</td><td>如 Django migrate</td></tr>
+</table>
+
+<p>我们的场景中 entrypoint <strong>是必须的</strong> — kubeconfig 通过 volume 从宿主机挂载（只读），地址是 <code>127.0.0.1</code>，在容器内不可达，必须在启动时替换。</p>
+
+<!-- 5. 修复方案 -->
+<h2 id="s5">5. 修复方案</h2>
+
+<h3>5.1 方案对比</h3>
+
+<table>
+  <tr><th>方案</th><th>思路</th><th>优点</th><th>缺点</th><th>结果</th></tr>
+  <tr>
+    <td>A. 修复 entrypoint 判断逻辑</td>
+    <td>通过文件大小区分真实二进制和 wrapper</td>
+    <td>不改 Dockerfile</td>
+    <td>启发式判断不够健壮</td>
+    <td>未采用</td>
+  </tr>
+  <tr>
+    <td style="color:#52c41a;font-weight:600">B. wrapper 移到 Dockerfile</td>
+    <td>Dockerfile 创建 wrapper，entrypoint 只做 kubeconfig 修复</td>
+    <td>最简洁，无递归风险</td>
+    <td>无</td>
+    <td style="color:#52c41a;font-weight:600">✅ 采用</td>
+  </tr>
+  <tr>
+    <td>C. runner.py 中传参</td>
+    <td>Python 调用 kubectl 时传环境变量</td>
+    <td>不改容器层</td>
+    <td>需改 10+ 处调用</td>
+    <td>未采用</td>
+  </tr>
+</table>
+
+<h3>5.2 方案 B 的具体改动</h3>
+
+<p><strong>Dockerfile</strong> — 安装 kubectl 并创建 wrapper（构建时完成，只执行一次）：</p>
+
+<pre><code># 下载 kubectl → 重命名为 kubectl.real → 创建 wrapper
+RUN curl -LO "https://dl.k8s.io/release/.../kubectl" \
+    && chmod +x kubectl \
+    && mv kubectl /usr/local/bin/kubectl.real \
+    && printf '#!/bin/sh\nexec /usr/local/bin/kubectl.real --insecure-skip-tls-verify "$@"\n' \
+       > /usr/local/bin/kubectl \
+    && chmod +x /usr/local/bin/kubectl</code></pre>
+
+<p><strong>entrypoint.sh</strong> — 只做 kubeconfig 修复，不动 kubectl：</p>
+
+<pre><code>#!/bin/sh
+# 修复 kubeconfig server 地址
+if [ -f "/app/config/kubeconfig" ]; then
+    cp /app/config/kubeconfig /tmp/kubeconfig-fixed
+    sed -i 's|server: https://127.0.0.1:|server: https://host.docker.internal:|g' \
+        /tmp/kubeconfig-fixed
+    export KUBECONFIG=/tmp/kubeconfig-fixed
+fi
+exec "$@"</code></pre>
+
+<div class="good">
+  <strong>✅ 设计原则：</strong>Dockerfile 负责"安装"（构建时一次），entrypoint 负责"配置"（启动时每次但幂等），两者职责分明。
+</div>
+
+<!-- 6. 经验教训 -->
+<h2 id="s6">6. 经验教训</h2>
+
+<div class="lesson">
+  <div class="lesson-icon red">1</div>
+  <div>
+    <strong>先分析再动手，不要盲目试错</strong>
+    <p style="font-size:13px;color:#666;margin:4px 0 0">本次问题从 Round 1 到 Round 5 花了数小时反复重建镜像。如果一开始就检查 entrypoint.sh 内容和 kubectl 文件大小，5 分钟就能定位递归问题。<strong>看日志 → 看文件状态 → 分析逻辑 → 再改代码</strong>，这个顺序不能乱。</p>
+  </div>
+</div>
+
+<div class="lesson">
+  <div class="lesson-icon red">2</div>
+  <div>
+    <strong>理解工具的生命周期再使用</strong>
+    <p style="font-size:13px;color:#666;margin:4px 0 0">Dockerfile RUN（构建一次）、ENTRYPOINT（每次启动）、CMD（运行时）的执行时机不同。在 entrypoint 中修改 Dockerfile 构建的文件，必须考虑"第二次执行"的情况。</p>
+  </div>
+</div>
+
+<div class="lesson">
+  <div class="lesson-icon red">3</div>
+  <div>
+    <strong>容器内和宿主机是两个世界</strong>
+    <p style="font-size:13px;color:#666;margin:4px 0 0"><code>127.0.0.1</code> 在容器内指向容器自身。宿主机的服务需要通过 <code>host.docker.internal</code>（OrbStack/Docker Desktop）访问。挂载 volume 时要注意地址映射。</p>
+  </div>
+</div>
+
+<div class="lesson">
+  <div class="lesson-icon green">4</div>
+  <div>
+    <strong>写文档比改代码更有价值</strong>
+    <p style="font-size:13px;color:#666;margin:4px 0 0">写分析报告的过程迫使自己理清问题全貌，反而更快找到了根因。<strong>"如果不能清楚地解释问题，说明你还没有理解它。"</strong></p>
+  </div>
+</div>
+
+<div class="lesson">
+  <div class="lesson-icon blue">5</div>
+  <div>
+    <strong>Dockerfile 和 Entrypoint 职责分离</strong>
+    <p style="font-size:13px;color:#666;margin:4px 0 0">Dockerfile：安装软件、下载文件（构建时，幂等）。Entrypoint：注入配置、修复环境（启动时，幂等）。应用进程：运行业务逻辑。三者职责不能混淆。</p>
+  </div>
+</div>
+
+<!-- 7. 知识沉淀 -->
+<h2 id="s7">7. 知识沉淀</h2>
+
+<h3>7.1 OrbStack K8s 容器内访问清单</h3>
+
+<table>
+  <tr><th>需求</th><th>方案</th><th>注意事项</th></tr>
+  <tr><td>访问宿主机 Docker</td><td>挂载 <code>/var/run/docker.sock</code></td><td>等价于 root 权限，生产环境需限制</td></tr>
+  <tr><td>访问 OrbStack K8s</td><td>挂载 <code>~/.kube/config</code> + entrypoint 替换地址</td><td>server 地址需从 <code>127.0.0.1</code> 改为 <code>host.docker.internal</code></td></tr>
+  <tr><td>跳过 TLS 验证</td><td>kubectl wrapper 添加 <code>--insecure-skip-tls-verify</code></td><td>OrbStack 证书不含 <code>host.docker.internal</code></td></tr>
+  <tr><td>共享镜像存储</td><td>Docker 和 K8s 共享，无需推送 Registry</td><td>OrbStack 内置特性</td></tr>
+</table>
+
+<h3>7.2 Entrypoint 最佳实践</h3>
+
+<pre><code>#!/bin/sh
+# entrypoint.sh 模板
+
+# 1. 配置修复（从挂载的只读 volume 生成可写的配置）
+if [ -f "/app/config/original.conf" ]; then
+    cp /app/config/original.conf /tmp/fixed.conf
+    sed -i 's/placeholder/value/g' /tmp/fixed.conf
+    export CONFIG_PATH=/tmp/fixed.conf
+fi
+
+# 2. 等待依赖（如数据库）
+# until pg_isready -h db; do sleep 1; done
+
+# 3. 数据库迁移（幂等）
+# python manage.py migrate --noinput
+
+# 4. 启动应用
+exec "$@"</code></pre>
+
+<div class="summary-box">
+  <p style="font-size:15px;font-weight:600;margin-bottom:8px">📌 一句话总结</p>
+  <p style="font-size:14px;margin:0">entrypoint.sh 修改 Dockerfile 构建的文件时，必须考虑容器重启的场景。<strong>如果一个操作只需要执行一次，就应该放在 Dockerfile 中；如果需要每次启动都执行，必须保证幂等性。</strong></p>
+</div>
+
+<hr>
+<p style="text-align:center;color:#999;font-size:12px">文档版本: v1.0 · 最后更新: 2026-08-01</p>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var toc = document.getElementById('doc-toc');
+  var showBtn = document.getElementById('doc-toc-show');
+  var hideBtn = document.getElementById('doc-toc-hide');
+  var links = Array.prototype.slice.call(document.querySelectorAll('.doc-toc-nav a[href^="#"]'));
+  var items = links.map(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    return el ? { id: id, el: el, a: a } : null;
+  }).filter(Boolean);
+  if (!items.length) return;
+
+  function highlight() {
+    var pos = window.scrollY + 120;
+    var active = null;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].el.getBoundingClientRect().top + window.scrollY <= pos) active = items[i].id;
+    }
+    var activeEl = active ? items.filter(function (x) { return x.id === active; })[0].a : null;
+    items.forEach(function (x) { x.a.classList.toggle('active', x.a === activeEl); });
+  }
+  window.setInterval(highlight, 150);
+  window.addEventListener('scroll', highlight, { passive: true });
+  highlight();
+
+  links.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var el = document.getElementById(a.getAttribute('href').slice(1));
+      if (el) el.scrollIntoView(true);
+    });
+  });
+
+  if (hideBtn && toc) hideBtn.addEventListener('click', function () {
+    toc.classList.add('is-hidden');
+    if (showBtn) showBtn.classList.add('is-visible');
+  });
+  if (showBtn) showBtn.addEventListener('click', function () {
+    if (toc) toc.classList.remove('is-hidden');
+    showBtn.classList.remove('is-visible');
+  });
+})();
+</script>
+</body>
+</html>

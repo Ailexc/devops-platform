@@ -1,0 +1,21 @@
+# Go
+backend/bin/
+*.exe
+*.test
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/*.local
+
+# Env
+.env
+deploy/.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

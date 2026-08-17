@@ -1,0 +1,10 @@
+# Executor .dockerignore
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+.git/
+.gitignore
+*.md
+config/backend_public.pem

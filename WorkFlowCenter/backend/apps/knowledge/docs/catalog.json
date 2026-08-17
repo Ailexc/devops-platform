@@ -1,0 +1,18 @@
+{
+  "categories": [
+    { "name": "架构设计", "icon": "Connection" },
+    { "name": "核心设计", "icon": "SetUp" },
+    { "name": "产品功能", "icon": "Grid" },
+    { "name": "复盘", "icon": "Finished" }
+  ],
+  "documents": [
+    { "key": "architecture", "title": "系统架构", "category": "架构设计", "icon": "Connection", "order": 10, "summary": "流程驱动的业务自动化平台：前后端分离 + 可编排流程引擎 + 能力接入 + 规则引擎的整体架构全景。", "file": "architecture.html" },
+    { "key": "tech-stack", "title": "技术栈", "category": "架构设计", "icon": "Cpu", "order": 20, "summary": "全栈技术选型一览：后端 Django/DRF，前端 Vue3 全家桶，流程设计器 Beeflow，容器化部署。", "file": "tech-stack.html" },
+    { "key": "engine-design", "title": "流程引擎设计", "category": "核心设计", "icon": "SetUp", "order": 30, "summary": "引擎核心：树形定义归一化、生命周期推进、节点类型、会签/或签、办理节点三模式。", "file": "engine-design.html" },
+    { "key": "rule-engine", "title": "业务规则引擎", "category": "核心设计", "icon": "Operation", "order": 40, "summary": "结构化规则 AST + 上下文指标，支持预检拦截与提交复检，判定过程可解释。", "file": "rule-engine.html" },
+    { "key": "precheck-preview", "title": "提单预检与流程预演", "category": "核心设计", "icon": "View", "order": 50, "summary": "四步提单体验：选流程 → 填表单 → 审批路径预演 → 提单预检（基础+规则+办理节点DryRun）。", "file": "precheck-preview.html" },
+    { "key": "capability-orchestration", "title": "能力编排与自动执行", "category": "核心设计", "icon": "Connection", "order": 60, "summary": "能力注册 → 动作编排 → 字段绑定 → 串行/并行执行 → 异常转人工，构成自动化流水线。", "file": "capability-orchestration.html" },
+    { "key": "modules-overview", "title": "功能模块总览", "category": "产品功能", "icon": "Grid", "order": 70, "summary": "流程办理、流程配置、任务平台、能力注册、集成中心、组织权限、测试模块、知识库。", "file": "modules-overview.html" },
+    { "key": "retrospective", "title": "复盘总结", "category": "复盘", "icon": "Finished", "order": 80, "summary": "亮点、技术难点、踩坑与改进方向，一套可演示、可讲解、可面试的完整项目。", "file": "retrospective.html" }
+  ]
+}

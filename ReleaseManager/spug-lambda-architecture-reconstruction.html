@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spug-lambda 架构推演</title>
+<style>
+  :root {
+    --bg: #f5f6fa;
+    --card: #ffffff;
+    --border: #e0e3eb;
+    --text: #1a1a2e;
+    --text-secondary: #6b7280;
+    --accent: #4f46e5;
+    --accent-bg: rgba(79,70,229,0.06);
+    --green: #10b981;
+    --green-bg: rgba(16,185,129,0.08);
+    --orange: #f59e0b;
+    --orange-bg: rgba(245,158,11,0.08);
+    --red: #ef4444;
+    --red-bg: rgba(239,68,68,0.06);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 15px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font);
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.7;
+    padding: 0;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #2d2d5e 100%);
+    color: white;
+    padding: 48px 40px;
+    text-align: center;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; letter-spacing: 1px; }
+  .header .subtitle { font-size: 15px; opacity: 0.75; }
+  .header .meta { margin-top: 12px; font-size: 13px; opacity: 0.5; }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin-bottom: 32px;
+  }
+  .toc h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary); }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin-bottom: 4px; }
+  .toc a { color: var(--accent); text-decoration: none; font-size: 14px; }
+  .toc a:hover { text-decoration: underline; }
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+  }
+  .section h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section h2 .num {
+    background: var(--accent);
+    color: white;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-right: 6px;
+  }
+  .section h3 { font-size: 16px; font-weight: 600; margin-top: 20px; margin-bottom: 10px; }
+  .section p { margin-bottom: 12px; }
+  .section p.assumption {
+    background: var(--orange-bg);
+    border-left: 3px solid var(--orange);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+    color: #92400e;
+    margin-bottom: 14px;
+  }
+  .diagram-wrap {
+    background: #f8f9fc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .diagram-wrap svg { display: block; margin: 0 auto; max-width: 100%; }
+  .diagram-wrap figcaption {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+  }
+  .code-block {
+    background: #1a1a2e;
+    color: #e4e4ef;
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+    margin: 12px 0;
+    white-space: pre;
+  }
+  .code-block .kw { color: #7c9dff; }
+  .code-block .str { color: #98d8a8; }
+  .code-block .cm { color: #6b7280; font-style: italic; }
+  .table-wrap { overflow-x: auto; margin: 14px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+  }
+  th { background: #f3f4f6; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
+  td { background: white; }
+  tr:hover td { background: #fafbfc; }
+  .callout {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 14px 0;
+    font-size: 14px;
+    border-left: 4px solid;
+  }
+  .callout.key { background: var(--accent-bg); border-color: var(--accent); }
+  .callout.question { background: var(--orange-bg); border-color: var(--orange); }
+  .callout-summary {
+    background: var(--green-bg);
+    border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .callout-summary strong { color: #065f46; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .tag-blue { background: var(--accent-bg); color: var(--accent); }
+  .tag-green { background: var(--green-bg); color: #065f46; }
+  .tag-orange { background: var(--orange-bg); color: #92400e; }
+  .tag-red { background: var(--red-bg); color: #991b1b; }
+  ul, ol { margin: 8px 0 12px 20px; }
+  li { margin-bottom: 6px; }
+  .footer {
+    text-align: center;
+    padding: 24px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Spug-lambda 架构推演</h1>
+  <div class="subtitle">基于聊天记录、Demo 代码与面试指南的综合重构</div>
+  <div class="meta">生成于 2026-07-23 · 本文档为推演性质，非实际系统文档</div>
+</div>
+<div class="container">
+<div class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li><a href="#ch1">系统全景：两层安全架构</a></li>
+    <li><a href="#ch2">应用生命周期：从工单到 Spug 同步</a></li>
+    <li><a href="#ch3">CI 构建：异步执行链路</a></li>
+    <li><a href="#ch4">构建脚本：为什么每个应用维护一份</a></li>
+    <li><a href="#ch5">CD 部署：kubectl set image 模式</a></li>
+    <li><a href="#ch6">质量门禁：环境逐级收严</a></li>
+    <li><a href="#ch7">镜像生命周期与晋级</a></li>
+    <li><a href="#ch8">关键设计决策与演进方向</a></li>
+  </ol>
+</div>
+
+<div class="section" id="ch1">
+  <h2><span class="num">1</span> 系统全景：两层安全架构</h2>
+  <p>Spug 发布系统的核心设计理念是<strong>安全隔离</strong>：内网服务不能直接持有云平台密钥，所有对 AWS 的操作必须经过 API Gateway + Lambda 作为安全代理。</p>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 760 480" width="760" height="auto" xmlns="http://www.w3.org/2000/svg" style="font-family:var(--font);max-width:760px;">
+      <defs>
+        <marker id="arw" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#6B7280"/>
+        </marker>
+      </defs>
+      <line x1="200" y1="32" x2="200" y2="468" stroke="#EF4444" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="186" y="250" text-anchor="middle" font-size="11" fill="#EF4444" transform="rotate(-90,186,250)">安全边界</text>
+      <rect x="10" y="32" width="186" height="436" rx="8" fill="white" stroke="#E5E7EB"/>
+      <text x="103" y="52" text-anchor="middle" font-size="12" font-weight="700" fill="#6B7280">内网</text>
+      <rect x="24" y="70" width="88" height="36" rx="6" fill="white" stroke="#E5E7EB"/>
+      <text x="68" y="92" text-anchor="middle" font-size="11" fill="#1A1A2E">前端 (React)</text>
+      <line x1="68" y1="106" x2="68" y2="116" stroke="#6B7280" stroke-width="1" marker-end="url(#arw)"/>
+      <rect x="24" y="120" width="160" height="40" rx="6" fill="rgba(79,70,229,0.08)" stroke="#4F46E5"/>
+      <text x="104" y="136" text-anchor="middle" font-size="11" fill="#4F46E5" font-weight="600">Spug-backend</text>
+      <text x="104" y="150" text-anchor="middle" font-size="9" fill="#6B7280">Django REST API</text>
+      <text x="104" y="196" text-anchor="middle" font-size="10" fill="#6B7280">不持有任何 AWS 密钥</text>
+      <text x="104" y="210" text-anchor="middle" font-size="10" fill="#6B7280">只能通过 API Gateway</text>
+      <rect x="24" y="240" width="160" height="70" rx="6" fill="#F8F9FC" stroke="#E5E7EB"/>
+      <text x="104" y="260" text-anchor="middle" font-size="11" fill="#1A1A2E" font-weight="600">核心职能</text>
+      <text x="104" y="278" text-anchor="middle" font-size="10" fill="#6B7280">权限模型 / 发布审批</text>
+      <text x="104" y="292" text-anchor="middle" font-size="10" fill="#6B7280">CMDB 同步 / 镜像绑定</text>
+      <line x1="196" y1="140" x2="208" y2="140" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arw)"/>
+      <text x="204" y="132" text-anchor="middle" font-size="9" fill="#6B7280">HTTP</text>
+      <rect x="214" y="32" width="536" height="436" rx="8" fill="white" stroke="#E5E7EB"/>
+      <text x="482" y="52" text-anchor="middle" font-size="12" font-weight="700" fill="#1A1A2E">AWS 云</text>
+      <rect x="234" y="70" width="200" height="36" rx="6" fill="white" stroke="#F59E0B"/>
+      <text x="334" y="93" text-anchor="middle" font-size="11" fill="#F59E0B" font-weight="600">API Gateway</text>
+      <line x1="334" y1="106" x2="334" y2="116" stroke="#6B7280" stroke-width="1" marker-end="url(#arw)"/>
+      <rect x="234" y="120" width="200" height="52" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10B981"/>
+      <text x="334" y="140" text-anchor="middle" font-size="11" fill="#10B981" font-weight="600">Spug-lambda A (CI)</text>
+      <text x="334" y="156" text-anchor="middle" font-size="10" fill="#6B7280">编排构建：创建 Job 立即返回</text>
+      <rect x="234" y="184" width="200" height="52" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10B981"/>
+      <text x="334" y="204" text-anchor="middle" font-size="11" fill="#10B981" font-weight="600">Spug-lambda B (CD)</text>
+      <text x="334" y="220" text-anchor="middle" font-size="10" fill="#6B7280">kubectl set image 滚动更新</text>
+      <rect x="470" y="120" width="140" height="36" rx="6" fill="white" stroke="#8B5CF6"/>
+      <text x="540" y="143" text-anchor="middle" font-size="11" fill="#7C3AED" font-weight="600">SQS 队列</text>
+      <line x1="434" y1="146" x2="466" y2="146" stroke="#6B7280" stroke-width="1" marker-end="url(#arw)"/>
+      <text x="450" y="140" text-anchor="middle" font-size="9" fill="#6B7280">写状态</text>
+      <line x1="470" y1="120" x2="104" y2="186" stroke="#8B5CF6" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arw)"/>
+      <text x="260" y="190" font-size="9" fill="#7C3AED">拉取日志</text>
+      <rect x="234" y="260" width="300" height="100" rx="6" fill="#F8F9FC" stroke="#4F46E5"/>
+      <text x="384" y="282" text-anchor="middle" font-size="11" fill="#4F46E5" font-weight="600">EKS CI Job（临时 Pod）</text>
+      <text x="384" y="302" text-anchor="middle" font-size="10" fill="#6B7280">环境基础镜像 - 拉代码 - 编译 - 组装镜像 - 推送 ECR</text>
+      <text x="384" y="318" text-anchor="middle" font-size="10" fill="#6B7280">构建日志实时写入 SQS</text>
+      <rect x="560" y="270" width="170" height="36" rx="6" fill="white" stroke="#059669"/>
+      <text x="645" y="293" text-anchor="middle" font-size="11" fill="#059669" font-weight="600">ECR 镜像仓库</text>
+      <line x1="534" y1="310" x2="556" y2="293" stroke="#6B7280" stroke-width="1" marker-end="url(#arw)"/>
+      <rect x="234" y="380" width="300" height="70" rx="6" fill="rgba(79,70,229,0.06)" stroke="#4F46E5"/>
+      <text x="384" y="400" text-anchor="middle" font-size="11" fill="#4F46E5" font-weight="600">EKS Deployment</text>
+      <text x="384" y="418" text-anchor="middle" font-size="10" fill="#6B7280">kubectl set image 触发滚动更新</text>
+      <line x1="334" y1="316" x2="334" y2="378" stroke="#6B7280" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arw)"/>
+      <text x="320" y="352" text-anchor="middle" font-size="9" fill="#6B7280">CD Lambda 触发</text>
+    </svg>
+    <figcaption>图 1-1：Spug 两层安全架构全景</figcaption>
+  </div>
+  <p>关键要点：Spug-backend 不持有任何 AWS 密钥，所有的 AWS 操作（EC2 SSM、EKS kubectl、ECR 推送）都由 Lambda 执行。这意味着即使内网被攻破，攻击者也无法直接操作 AWS 资源。</p>
+</div>
+
+<div class="section" id="ch2">
+  <h2><span class="num">2</span> 应用生命周期：从工单到 Spug 同步</h2>
+  <p>一个应用从申请到可以在 Spug 上发布，需要经过两个完全解耦的阶段。</p>
+  <h3>第一阶段：工单流程（与 Spug 无关）</h3>
+  <div class="code-block">
+<span class="cm"># 业务方提交"新增服务"或"存量服务新增环境"工单</span>
+    ↓
+工单系统自动化节点调用运维 API
+    ↓
+运维 API 根据提交信息生成初始 K8s YAML
+    ↓
+YAML 存入运维 Git 仓库并首次 apply 到集群
+    ↓
+应用信息录进 CMDB（应用名、语言、业务线、负责人等）</div>
+  <p class="assumption">此阶段 Spug 完全不参与。YAML 中的 image 通常写入约定的初始值（如占位镜像），目的是让 Deployment 对象先在集群中存在。后续每次发布都由 Spug-lambda 通过 <code>kubectl set image</code> 来修改。</p>
+  <h3>第二阶段：Spug 从 CMDB 同步</h3>
+  <div class="code-block">
+Spug 定时/事件驱动从 CMDB 同步应用数据
+    ↓
+根据 language 字段匹配 Spug 内部镜像配置表
+    ↓
+绑定到 Application 表：builder_image + base_image
+    ↓
+Java  → maven:3.9-temurin-21  +  temurin:21-jre-alpine
+Go    → golang:1.23-alpine      +  alpine:3.20
+Node  → node:20-alpine           +  node:20-alpine
+Python→ python:3.11-slim         +  python:3.11-slim</div>
+  <div class="callout key"><strong>关键设计</strong>：开发者不需要在工单中填写镜像信息。Spug 同步时根据 language 字段匹配预设规则，自动完成镜像绑定。应用基础镜像和环境基础镜像均在 AWS ECR 中预置。</div>
+</div>
+
+<div class="section" id="ch3">
+  <h2><span class="num">3</span> CI 构建：异步执行链路</h2>
+  <p>CI 构建采用<strong>全异步</strong>模式。Spug-lambda A 只做"创建 Job"这一个轻量操作（1-2 秒），真正的编译在 EKS Job 中异步跑。通过 SQS 做异步回调，后端收到状态后通过 WebSocket 推送给前端实时展示。</p>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 740 460" width="740" height="auto" xmlns="http://www.w3.org/2000/svg" style="font-family:var(--font);max-width:740px;">
+      <defs>
+        <marker id="a3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#6B7280"/>
+        </marker>
+      </defs>
+      <text x="370" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#1A1A2E">CI 构建异步执行时序</text>
+      <text x="370" y="48" text-anchor="middle" font-size="10" fill="#6B7280">用户点击发布</text>
+      <rect x="280" y="56" width="180" height="34" rx="6" fill="rgba(79,70,229,0.08)" stroke="#4F46E5"/>
+      <text x="370" y="78" text-anchor="middle" font-size="11" fill="#4F46E5" font-weight="600">前端 Backend: POST /releases/:id/build</text>
+      <line x1="370" y1="90" x2="370" y2="100" stroke="#6B7280" stroke-width="1" marker-end="url(#a3)"/>
+      <text x="370" y="114" text-anchor="middle" font-size="10" fill="#6B7280">Backend 转发到 Lambda</text>
+      <rect x="250" y="122" width="240" height="34" rx="6" fill="#F8F9FC" stroke="#E5E7EB"/>
+      <text x="370" y="144" text-anchor="middle" font-size="11" fill="#1A1A2E">Backend API Gateway Lambda A</text>
+      <line x1="370" y1="156" x2="370" y2="166" stroke="#6B7280" stroke-width="1" marker-end="url(#a3)"/>
+      <text x="370" y="180" text-anchor="middle" font-size="10" fill="#6B7280">Lambda 创建 Job 后快速返回（1-2秒）</text>
+      <rect x="260" y="188" width="220" height="34" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10B981"/>
+      <text x="370" y="210" text-anchor="middle" font-size="11" fill="#10B981" font-weight="600">Lambda 创建 K8s Job 返回 code 200</text>
+      <rect x="140" y="240" width="160" height="110" rx="8" fill="#F8F9FC" stroke="#4F46E5"/>
+      <text x="220" y="262" text-anchor="middle" font-size="11" fill="#4F46E5" font-weight="600">EKS CI Job (异步运行)</text>
+      <text x="220" y="282" text-anchor="middle" font-size="10" fill="#6B7280">拉代码 / 编译 / 组装镜像</text>
+      <text x="220" y="298" text-anchor="middle" font-size="10" fill="#6B7280">推送 ECR</text>
+      <text x="220" y="314" text-anchor="middle" font-size="10" fill="#6B7280">写状态到 SQS</text>
+      <line x1="300" y1="300" x2="330" y2="300" stroke="#8B5CF6" stroke-width="1.5" marker-end="url(#a3)"/>
+      <text x="315" y="292" text-anchor="middle" font-size="9" fill="#7C3AED">写日志</text>
+      <rect x="334" y="240" width="140" height="60" rx="6" fill="white" stroke="#8B5CF6"/>
+      <text x="404" y="262" text-anchor="middle" font-size="11" fill="#7C3AED" font-weight="600">SQS 队列</text>
+      <text x="404" y="280" text-anchor="middle" font-size="10" fill="#6B7280">build-log-queue</text>
+      <text x="404" y="294" text-anchor="middle" font-size="10" fill="#6B7280">build-status-queue</text>
+      <line x1="404" y1="240" x2="404" y2="200" stroke="#8B5CF6" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a3)"/>
+      <text x="430" y="218" text-anchor="middle" font-size="9" fill="#7C3AED">Backend 从 SQS 拉取状态</text>
+      <rect x="500" y="240" width="160" height="60" rx="8" fill="rgba(79,70,229,0.08)" stroke="#4F46E5"/>
+      <text x="580" y="262" text-anchor="middle" font-size="11" fill="#4F46E5" font-weight="600">Spug-backend</text>
+      <text x="580" y="280" text-anchor="middle" font-size="10" fill="#6B7280">长轮询 SQS 写 TaskLog</text>
+      <line x1="660" y1="270" x2="690" y2="270" stroke="#6B7280" stroke-width="1.5" marker-end="url(#a3)"/>
+      <rect x="694" y="240" width="36" height="120" rx="6" fill="#F8F9FC" stroke="#E5E7EB"/>
+      <text x="712" y="290" text-anchor="middle" font-size="10" fill="#1A1A2E" transform="rotate(90,712,290)">WebSocket</text>
+      <rect x="694" y="130" width="36" height="100" rx="6" fill="white" stroke="#E5E7EB"/>
+      <text x="712" y="170" text-anchor="middle" font-size="10" fill="#1A1A2E" transform="rotate(90,712,170)">前端实时展示</text>
+      <line x1="712" y1="130" x2="712" y2="100" stroke="#6B7280" stroke-width="1" marker-end="url(#arw)"/>
+      <rect x="260" y="370" width="240" height="34" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10B981"/>
+      <text x="370" y="392" text-anchor="middle" font-size="11" fill="#10B981" font-weight="600">CI 完成 状态更新 调 CD Lambda</text>
+      <line x1="60" y1="56" x2="60" y2="420" stroke="#E5E7EB" stroke-width="1"/>
+      <text x="50" y="60" text-anchor="end" font-size="9" fill="#6B7280">T+0s</text>
+      <text x="50" y="140" text-anchor="end" font-size="9" fill="#6B7280">T+1s</text>
+      <text x="50" y="200" text-anchor="end" font-size="9" fill="#6B7280">T+2s</text>
+      <text x="50" y="300" text-anchor="end" font-size="9" fill="#6B7280">T+5m~15m</text>
+      <text x="50" y="395" text-anchor="end" font-size="9" fill="#6B7280">T+完成</text>
+    </svg>
+    <figcaption>图 3-1：CI 构建异步执行时序</figcaption>
+  </div>
+  <p>设计要点：通过两个 SQS 队列解耦 —— <span class="tag tag-blue">build-log-queue</span> 承载实时日志（允许丢失），<span class="tag tag-green">build-status-queue</span> 承载构建终态（精确一次投递）。这绕过了 Lambda 15 分钟的超时限制——Java 项目编译 20 分钟也不会出问题。</p>
+</div>
+
+<div class="section" id="ch4">
+  <h2><span class="num">4</span> 构建脚本：为什么每个应用维护一份</h2>
+  <div class="callout question"><strong>你的困惑</strong>：每个应用/环境都要维护一份构建脚本，Lambda 仓库变成配置库。为什么不能统一模板？</div>
+  <h3>现实中的差异来源</h3>
+  <p>表面上看都是 <code>mvn build</code> 或 <code>go build</code>，但每个应用脚本里暗藏了大量隐式差异：</p>
+  <div class="code-block">
+<span class="cm"># app-a/prod.build.sh（Java 应用，Maven 多模块 + 特殊 profile）</span>
+mvn clean package -DskipTests -P prod \
+  -Dsonar.host.url=... \
+  -Dmaven.repo.local=/cache/m2
+docker build -t $ECR_REPO/$APP:$TAG .
+docker push $ECR_REPO/$APP:$TAG
+
+<span class="cm"># app-b/prod.build.sh（Node 应用，前端 + 后端 + CDN 部署）</span>
+npm ci --production=false
+npm run build:server
+npm run build:client
+aws s3 cp dist/ s3://app-b-static/ --recursive
+docker build -t $ECR_REPO/$APP:$TAG .
+docker push $ECR_REPO/$APP:$TAG
+
+<span class="cm"># app-c/prod.build.sh（Go 应用，编译产物走 EC2 路径）</span>
+go build -o app -ldflags "-X main.version=$TAG"
+aws s3 cp app s3://app-c-binaries/$TAG/
+aws ssm send-command --instance-ids i-xxx \
+  --document-name AWS-RunShellScript \
+  --parameters commands="aws s3 cp s3://app-c-binaries/$TAG/app /opt/app && systemctl restart app"</div>
+  <h3>演进路线</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>阶段</th><th>方案</th><th>覆盖度</th></tr></thead>
+      <tbody>
+        <tr><td>第 1 层</td><td>按语言提供默认模板 + override 机制</td><td>80% 通用 + 20% 特殊</td></tr>
+        <tr><td>第 2 层</td><td>模板变量注入（Profile、缓存路径作为参数）</td><td>95% 通用</td></tr>
+        <tr><td>第 3 层</td><td>构建脚本归业务方，存项目仓库（spug.build.sh）</td><td>100% 去中心化</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout key"><strong>核心矛盾</strong>：这本质上不是技术问题，而是组织问题——业务团队想要自主权，Lambda 维护者想要通用性。</div>
+</div>
+
+<div class="section" id="ch5">
+  <h2><span class="num">5</span> CD 部署：kubectl set image 模式</h2>
+  <p>CI 构建完成后，CD Lambda 直接通过 <code>kubectl set image</code> 修改集群中正在运行的 Deployment。不经过 Git 仓库，不重新 apply 整个 YAML。</p>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 700 220" width="700" height="auto" xmlns="http://www.w3.org/2000/svg" style="font-family:var(--font);max-width:700px;">
+      <defs>
+        <marker id="a4" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#6B7280"/>
+        </marker>
+      </defs>
+      <rect x="10" y="20" width="160" height="40" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10B981"/>
+      <text x="90" y="46" text-anchor="middle" font-size="11" fill="#10B981" font-weight="600">CI 构建完成</text>
+      <line x1="170" y1="40" x2="190" y2="40" stroke="#6B7280" stroke-width="1.5" marker-end="url(#a4)"/>
+      <rect x="194" y="20" width="170" height="40" rx="6" fill="rgba(79,70,229,0.08)" stroke="#4F46E5"/>
+      <text x="279" y="46" text-anchor="middle" font-size="11" fill="#4F46E5" font-weight="600">Backend 调 CD Lambda</text>
+      <line x1="364" y1="40" x2="384" y2="40" stroke="#6B7280" stroke-width="1.5" marker-end="url(#a4)"/>
+      <rect x="388" y="20" width="200" height="40" rx="6" fill="white" stroke="#F59E0B"/>
+      <text x="488" y="46" text-anchor="middle" font-size="11" fill="#F59E0B" font-weight="600">API Gateway Lambda B</text>
+      <rect x="50" y="80" width="640" height="130" rx="8" fill="white" stroke="#E5E7EB"/>
+      <text x="370" y="102" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1A2E">Lambda B 执行 CD 操作</text>
+      <rect x="80" y="116" width="580" height="26" rx="4" fill="#F8F9FC" stroke="#E5E7EB"/>
+      <text x="370" y="134" text-anchor="middle" font-size="11" fill="#1A1A2E" font-family="monospace">kubectl set image deployment/payment-api payment-api=ecr/payment-api:build-456</text>
+      <line x1="370" y1="142" x2="370" y2="150" stroke="#6B7280" stroke-width="1" marker-end="url(#a4)"/>
+      <rect x="80" y="154" width="580" height="40" rx="6" fill="rgba(79,70,229,0.06)" stroke="#4F46E5"/>
+      <text x="370" y="172" text-anchor="middle" font-size="11" fill="#4F46E5" font-weight="600">K8s 检测到 spec.template 变化 触发滚动更新</text>
+      <text x="370" y="188" text-anchor="middle" font-size="10" fill="#6B7280">新 Pod 拉取新镜像 Ready 旧 Pod 逐一销毁</text>
+    </svg>
+    <figcaption>图 5-1：CD 部署链路</figcaption>
+  </div>
+  <p>回滚能力：K8s 的 Deployment 天然支持 <code>kubectl rollout undo</code>。在 Spug 层面，回滚操作通过调用 CD Lambda 来执行，Lambda 内部决定是执行 <code>rollout undo</code> 还是用旧的 image tag 再执行一次 <code>set image</code>。</p>
+</div>
+
+<div class="section" id="ch6">
+  <h2><span class="num">6</span> 质量门禁：环境逐级收严</h2>
+  <p>同一个发布单从 dev 走到 prod，每进一级环境多一层检查：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>门禁</th><th>DEV / TEST</th><th>STAGING</th><th>PROD</th></tr></thead>
+      <tbody>
+        <tr><td>Git 分支限制</td><td>不限</td><td>release/*</td><td>main</td></tr>
+        <tr><td>代码 Review</td><td>不检查</td><td>至少 1 人 Approve</td><td>至少 2 人 Approve</td></tr>
+        <tr><td>安全扫描</td><td>不检查</td><td>SAST 扫描</td><td>SAST + 依赖扫描</td></tr>
+        <tr><td>审批</td><td>无需审批</td><td>应用负责人审批</td><td>技术经理 / 架构师</td></tr>
+        <tr><td>镜像要求</td><td>任意构建</td><td>任意构建</td><td>必须从 staging 晋升</td></tr>
+        <tr><td>灰度 / 全量</td><td>直接部署</td><td>直接部署</td><td>灰度 10%  观察  全量</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>在代码层面，这体现为发布状态机中每个阶段的前置检查条件：</p>
+  <div class="code-block">
+STAGES = [
+    (<span class="str">'deploy_dev'</span>,             [<span class="str">'build_done'</span>]),           <span class="cm"># 仅需构建完成</span>
+    (<span class="str">'approve_staging'</span>,         [<span class="str">'test_done'</span>, <span class="str">'security_scan_passed'</span>]),
+    (<span class="str">'approve_prod'</span>,            [<span class="str">'staging_done'</span>, <span class="str">'branch_is_main'</span>,
+                                <span class="str">'review_approved'</span>, <span class="str">'image_promoted_from_staging'</span>]),
+    (<span class="str">'gray_release'</span>,             [<span class="str">'prod_approved'</span>]),
+    (<span class="str">'full_release'</span>,             [<span class="str">'gray_verified'</span>]),
+]</div>
+</div>
+
+<div class="section" id="ch7">
+  <h2><span class="num">7</span> 镜像生命周期与晋级</h2>
+  <p>生产环境不允许使用未经过预发验证的镜像。这通过 <strong>ArtifactPromotion</strong>（制品晋级）机制来保证：</p>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 700 140" width="700" height="auto" xmlns="http://www.w3.org/2000/svg" style="font-family:var(--font);max-width:700px;">
+      <defs>
+        <marker id="a6" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#6B7280"/>
+        </marker>
+      </defs>
+      <rect x="10" y="30" width="90" height="50" rx="6" fill="#E8F5E9" stroke="#4CAF50"/>
+      <text x="55" y="50" text-anchor="middle" font-size="10" font-weight="600" fill="#2E7D32">CI 构建</text>
+      <text x="55" y="66" text-anchor="middle" font-size="9" fill="#66BB6A">build-456</text>
+      <line x1="100" y1="55" x2="116" y2="55" stroke="#6B7280" stroke-width="1.5" marker-end="url(#a6)"/>
+      <rect x="120" y="30" width="90" height="50" rx="6" fill="#FFF3E0" stroke="#FF9800"/>
+      <text x="165" y="50" text-anchor="middle" font-size="10" font-weight="600" fill="#E65100">dev 验证</text>
+      <text x="165" y="66" text-anchor="middle" font-size="9" fill="#FFA726">通过</text>
+      <line x1="210" y1="55" x2="226" y2="55" stroke="#6B7280" stroke-width="1.5" marker-end="url(#a6)"/>
+      <rect x="230" y="30" width="90" height="50" rx="6" fill="#FFF3E0" stroke="#FF9800"/>
+      <text x="275" y="50" text-anchor="middle" font-size="10" font-weight="600" fill="#E65100">test 验证</text>
+      <text x="275" y="66" text-anchor="middle" font-size="9" fill="#FFA726">通过</text>
+      <line x1="320" y1="55" x2="336" y2="55" stroke="#6B7280" stroke-width="1.5" marker-end="url(#a6)"/>
+      <rect x="340" y="30" width="90" height="50" rx="6" fill="#FFF3E0" stroke="#FF9800"/>
+      <text x="385" y="50" text-anchor="middle" font-size="10" font-weight="600" fill="#E65100">staging 验证</text>
+      <text x="385" y="66" text-anchor="middle" font-size="9" fill="#FFA726">通过</text>
+      <line x1="430" y1="55" x2="446" y2="55" stroke="#6B7280" stroke-width="1.5" marker-end="url(#a6)"/>
+      <rect x="450" y="30" width="90" height="50" rx="6" fill="#FFEBEE" stroke="#F44336"/>
+      <text x="495" y="50" text-anchor="middle" font-size="10" font-weight="600" fill="#C62828">prod 部署</text>
+      <text x="495" y="66" text-anchor="middle" font-size="9" fill="#EF5350">build-456</text>
+      <text x="10" y="115" font-size="10" fill="#6B7280">ArtifactPromotion 记录：null  dev | dev  test | test  staging | staging  prod</text>
+    </svg>
+    <figcaption>图 7-1：镜像晋级链路。每个晋级步骤对应一个发布阶段（ReleaseTask）。</figcaption>
+  </div>
+  <p>晋级机制的价值：防止"跳过验证直接上生产"、每一级晋级对应审批节点形成审计链、支持回退到上一个经过验证的版本。</p>
+</div>
+
+<div class="section" id="ch8">
+  <h2><span class="num">8</span> 关键设计决策与演进方向</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>决策</th><th>选择</th><th>权衡</th></tr></thead>
+      <tbody>
+        <tr><td>安全隔离</td><td>API Gateway + Lambda 代理层</td><td>增加链路复杂度，满足安全合规</td></tr>
+        <tr><td>CI 执行</td><td>Lambda 创建 EKS Job + SQS 异步回调</td><td>绕过 15 分钟超时；需额外队列监控</td></tr>
+        <tr><td>实时日志</td><td>CI Job  SQS  Backend  WebSocket  前端</td><td>全链路异步，延迟约 1-3 秒</td></tr>
+        <tr><td>CD 方式</td><td>kubectl set image 直接修改集群</td><td>简单直接，不回写 Git；Git 中 YAML 可能过期</td></tr>
+        <tr><td>YAML 生成</td><td>工单自动化  运维 API  运维 Git 仓库</td><td>与 Spug 解耦，各司其职</td></tr>
+        <tr><td>镜像绑定</td><td>Spug 从 CMDB 同步后按语言匹配</td><td>开发者无感，规则需维护</td></tr>
+        <tr><td>构建脚本</td><td>每个应用/环境独立维护</td><td>灵活但冗余，存在软件腐烂趋势</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout-summary"><strong>1. 构建脚本模板化</strong><br>按语言提供默认模板覆盖 80% 场景，特殊应用通过 override 或变量注入处理。</div>
+  <div class="callout-summary"><strong>2. 引入 GitOps</strong><br>将 CD 从 set image 演进为 ArgoCD 模式，每次构建后自动修改 Git 仓库 YAML 由 ArgoCD sync 到集群。</div>
+  <div class="callout-summary"><strong>3. 构建脚本归业务方</strong><br>将脚本迁移到业务代码仓库（spug.build.sh），Lambda 构建时从 Git 拉取，脚本版本与代码版本天然一致。</div>
+</div>
+
+<div class="footer">
+  <p>本文档基于聊天记录、Demo 代码（Django + React + K8s demo）及面试指南综合推演。非实际系统文档，仅用于梳理理解。</p>
+</div>
+
+</div>
+</body>
+</html>

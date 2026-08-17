@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>能力包与接口契约</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.75; color: #1f2937; max-width: 860px; margin: 0 auto; padding: 32px 24px; background: #fff; }
+  @media (prefers-color-scheme: dark) { body { color: #d1d5db; background: #0f172a; } }
+  h1 { font-size: 26px; border-bottom: 2px solid #d97706; padding-bottom: 10px; }
+  h2 { font-size: 19px; color: #d97706; margin-top: 30px; border-left: 4px solid #d97706; padding-left: 10px; }
+  h3 { font-size: 15px; }
+  code { background: #fffbeb; color: #b45309; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  pre { background: #1e293b; color: #e2e8f0; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; }
+  th { background: #fffbeb; }
+  @media (prefers-color-scheme: dark) { th { background: #1e293b; } th, td { border-color: #374151; } }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-right: 6px; }
+  .tag.amber { background: #fef3c7; color: #b45309; }
+  .tag.blue { background: #dbeafe; color: #1d4ed8; }
+  .tag.green { background: #dcfce7; color: #15803d; }
+  .callout { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  @media (prefers-color-scheme: dark) { .callout { background: #451a03; border-color: #78350f; } }
+  .box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+  @media (prefers-color-scheme: dark) { .box { background: #111827; border-color: #1f2937; } }
+</style>
+</head>
+<body>
+<h1>📦 能力包与接口契约</h1>
+<p><span class="tag amber">业务设计</span><span class="tag blue">复盘总结</span></p>
+<p class="callout">本文复盘系统的核心业务抽象——能力包（Capability）：如何把「接口权限」声明式地打包成可申请、可审批、可授权的单元，并借 OpenAPI 解析出接口契约。</p>
+
+<h2>1. 能力包模型</h2>
+<p>能力包是权限的<strong>声明式载体</strong>，把散落的接口权限组织成可复用的业务单元：</p>
+<table>
+<tr><th>概念</th><th>说明</th><th>示例</th></tr>
+<tr><td>能力 Capability</td><td>对某一业务域的权限集合</td><td>主机监控</td></tr>
+<tr><td>数据模型 DataModel</td><td>能力操作的对象</td><td>host（主机）</td></tr>
+<tr><td>预设 Preset</td><td>能力的一组固定权限组合（接口子集 + 数据范围）</td><td>只读监控 / 完整监控</td></tr>
+<tr><td>权限点 Action</td><td>最小接口权限单元</td><td>host:list / host:read / host:create</td></tr>
+</table>
+
+<h2>2. 授权闭环：从声明到生效</h2>
+<pre>
+应用 Owner
+   │ ① 声明能力（绑定接口 + 数据模型）
+   │ ② 配置预设（接口组合 + 可申请主体 + 数据范围）
+   │ ③ 上架市场（走审批）
+   ▼
+能力市场（用户视角）
+   │ ④ 浏览 → 选预设 → 选主体（人/程序） → 选数据范围
+   │ ⑤ 提交申请（走审批：申请人≠审批人，SoD）
+   ▼
+审批通过（系统自动）
+   │ ⑥ 生成 Casbin 策略（动作级）
+   │ ⑦ 写入 OpenFGA 关系元组（数据级，可选）
+   │ ⑧ 策略分发 → 网关实时生效
+</pre>
+
+<h2>3. 数据范围控制</h2>
+<p>预设可配置数据级控制（数据范围维度），申请者只能访问匹配范围内的数据实例：</p>
+<pre>
+// 数据范围维度示例：环境 × 地域 × 实例
+env    ∈ { prod, staging, dev }
+region ∈ { cn-east-1, cn-north-1 }
+instance ∈ { host-01, host-02, ... }
+
+// 申请：prod + cn-east-1 → 运行时按 grantee 解析为 CEL 条件
+条件: env == "prod" && region == "cn-east-1"
+</pre>
+
+<h2>4. 接口契约（OpenAPI 解析）</h2>
+<p>系统的接口权限点（Action）由 OpenAPI 规格自动解析而来，并携带<strong>接口契约</strong>（调用示例），让权限申请方「所见即所得」：</p>
+<pre>
+// Action 携带的接口契约字段
+{
+  "code": "host:read",
+  "name": "读取主机详情",
+  "method": "GET",
+  "path": "/api/v1/hosts/{id}",
+  "req_example": "GET /api/v1/hosts/1",
+  "resp_example": "{ \"id\": 1, \"name\": \"web-01\", \"env\": \"prod\" }"
+}
+</pre>
+<div class="box"><b>解析链路</b>：应用注册时提供 OpenAPI → 解析器提取每个 operation 的 <code>parameters / requestBody / responses</code> → 用 schema 示例生成器产出请求/响应示例 → 落库到 Action。</div>
+<div class="box"><b>消费端</b>：能力市场预设卡片展示 method + path + 可展开的请求/响应示例；应用详情「我接入了谁」展示上游接口契约。让授权决策有据可依。</div>
+
+<h2>5. 安全边界：应用管理 vs 应用市场</h2>
+<p>应用管理（/apps）是 Owner 私有的管理工作台；应用市场（/app-market）是公开申请门户。两者语义不同，边界必须清晰：</p>
+<table>
+<tr><th>面</th><th>可见性</th><th>内容</th></tr>
+<tr><td>应用管理</td><td>仅 Owner / admin</td><td>完整详情、权限点、凭证、网络信息</td></tr>
+<tr><td>应用市场</td><td>全部登录用户</td><td>公开目录（id/code/name/类型/简介）+ 申请接入所需网络/鉴权信息</td></tr>
+</table>
+<div class="box"><b>修复教训</b>：早期管理面接口对任意登录用户放行，非 Owner 能看到所有应用及凭证信息。修复为按 Owner 过滤 + 收紧 mgScope + 拆出公开目录接口。</div>
+
+<h2>6. 踩坑复盘</h2>
+<ul>
+<li><b>授权主体映射</b>：程序申请（ReqSubjectApp）落库策略时需映射为服务主体（SubjectService），否则主体类型错乱、策略失效。</li>
+<li><b>Action ID 回填</b>：UpsertAction 对已存在记录不返回 ID，权限点引用会变成 <code>[0,0]</code>；需重新 ByCode 查询。</li>
+<li><b>接口契约聚合</b>：「我接入了谁」的上游接口需跨所有策略按应用聚合 action_ids，才能得到完整契约视图。</li>
+</ul>
+
+<h2>7. 小结</h2>
+<p>能力包把「接口权限」声明式地组织成可申请、可审批、可授权的业务单元；接口契约让授权决策透明化；清晰的公私边界保障安全。这是系统业务层的核心。</p>
+</body>
+</html>

@@ -1,0 +1,226 @@
+import { useEffect, useState, useCallback } from 'react';
+import {
+  Table, Tag, Typography, Space, Button, Modal, Input, message, Tabs, Descriptions,
+} from 'antd';
+import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { approvalApi } from '../../api';
+
+const { Text } = Typography;
+const { TextArea } = Input;
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'processing', approved: 'success', rejected: 'error',
+};
+const STATUS_LABELS: Record<string, string> = {
+  pending: '待审批', approved: '已通过', rejected: '已驳回',
+};
+const ENV_COLORS: Record<string, string> = {
+  dev: 'blue', test: 'green', staging: 'orange', prod: 'red',
+};
+const ENV_LABELS: Record<string, string> = {
+  dev: '开发', test: '测试', staging: '预发', prod: '生产',
+};
+const GRANT_SCOPE_LABELS: Record<string, string> = {
+  own_group: '本组权限', cross_group: '跨组协作',
+};
+
+export default function PermissionApprovalPage() {
+  const [pendingList, setPendingList] = useState<any[]>([]);
+  const [historyList, setHistoryList] = useState<any[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [actionType, setActionType] = useState<'approved' | 'rejected'>('approved');
+  const [selectedApproval, setSelectedApproval] = useState<any>(null);
+  const [actionComment, setActionComment] = useState('');
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+
+  const fetchPending = useCallback(() => {
+    setPendingLoading(true);
+    approvalApi.permissionPending().then((res: any) => {
+      setPendingList(res.data || []);
+    }).finally(() => setPendingLoading(false));
+  }, []);
+
+  const fetchHistory = useCallback(() => {
+    setHistoryLoading(true);
+    approvalApi.permissionList().then((res: any) => {
+      setHistoryList(res.data || []);
+    }).finally(() => setHistoryLoading(false));
+  }, []);
+
+  useEffect(() => { fetchPending(); fetchHistory(); }, [fetchPending, fetchHistory]);
+
+  const handleApprove = (record: any, type: 'approved' | 'rejected') => {
+    setSelectedApproval(record);
+    setActionType(type);
+    setActionComment('');
+    setActionModalVisible(true);
+  };
+
+  const confirmAction = async () => {
+    if (!selectedApproval) return;
+    setActionSubmitting(true);
+    try {
+      const apiFn = actionType === 'approved'
+        ? () => approvalApi.approveStep(selectedApproval.id, actionComment)
+        : () => approvalApi.rejectStep(selectedApproval.id, actionComment);
+      await apiFn();
+      message.success(actionType === 'approved' ? '审批已通过' : '已驳回');
+      setActionModalVisible(false);
+      fetchPending();
+      fetchHistory();
+    } catch (e: any) {
+      message.error(e?.message || '操作失败');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  const renderStep = (r: any) => {
+    if (r.step_order && r.total_steps && r.total_steps > 1) {
+      return (
+        <Text type="secondary">
+          第 {r.step_order}/{r.total_steps} 步
+          {r.step_name && <span> · {r.step_name}</span>}
+        </Text>
+      );
+    }
+    return <Text type="secondary">-</Text>;
+  };
+
+  const pendingColumns = [
+    {
+      title: '申请人', dataIndex: 'applicant_name', key: 'applicant_name', width: 100,
+      render: (v: string) => <Text strong>{v || '-'}</Text>,
+    },
+    {
+      title: '应用', dataIndex: 'app_name', key: 'app_name', width: 140,
+      render: (v: string) => <Text strong>{v || '-'}</Text>,
+    },
+    {
+      title: '环境', dataIndex: 'env_type', key: 'env_type', width: 90,
+      render: (v: string) => <Tag color={ENV_COLORS[v] || 'default'}>{ENV_LABELS[v] || v || '-'}</Tag>,
+    },
+    {
+      title: '授权范围', dataIndex: 'grant_scope', key: 'grant_scope', width: 100,
+      render: (v: string) => (
+        <Tag color={v === 'cross_group' ? 'orange' : 'blue'}>
+          {GRANT_SCOPE_LABELS[v] || v || '-'}
+        </Tag>
+      ),
+    },
+    {
+      title: '审批步骤', key: 'step', width: 150,
+      render: (_: any, r: any) => renderStep(r),
+    },
+    {
+      title: '审批人', dataIndex: 'approver_name', key: 'approver_name', width: 100,
+    },
+    {
+      title: '申请时间', dataIndex: 'created_at', key: 'created_at', width: 160,
+    },
+    {
+      title: '操作', key: 'action', width: 160,
+      render: (_: any, record: any) => (
+        <Space size="small">
+          <Button type="link" style={{ color: '#52c41a' }} size="small" icon={<CheckOutlined />}
+            onClick={() => handleApprove(record, 'approved')}>通过</Button>
+          <Button type="link" danger size="small" icon={<CloseOutlined />}
+            onClick={() => handleApprove(record, 'rejected')}>驳回</Button>
+        </Space>
+      ),
+    },
+  ];
+
+  const historyColumns = [
+    {
+      title: '申请人', dataIndex: 'applicant_name', key: 'applicant_name', width: 100,
+      render: (v: string) => <Text strong>{v || '-'}</Text>,
+    },
+    {
+      title: '应用', dataIndex: 'app_name', key: 'app_name', width: 140,
+      render: (v: string) => <Text strong>{v || '-'}</Text>,
+    },
+    {
+      title: '环境', dataIndex: 'env_type', key: 'env_type', width: 90,
+      render: (v: string) => <Tag color={ENV_COLORS[v] || 'default'}>{ENV_LABELS[v] || v || '-'}</Tag>,
+    },
+    {
+      title: '授权范围', dataIndex: 'grant_scope', key: 'grant_scope', width: 100,
+      render: (v: string) => (
+        <Tag color={v === 'cross_group' ? 'orange' : 'blue'}>
+          {GRANT_SCOPE_LABELS[v] || v || '-'}
+        </Tag>
+      ),
+    },
+    {
+      title: '审批步骤', key: 'step', width: 150,
+      render: (_: any, r: any) => renderStep(r),
+    },
+    {
+      title: '结果', dataIndex: 'action', key: 'action_result', width: 90,
+      render: (v: string) => {
+        const color = v === 'approved' ? 'green' : v === 'rejected' ? 'red' : 'orange';
+        const label = STATUS_LABELS[v] || v;
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
+    {
+      title: '意见', dataIndex: 'comment', key: 'comment', ellipsis: true,
+      render: (v: string) => v || '-',
+    },
+    {
+      title: '时间', dataIndex: 'updated_at', key: 'updated_at', width: 160,
+    },
+  ];
+
+  const tabItems = [
+    {
+      key: 'pending',
+      label: `我的待审批 (${pendingList.length})`,
+      children: (
+        <Table dataSource={pendingList} columns={pendingColumns} rowKey="id"
+          loading={pendingLoading} pagination={{ showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条`, pageSize: 10 }}
+          scroll={{ x: 900 }}
+        />
+      ),
+    },
+    {
+      key: 'history',
+      label: '审批历史',
+      children: (
+        <Table dataSource={historyList} columns={historyColumns} rowKey="id"
+          loading={historyLoading} pagination={{ showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条`, pageSize: 10 }}
+          scroll={{ x: 900 }}
+        />
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Typography.Title level={4} style={{ marginBottom: 16 }}>权限审批</Typography.Title>
+      <Tabs items={tabItems} />
+
+      <Modal
+        title={actionType === 'approved' ? '确认通过' : '确认驳回'}
+        open={actionModalVisible}
+        onOk={confirmAction}
+        onCancel={() => setActionModalVisible(false)}
+        okText={actionType === 'approved' ? '通过' : '驳回'}
+        okButtonProps={{ danger: actionType === 'rejected', loading: actionSubmitting }}
+      >
+        {selectedApproval && (
+          <Descriptions column={1} size="small" bordered style={{ marginBottom: 16 }}>
+            <Descriptions.Item label="申请人">{selectedApproval.applicant_name}</Descriptions.Item>
+            <Descriptions.Item label="应用">{selectedApproval.app_name}</Descriptions.Item>
+            <Descriptions.Item label="环境">{ENV_LABELS[selectedApproval.env_type] || selectedApproval.env_type}</Descriptions.Item>
+            <Descriptions.Item label="授权范围">{GRANT_SCOPE_LABELS[selectedApproval.grant_scope] || selectedApproval.grant_scope}</Descriptions.Item>
+          </Descriptions>
+        )}
+        <TextArea rows={3} placeholder="审批意见（可选）" value={actionComment} onChange={(e) => setActionComment(e.target.value)} />
+      </Modal>
+    </div>
+  );
+}

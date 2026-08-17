@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>应用接入指南 · 统一认证中心 SSO</title>
+<style>
+  :root {
+    --primary: #1d5fd6;
+    --primary-dark: #0b1e4b;
+    --primary-light: #4f8cff;
+    --bg: #f5f7fb;
+    --card: #ffffff;
+    --border: #e4e9f2;
+    --text: #101828;
+    --text-2: #475467;
+    --text-3: #667085;
+    --ok: #10b981;
+    --warn: #f59e0b;
+    --info: #0ea5e9;
+    --purple: #8b5cf6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+      'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .hero {
+    background: linear-gradient(135deg, #0b1e4b 0%, #123a8f 55%, #1d5fd6 100%);
+    color: #fff;
+    padding: 48px 24px 40px;
+    text-align: center;
+  }
+  .hero h1 { margin: 0 0 8px; font-size: 30px; }
+  .hero p { margin: 0 auto; max-width: 760px; opacity: .92; font-size: 15px; }
+  .hero .tagline { margin-top: 14px; display: inline-block; background: rgba(255,255,255,.14);
+    border: 1px solid rgba(255,255,255,.25); padding: 4px 14px; border-radius: 20px; font-size: 13px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
+  section { margin-bottom: 44px; }
+  .sec-title { display: flex; align-items: center; gap: 12px; margin: 0 0 6px; font-size: 22px; }
+  .sec-title .num { flex: none; width: 34px; height: 34px; border-radius: 10px;
+    background: var(--primary); color: #fff; display: flex; align-items: center;
+    justify-content: center; font-size: 17px; font-weight: 700; }
+  .sec-sub { color: var(--text-3); margin: 0 0 22px 46px; font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 22px 24px; box-shadow: 0 1px 3px rgba(16,24,40,.06); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  h3 { margin: 0 0 10px; font-size: 16px; }
+  p { margin: 6px 0; }
+  code { background: #eef2fa; padding: 2px 7px; border-radius: 6px; font-size: 13px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace; color: #1d4ed8; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .tag.ok { background: #ecfdf5; color: #047857; }
+  .tag.info { background: #eff8ff; color: #0369a1; }
+  .tag.warn { background: #fffbeb; color: #b45309; }
+  .tag.purple { background: #f5f3ff; color: #6d28d9; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f8fafd; color: var(--text-2); font-weight: 600; white-space: nowrap; }
+
+  /* ---------- 图例元素 ---------- */
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; }
+  .flow .node { flex: 1; min-width: 130px; background: #f8faff; border: 2px solid var(--primary-light);
+    border-radius: 12px; padding: 14px 10px; text-align: center; position: relative; }
+  .flow .node .ic { font-size: 22px; }
+  .flow .node b { display: block; font-size: 14px; margin-top: 4px; }
+  .flow .node small { color: var(--text-3); font-size: 12px; }
+  .flow .node.hl { background: #eaf1ff; border-color: var(--primary); }
+  .flow .node.warn { border-color: var(--warn); background: #fffbf0; }
+  .flow .node.purple { border-color: var(--purple); background: #f7f5ff; }
+  .flow .arrow { flex: none; display: flex; align-items: center; padding: 0 6px; color: var(--primary); font-weight: 700; }
+  .flow.v .arrow { transform: rotate(90deg); }
+  .flow-vert { display: flex; flex-direction: column; align-items: stretch; max-width: 340px; margin: 0 auto; }
+  .flow-vert .arrow { align-self: center; padding: 4px 0; }
+
+  /* 泳道时序图 */
+  .lane { display: grid; grid-template-columns: 120px 1fr; gap: 0; border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; background: #fff; }
+  .lane .l-head { display: flex; flex-direction: column; justify-content: flex-start; gap: 6px; }
+  .lane .col { padding: 14px; border-right: 1px solid var(--border); }
+  .lane .col:last-child { border-right: none; }
+  .lane .l-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .lane .row { position: relative; padding: 8px 0; border-bottom: 1px dashed #edf0f6; }
+  .lane .row:last-child { border-bottom: none; }
+  .lane .msg { background: #f1f5fe; border: 1px solid #d6e4ff; border-radius: 10px; padding: 8px 12px;
+    font-size: 13px; display: inline-block; max-width: 88%; }
+  .lane .msg.right { float: right; background: #ecfdf5; border-color: #a7f3d0; }
+  .lane .msg code { background: transparent; padding: 0; }
+  .lane .note { font-size: 12px; color: var(--text-3); padding: 2px 0 0; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 13px; color: var(--text-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+
+  .callout { border-left: 4px solid var(--primary); background: #f2f6ff; border-radius: 0 10px 10px 0;
+    padding: 12px 16px; margin: 14px 0; font-size: 14px; }
+  .callout.warn { border-color: var(--warn); background: #fffbeb; }
+  .callout.ok { border-color: var(--ok); background: #ecfdf5; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 5px 0; }
+  .footer { text-align: center; color: var(--text-3); font-size: 13px; padding: 20px 0 40px; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>如何把一个新应用接入统一门户（SSO）</h1>
+  <p>完整路径 · 两种接入方式 · 凭证机制 —— 图文详解</p>
+  <div class="tagline">统一认证中心 Authentication · DevOps Platform</div>
+</div>
+
+<div class="wrap">
+
+<!-- ============ 0. 先看懂整体 ============ -->
+<section>
+  <h2 class="sec-title"><span class="num">0</span>先看懂整体架构</h2>
+  <p class="sec-sub">在接入应用之前，先理解"统一门户 + 认证中心 + 网关"各自的分工</p>
+  <div class="card">
+    <div class="flow">
+      <div class="node"><span class="ic">👤</span><b>用户</b><small>浏览器</small></div>
+      <div class="arrow">→</div>
+      <div class="node hl"><span class="ic">🏠</span><b>统一门户 Portal</b><small>登录 / 应用广场</small></div>
+      <div class="arrow">→</div>
+      <div class="node hl"><span class="ic">🔑</span><b>认证中心 Auth</b><small>签发统一 JWT</small></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="ic">🛡️</span><b>统一网关 Gateway</b><small>forwardAuth 鉴权</small></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="ic">📦</span><b>业务系统</b><small>被保护的应用</small></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:#1d5fd6"></span> 本项目核心组件</span>
+      <span><span class="dot" style="background:#4f8cff"></span> 周边组件</span>
+      <span>一句话：用户只登一次，拿到一张"通用门票"（统一 JWT），凭它访问所有已接入应用。</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 1. 完整路径 ============ -->
+<section>
+  <h2 class="sec-title"><span class="num">1</span>接入一个新应用的完整路径</h2>
+  <p class="sec-sub">从"想接入"到"用户点一下就能进"，一共 5 步</p>
+  <div class="card">
+    <div class="flow">
+      <div class="node"><span class="ic">🧑‍💻</span><b>① 注册</b><small>开发者/管理员<br/>填应用信息</small></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="ic">🪪</span><b>② 发凭证</b><small>自动生成<br/>client_id / secret</small></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="ic">🔧</span><b>③ 接入配置</b><small>网关路由<br/>前端 SSO · 后端验签</small></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="ic">🚀</span><b>④ 上架</b><small>出现在<br/>应用广场</small></div>
+      <div class="arrow">→</div>
+      <div class="node hl"><span class="ic">✅</span><b>⑤ 使用</b><small>用户点击<br/>SSO 无感进入</small></div>
+    </div>
+    <table style="margin-top:20px">
+      <tr><th>步骤</th><th>谁来做</th><th>做什么</th><th>产出</th></tr>
+      <tr><td>① 注册</td><td>应用负责人</td><td>在门户"应用管理"填：应用标识、名称、图标、首页地址、SSO 类型</td><td>应用记录</td></tr>
+      <tr><td>② 发凭证</td><td>系统自动</td><td>生成应用身份证（client_id）和密钥（client_secret）</td><td>应用凭证</td></tr>
+      <tr><td>③ 接入配置</td><td>应用方</td><td>按接入方式选 A（挂网关）或 B（自验签），见第 2 节</td><td>鉴权打通</td></tr>
+      <tr><td>④ 上架</td><td>系统自动</td><td>应用广场数据驱动，注册即显示（可控制启用/禁用）</td><td>广场入口</td></tr>
+      <tr><td>⑤ 使用</td><td>用户</td><td>点击应用 → 携带统一 JWT 跳转 → 网关/后端验证 → 无感进入</td><td>SSO 闭环</td></tr>
+    </table>
+    <div class="callout ok">✅ 本 Demo 里，①②④⑤ 已经全自动打通（应用管理页面 + 应用广场数据驱动）；③ 是唯一需要"应用方"动手的一步，而这一步正取决于你选哪种接入方式。</div>
+  </div>
+</section>
+
+<!-- ============ 2. 两种接入方式 ============ -->
+<section>
+  <h2 class="sec-title"><span class="num">2</span>第 ③ 步的关键：两种接入方式</h2>
+  <p class="sec-sub">应用的前端请求后端，怎么经过网关？关键看应用部署在不在网关后面</p>
+
+  <div class="grid2">
+    <!-- 方式 A -->
+    <div class="card">
+      <h3>方式 A：经统一网关 <span class="tag ok">forwardAuth · 推荐</span></h3>
+      <p style="color:var(--text-3);font-size:13px">应用挂在网关后面，所有 /api 请求都被网关先"过一道验票闸机"</p>
+      <div class="flow-vert">
+        <div class="node"><span class="ic">🌐</span><b>浏览器</b><small>打开 app.xxx.orb.local</small></div>
+        <div class="arrow">↓</div>
+        <div class="node"><span class="ic">🛡️</span><b>统一网关</b><small>Traefik 先拦截所有 /api/*</small></div>
+        <div class="arrow">↓</div>
+        <div class="node warn"><span class="ic">🔍</span><b>校验 JWT</b><small>forwardAuth → 认证中心 /verify</small></div>
+        <div class="arrow">↓ 通过则注入 X-Auth-* 头</div>
+        <div class="node"><span class="ic">📦</span><b>业务后端</b><small>零鉴权，读 X-Auth-* 头即知是谁</small></div>
+      </div>
+      <div class="callout">✅ <b>特点</b>：业务系统几乎不用写鉴权代码；网关统一管所有应用的"验票"。适合网关能覆盖到的应用。<br/>
+      <span class="tag info">本 Demo</span> mock-app 就是这种方式，已验证：无 token → 401，带 token → 放行。</div>
+    </div>
+    <!-- 方式 B -->
+    <div class="card">
+      <h3>方式 B：不经网关 <span class="tag purple">JWKS 自验签</span></h3>
+      <p style="color:var(--text-3);font-size:13px">应用在网关外面（外部部署 / 后端互调），自己验 JWT</p>
+      <div class="flow-vert">
+        <div class="node"><span class="ic">📦</span><b>业务后端</b><small>直接收到带 Bearer JWT 的请求</small></div>
+        <div class="arrow">↓</div>
+        <div class="node warn"><span class="ic">🔑</span><b>本地验签</b><small>拉认证中心公钥 JWKS 验 JWT 签名</small></div>
+        <div class="arrow">↓</div>
+        <div class="node"><span class="ic">👤</span><b>读身份</b><small>从 JWT 取 uid / name / source</small></div>
+        <div class="arrow">↔</div>
+        <div class="node"><span class="ic">🔐</span><b>认证中心</b><small>只发布公钥，不参与每次请求</small></div>
+      </div>
+      <div class="callout">✅ <b>特点</b>：因为 JWT 用 RS256 非对称签名，公钥公开，<b>任何系统都能独立验签</b>，不依赖网关。适合外部/内部服务。<br/>
+      <span class="tag info">每语言</span> 加 20-30 行中间件即可（Go / Python / Node 都有 jose 库）。</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <h3>两种方式对比</h3>
+    <table>
+      <tr><th>维度</th><th>方式 A：网关 forwardAuth</th><th>方式 B：JWKS 自验签</th></tr>
+      <tr><td>谁校验 JWT</td><td>统一网关（业务后端零鉴权）</td><td>业务后端自己（本地验签）</td></tr>
+      <tr><td>业务后端改动</td><td>几乎零（读 X-Auth-* 头即可）</td><td>加一个验签中间件（20-30 行）</td></tr>
+      <tr><td>适用场景</td><td>应用在网关后面</td><td>外部部署 / 后端到后端互调</td></tr>
+      <tr><td>优点</td><td>集中管控、业务改动最小、一处升级全局生效</td><td>不依赖网关、适合异构外部系统</td></tr>
+      <tr><td>代价</td><td>需要网关能路由到该应用（跨项目较繁琐）</td><td>每个系统都要维护验签依赖</td></tr>
+      <tr><td>本 Demo</td><td>✅ mock-app 已实现</td><td>机制已具备（JWKS 公钥已发布），可补示例</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 3. 网关模式流量细看 ============ -->
+<section>
+  <h2 class="sec-title"><span class="num">3</span>方式 A 细看：一次请求怎么走</h2>
+  <p class="sec-sub">以"用户从门户点进应用 → 应用前端调后端 API"为例（泳道图）</p>
+  <div class="card">
+    <div class="lane">
+      <div class="col l-head">
+        <span class="l-title">👤 浏览器</span>
+        <span class="l-title">🏠 门户</span>
+        <span class="l-title">📦 业务前端</span>
+        <span class="l-title">🛡️ 网关</span>
+        <span class="l-title">📦 业务后端</span>
+        <span class="l-title">🔑 认证中心</span>
+      </div>
+      <div class="col">
+        <div class="row"><span class="msg">登录门户（一次）</span></div>
+        <div class="row"><span class="msg right">拿到统一 JWT</span></div>
+        <div class="row"><span class="msg">点击应用 → 带 token 跳转</span></div>
+        <div class="row"><span class="msg right">前端把 token 存好，调 API 时带 <code>Authorization: Bearer JWT</code></span></div>
+        <div class="row"><span class="msg">拦截 /api/* → 转发给认证中心校验</span></div>
+        <div class="row"><span class="msg right">200 + 注入 X-Auth-* 头</span></div>
+        <div class="row"><span class="msg">放行，转发请求 + X-Auth-* 头</span></div>
+        <div class="row"><span class="msg right">返回数据（后端读 X-Auth-* 头就知道是谁）</span></div>
+        <div class="row"><span class="note">→ 全程免登录，用户无感知</span></div>
+      </div>
+    </div>
+    <div class="callout warn">⚠️ 注意：用户访问的<b>业务页面本身</b>（静态资源）可以不经过 forwardAuth（SPA 先加载再带 token 调 API）；<b>业务 API</b> 才是被网关真正保护、需要验票的部分。</div>
+  </div>
+</section>
+
+<!-- ============ 4. client_id / secret ============ -->
+<section>
+  <h2 class="sec-title"><span class="num">4</span>client_id / client_secret 到底干嘛的？</h2>
+  <p class="sec-sub">这俩凭证在"token 跳转"模式下用不上，在"OIDC 授权码"模式才是主角</p>
+  <div class="card">
+    <table>
+      <tr><th>SSO 类型</th><th>需要 client_secret 吗</th><th>为什么</th></tr>
+      <tr>
+        <td><b>token 跳转</b><br/><span class="tag info">本 Demo 现状</span></td>
+        <td>❌ 不需要</td>
+        <td>门户直接签发 JWT 带过去，网关/后端验 JWT 签名即可。"凭证"就是 JWT 本身，用不到 client_secret。</td>
+      </tr>
+      <tr>
+        <td><b>OIDC / OAuth2 授权码</b><br/><span class="tag warn">真实企业 SSO 主流</span></td>
+        <td>✅ 必须</td>
+        <td>见下方流程图：client_id 标识"是哪个应用"；client_secret 证明"我是这个应用的后端"，用于拿授权码换 token。</td>
+      </tr>
+    </table>
+
+    <h3 style="margin-top:20px">OIDC 授权码模式里它们怎么用</h3>
+    <div class="lane" style="margin-top:10px">
+      <div class="col l-head">
+        <span class="l-title">👤 用户</span>
+        <span class="l-title">📦 业务前端</span>
+        <span class="l-title">📦 业务后端</span>
+        <span class="l-title">🔑 认证中心</span>
+      </div>
+      <div class="col">
+        <div class="row"><span class="msg">访问业务系统（未登录）</span></div>
+        <div class="row"><span class="msg right">302 → 认证中心 /authorize?<code>client_id</code>=xxx</span><br/>
+          <span class="note">client_id = 应用身份证（公开）</span></div>
+        <div class="row"><span class="msg">用户登录授权</span></div>
+        <div class="row"><span class="msg right">302 带回授权码 code</span></div>
+        <div class="row"><span class="msg">后端 POST /token?<code>code</code> + <code>client_secret</code></span><br/>
+          <span class="note">client_secret = 应用后端的密钥（机密，只存后端）</span></div>
+        <div class="row"><span class="msg right">校验通过 → 发 access_token + id_token</span></div>
+        <div class="row"><span class="msg">建立会话 → 正常访问</span></div>
+      </div>
+    </div>
+
+    <div class="callout ok">✅ <b>一句话总结</b>：<code>client_id</code> 是"我是谁"，<code>client_secret</code> 是"我真的是我"。它俩用于 <b>OIDC/OAuth2</b> 场景——应用后端向认证中心换取 token 时的身份凭证。我们 Demo 先自动生成它们，是为接 OIDC 预留的<b>完整应用凭证模型</b>（面试正好讲这个知识点）。</div>
+  </div>
+</section>
+
+<!-- ============ 5. 接入清单 ============ -->
+<section>
+  <h2 class="sec-title"><span class="num">5</span>一份接入前的自查清单</h2>
+  <p class="sec-sub">把上面的内容浓缩成可执行的核对项</p>
+  <div class="card">
+    <ol>
+      <li><b>确定接入方式</b>：应用部署在我们网关后面？→ 选 A（forwardAuth）；在外部/内部服务？→ 选 B（JWKS 自验签）</li>
+      <li><b>注册应用</b>：在门户「应用管理」填写信息，拿到 <code>client_id</code> / <code>client_secret</code> 和统一 JWT 的验签公钥地址 <code>/.well-known/jwks.json</code></li>
+      <li><b>前端改造</b>：登录流程改为"从门户跳转读统一 JWT"（存好 token，调 API 时带 <code>Authorization</code> 头）；401 时跳回门户登录</li>
+      <li><b>鉴权打通</b>：方式 A → 网关加一条路由 + forwardAuth；方式 B → 后端加 JWKS 验签中间件</li>
+      <li><b>验证闭环</b>：门户登录 → 点应用 → 无感进入；无 token 直访 → 401</li>
+    </ol>
+    <div class="callout">💡 面试可以这样讲：先讲"统一门户 + 统一 JWT"，再讲"两种接入模式（网关/自验签）"，最后用 client_id/client_secret 引出 OIDC 授权码流程——一条线把整个 SSO 串起来。</div>
+  </div>
+</section>
+
+</div>
+
+<div class="footer">
+  统一认证中心 Authentication · 应用接入指南（图文版）· 用于知识点学习与面试演示
+</div>
+
+</body>
+</html>

@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>应用间鉴权与权限校验 · 全链路详解</title>
+<style>
+:root {
+  --brand:#2f6fed; --brand-strong:#1e5ad7; --brand-soft:#eaf1fe; --brand-softer:#f4f8ff;
+  --bg:#f5f7fa; --bg-card:#fff; --bg-hover:#f0f4fb; --bg-inset:#f8fafc;
+  --text:#1a2233; --text-secondary:#5b6472; --text-tertiary:#8b94a3;
+  --border:#e3e8ef; --border-strong:#c9d2df;
+  --success:#16a34a; --success-bg:#e9f9ef; --warning:#d97706; --warning-bg:#fef4e6;
+  --danger:#dc2626; --danger-bg:#fdecec; --info:#0891b2; --info-bg:#e6f7fb;
+  --purple:#7c3aed; --purple-bg:#f1eaff;
+  --radius:10px; --radius-sm:6px;
+  --shadow-sm:0 1px 2px rgba(26,34,51,.05),0 1px 3px rgba(26,34,51,.06);
+  --shadow-md:0 4px 12px rgba(26,34,51,.07),0 2px 4px rgba(26,34,51,.04);
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC','PingFang SC',sans-serif;
+  --font-mono:'SF Mono','JetBrains Mono','Cascadia Code',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.container{max-width:1000px;margin:0 auto;padding:32px 24px 80px}
+
+/* 头部 */
+.hero{background:linear-gradient(135deg,var(--brand),var(--brand-strong));border-radius:16px;color:#fff;padding:36px 40px;margin-bottom:28px}
+.hero h1{font-size:26px;font-weight:800;letter-spacing:-.01em}
+.hero .sub{font-size:14px;opacity:.9;margin-top:6px}
+.hero .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.16);font-size:12px;font-weight:600}
+
+/* TOC */
+.toc{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:32px;box-shadow:var(--shadow-sm)}
+.toc-title{font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text-secondary)}
+.toc a{display:inline-block;color:var(--brand-strong);text-decoration:none;font-size:13px;margin:3px 14px 3px 0}
+.toc a:hover{text-decoration:underline}
+
+/* 章节 */
+.chapter{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;margin-bottom:24px;box-shadow:var(--shadow-sm)}
+.chapter h2{font-size:20px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.chapter .lead{font-size:13px;color:var(--text-secondary);margin-bottom:20px}
+.chapter h3{font-size:16px;font-weight:700;margin:24px 0 10px;color:var(--text)}
+.chapter h3 .en{font-size:11px;color:var(--text-tertiary);font-weight:500;margin-left:6px}
+.chapter p{font-size:14px;color:var(--text);margin-bottom:10px}
+.chapter ul,.chapter ol{margin:8px 0 12px 22px}
+.chapter li{font-size:14px;margin-bottom:6px}
+.chapter li b{color:var(--brand-strong)}
+.chapter .sec-tag{display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:999px;font-size:11px;font-weight:600;background:var(--brand-soft);color:var(--brand-strong)}
+
+/* 表格 */
+table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0 18px}
+th{text-align:left;padding:10px 12px;font-family:var(--font-mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);background:var(--bg-inset);border-bottom:2px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:hover td{background:var(--bg-hover)}
+td.mono,td code{font-family:var(--font-mono);font-size:12px}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
+.tag-green{background:var(--success-bg);color:var(--success)}
+.tag-red{background:var(--danger-bg);color:var(--danger)}
+.tag-amber{background:var(--warning-bg);color:var(--warning)}
+.tag-blue{background:var(--brand-soft);color:var(--brand-strong)}
+.tag-gray{background:var(--bg-inset);color:var(--text-tertiary);border:1px solid var(--border)}
+.tag-violet{background:var(--purple-bg);color:var(--purple)}
+.tag-cyan{background:var(--info-bg);color:var(--info)}
+
+/* 代码/命令 */
+code,.code{font-family:var(--font-mono);font-size:12px;background:var(--bg-inset);border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:#0e7490}
+pre.codeblock{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:16px 18px;font-family:var(--font-mono);font-size:12px;line-height:1.7;overflow-x:auto;margin:12px 0 18px}
+pre.codeblock .cmt{color:#64748b}
+pre.codeblock .kw{color:#93c5fd}
+pre.codeblock .str{color:#86efac}
+
+/* 提示框 */
+.note{border-radius:10px;padding:14px 18px;font-size:13px;margin:14px 0;line-height:1.7}
+.note.blue{background:var(--brand-softer);border:1px solid #d6e4ff;color:var(--brand-strong)}
+.note.green{background:var(--success-bg);border:1px solid #c8f0d8;color:#15803d}
+.note.amber{background:var(--warning-bg);border:1px solid #fde8c8;color:#b45309}
+.note.red{background:var(--danger-bg);border:1px solid #fbcaca;color:#b91c1c}
+.note.cyan{background:var(--info-bg);border:1px solid #c8ecf6;color:#0e7490}
+.note.violet{background:var(--purple-bg);border:1px solid #e5d9ff;color:#6d28d9}
+
+/* 流程步骤 */
+.flow{display:flex;flex-direction:column;gap:0;margin:14px 0 18px;padding-left:24px;border-left:3px solid var(--brand-soft)}
+.flow-step{position:relative;padding:10px 0 10px 18px}
+.flow-step::before{content:'';position:absolute;left:-31px;top:18px;width:13px;height:13px;border-radius:50%;background:var(--bg-card);border:3px solid var(--brand)}
+.flow-step.done::before{background:var(--success);border-color:var(--success)}
+.flow-step .fs-title{font-size:14px;font-weight:700}
+.flow-step .fs-sub{font-size:12px;color:var(--text-secondary)}
+.flow-step .fs-desc{font-size:13px;color:var(--text);margin-top:2px}
+
+/* 时序图 */
+.seq{display:flex;align-items:stretch;gap:0;margin:16px 0 20px;overflow-x:auto;padding-bottom:8px}
+.seq-col{flex:1;min-width:110px;display:flex;flex-direction:column;align-items:center;position:relative}
+.seq-box{background:var(--bg-card);border:2px solid var(--border);border-radius:10px;padding:12px 10px;text-align:center;font-size:12px;font-weight:600;width:100%}
+.seq-box.brand{border-color:var(--brand);background:var(--brand-softer);color:var(--brand-strong)}
+.seq-box.green{border-color:var(--success);background:var(--success-bg);color:var(--success)}
+.seq-box.violet{border-color:var(--purple);background:var(--purple-bg);color:var(--purple)}
+.seq-arrow{font-size:14px;color:var(--brand);margin:6px 0;position:relative}
+.seq-num{position:absolute;top:-4px;right:-2px;width:16px;height:16px;border-radius:50%;background:var(--brand);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center}
+
+/* 双栏 */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0 18px}
+.col{border:1px solid var(--border);border-radius:10px;padding:16px 18px;background:var(--bg-inset)}
+.col h4{font-size:14px;font-weight:700;margin-bottom:8px}
+.col.blue h4{color:var(--brand-strong)}
+.col.green h4{color:var(--success)}
+.col ul{margin-left:16px}
+.col li{font-size:13px;margin-bottom:6px}
+
+/* 高亮主结论 */
+.keyline{border-left:4px solid var(--brand);background:var(--brand-softer);border-radius:0 10px 10px 0;padding:14px 18px;font-size:14px;font-weight:600;color:var(--brand-strong);margin:14px 0}
+
+.backtop{position:fixed;right:24px;bottom:24px;width:40px;height:40px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:var(--shadow-md);font-size:16px}
+@media(max-width:800px){.cols{grid-template-columns:1fr}.hero{padding:24px}.chapter{padding:20px}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="hero">
+  <h1>应用间鉴权与权限校验 · 全链路详解</h1>
+  <div class="sub">从行业通用做法 → 我们的系统架构 → 端到端工作流，建立宏观视角</div>
+  <div class="chips">
+    <span class="chip">🔐 认证 AuthN</span><span class="chip">🛡️ 鉴权 AuthZ</span>
+    <span class="chip">🌐 网关接入 Tier 1</span><span class="chip">📦 SDK 接入 Tier 2</span>
+    <span class="chip">🎫 凭证与授权分离</span>
+  </div>
+</div>
+
+<div class="toc">
+  <div class="toc-title">目录</div>
+  <a href="#c1">第一章 · 市面常见应用间鉴权方式</a>
+  <a href="#c2">第二章 · 认证 vs 鉴权：谁先谁后</a>
+  <a href="#c3">第三章 · 我们支持哪些方式 & 为什么</a>
+  <a href="#c4">第四章 · 双方各自要做什么</a>
+  <a href="#c5">第五章 · 网关接入 vs SDK 接入</a>
+  <a href="#c6">第六章 · 端到端工作流</a>
+  <a href="#c7">第七章 · 业内怎么做 & 我们的定位</a>
+  <a href="#c8">第八章 · OAuth2 与 SSO：协议、模块与单点登录</a>
+  <a href="#c9">第九章 · 面试叙事要点</a>
+  <a href="#c10">附录 · 术语表</a>
+</div>
+
+<!-- 总览 -->
+<div class="chapter">
+  <h2>🧭 总览：应用之间的一次安全调用</h2>
+  <p class="lead">先建立一张全景图，再逐层展开。</p>
+  <div class="seq">
+    <div class="seq-col"><div class="seq-box brand">调用方应用<br><span style="font-weight:400;font-size:11px">consumer</span></div></div>
+    <div class="seq-col"><div class="seq-arrow">→ <span class="seq-num">1</span></div></div>
+    <div class="seq-col"><div class="seq-box violet">IAM<br><span style="font-weight:400;font-size:11px">换令牌 / 决策</span></div></div>
+    <div class="seq-col"><div class="seq-arrow">→ <span class="seq-num">2</span></div></div>
+    <div class="seq-col"><div class="seq-box">网关 / SDK<br><span style="font-weight:400;font-size:11px">执行点 PEP</span></div></div>
+    <div class="seq-col"><div class="seq-arrow">→ <span class="seq-num">3</span></div></div>
+    <div class="seq-col"><div class="seq-box green">目标应用<br><span style="font-weight:400;font-size:11px">provider</span></div></div>
+  </div>
+  <ol>
+    <li><b>拿身份（认证）</b>：调用方用凭证（client_id/secret 等）向 IAM 换取访问令牌（JWT）；</li>
+    <li><b>验身份 + 问权限（鉴权）</b>：网关（或应用内 SDK）先验令牌（你是谁），再问 IAM/PDP「这个身份对这个动作/这条数据能不能」（能不能）；</li>
+    <li><b>放行 / 拦截</b>：允许则转发到目标应用，拒绝则 403（deny-by-default）。</li>
+  </ol>
+  <div class="keyline">核心一句话：<b>认证回答「你是谁」，鉴权回答「你能不能」；凭证负责身份（一次签发），授权负责范围（多次追加）。</b></div>
+</div>
+
+<!-- 第一章 -->
+<div class="chapter" id="c1">
+  <h2>第一章 · 市面常见应用间鉴权方式</h2>
+  <p class="lead">应用之间（机器对机器，M2M）的主流做法，本质都是「<b>出示一个身份凭据，让对方验证后放行</b>」，区别在于凭据的形态、签发方与校验方式。</p>
+
+  <h3>1.1 静态 Token / API Key <span class="en">最简单</span></h3>
+  <ul>
+    <li><b>怎么做</b>：平台给调用方签发一个固定字符串（如 <code>X-API-Key: k_xxxx</code>），调用时放在请求头；服务端查表/比对后放行。</li>
+    <li><b>优点</b>：实现简单、接入快；<b>缺点</b>：无状态性弱（要查签发记录）、泄漏面大、难以精细化控制（scope）。</li>
+    <li><b>典型场景</b>：内部工具脚本、低频调用、只读接口。</li>
+  </ul>
+
+  <h3>1.2 OAuth 2.0 Client Credentials <span class="en">M2M 主流标准</span></h3>
+  <ul>
+    <li><b>怎么做</b>：应用以 <code>client_id + client_secret</code> 向授权服务器换取 <b>短期 access_token</b>（通常是 JWT）；后续请求携带 <code>Authorization: Bearer &lt;token&gt;</code>；服务端验签（JWKS）+ 校验 <code>aud</code> / <code>scope</code> / <code>exp</code>。</li>
+    <li><b>优点</b>：标准化、令牌无状态（验签即可）、可吊销（黑名单/短 TTL）、支持 scope 最小权限；<b>缺点</b>：需要一套授权服务器与密钥轮换。</li>
+    <li><b>典型场景</b>：云厂商 SDK（AWS/GCP）、企业服务间调用的事实标准。</li>
+  </ul>
+
+  <h3>1.3 mTLS / SPIFFE <span class="en">最强身份，最重基建</span></h3>
+  <ul>
+    <li><b>怎么做</b>：调用方与服务端互验证书，身份在 <b>TLS 握手层</b>建立，不依赖 token 字符串；SPIFFE 进一步为每个工作负载签发标准化身份（SPIFFE ID）。</li>
+    <li><b>优点</b>：最强、零 token 处理、天然防重放；<b>缺点</b>：证书生命周期管理（签发/轮换/吊销）成本高，需要 PKI 基建。</li>
+    <li><b>典型场景</b>：服务网格（Istio）、高安全合规环境。</li>
+  </ul>
+
+  <h3>1.4 OIDC / 委托令牌 <span class="en">涉及"人"的场景</span></h3>
+  <ul>
+    <li><b>怎么做</b>：用户经企业 SSO 登录后，应用获得 ID Token / Access Token（OIDC 标准），代表「某个用户」访问下游；可叠加 on-behalf-of 流在服务间传播身份。</li>
+    <li><b>适用</b>：需要用户级身份与审计的应用间调用（区别于纯 M2M）。</li>
+  </ul>
+
+  <h3>1.5 对比表</h3>
+  <table>
+    <thead><tr><th>方式</th><th>身份载体</th><th>签发方</th><th>校验方式</th><th>吊销</th><th>适用</th></tr></thead>
+    <tbody>
+      <tr><td>API Key / 静态 Token</td><td>固定字符串</td><td>平台</td><td>查签发记录</td><td>查表可吊销</td><td>轻量/内网</td></tr>
+      <tr><td>OAuth2 Client Credentials</td><td>短 TTL JWT</td><td>授权服务器</td><td>验签 + aud/scope/exp</td><td>短 TTL + 黑名单</td><td><b>M2M 标准</b></td></tr>
+      <tr><td>mTLS / SPIFFE</td><td>客户端证书</td><td>CA / 网格</td><td>TLS 握手验证书</td><td>证书吊销列表</td><td>高安全/网格</td></tr>
+      <tr><td>OIDC 委托</td><td>ID/访问令牌</td><td>企业 IdP</td><td>验签 + 用户会话</td><td>会话/刷新失效</td><td>带人的访问</td></tr>
+    </tbody>
+  </table>
+  <div class="note blue">💡 行业结论：M2M 首选 <b>OAuth2 Client Credentials + JWT</b>（标准、无状态、可吊销、scope 化）；静态 Token/API Key 作为轻量补充；mTLS 是强安全演进方向。</div>
+</div>
+
+<!-- 第二章 -->
+<div class="chapter" id="c2">
+  <h2>第二章 · 认证 vs 鉴权：谁先谁后</h2>
+  <p class="lead">两个概念必须分开，顺序也不能反。</p>
+  <div class="cols">
+    <div class="col blue"><h4>🔐 认证 AuthN（你是谁）</h4><ul><li>验证凭据有效：JWT 验签、secret 比对、证书校验</li><li>产出<b>可信身份</b>（如 <code>client:xxx</code> / <code>u:alice</code>）</li><li>无状态、廉价，每请求可做</li></ul></div>
+    <div class="col green"><h4>🛡️ 鉴权 AuthZ（你能不能）</h4><ul><li>基于可信身份做授权决策：动作级（RBAC/ABAC）+ 数据级（实例/条件）</li><li>可缓存 / 本地 bundle，高风险写强制远程</li><li>决策结果：allow / deny + 理由留痕</li></ul></div>
+  </div>
+  <h3>为什么认证必须在前</h3>
+  <ol>
+    <li><b>决策前提</b>：不知道「你是谁」，就无法判断「你能不能」——鉴权的主体输入来自认证结果；</li>
+    <li><b>防绕过</b>：若先鉴权后认证，攻击者可用伪造身份绕过授权检查；</li>
+    <li><b>审计完整</b>：决策日志需要记录「谁」被拒绝/放行，身份必须先被确认。</li>
+  </ol>
+  <div class="keyline">顺序铁律：<b>认证 → 鉴权 → 放行/拦截</b>。身份不可信之前，任何授权决策都无效。</div>
+  <h3>身份如何在链路中传播</h3>
+  <p>在我们的系统中，身份通过标准化主体键传播：</p>
+  <pre class="codeblock"><span class="cmt">// JWT 载荷（IAM 签发）</span>
+{
+  <span class="kw">sub</span>: <span class="str">"s:client-cmdb-xxxx"</span>,   <span class="cmt">// 程序身份</span>
+  <span class="kw">st</span>: <span class="str">2</span>,                          <span class="cmt">// 1=user 2=service</span>
+  <span class="kw">sk</span>: <span class="str">"s:client-cmdb-xxxx"</span>,     <span class="cmt">// 决策主体 key</span>
+  <span class="kw">scope</span>: <span class="str">"app:cmdb"</span>,             <span class="cmt">// 已授权范围</span>
+  <span class="kw">iss</span>: <span class="str">"iam"</span>, <span class="kw">exp</span>: <span class="str">…</span>        <span class="cmt">// 签发方 + 过期</span>
+}
+
+<span class="cmt">// 网关模式：身份头由网关注入/透传</span>
+X-User: client:cmdb        <span class="cmt">// PEP → PDP 决策主体</span>
+X-App: cmdb                <span class="cmt">// 目标应用</span></pre>
+</div>
+
+<!-- 第三章 -->
+<div class="chapter" id="c3">
+  <h2>第三章 · 我们的系统支持哪些鉴权方式 & 为什么</h2>
+  <p class="lead">回到权限中心：接入方式 = 网关（Tier 1）或 SDK（Tier 2），凭据形态由 IAM 统一签发。</p>
+
+  <h3>3.1 支持矩阵</h3>
+  <table>
+    <thead><tr><th>方式</th><th>支持状态</th><th>凭据</th><th>为什么能支持</th></tr></thead>
+    <tbody>
+      <tr><td><b>OAuth2 Client Credentials</b></td><td><span class="tag tag-green">✅ 支持（已实现）</span></td><td><code>client_id + client_secret</code> → JWT</td><td>IAM 内置 <code>POST /v1/oauth/token</code>，签发 HS256 JWT（短 TTL、带 scope），网关/SDK 验签即可</td></tr>
+      <tr><td><b>静态 Token</b></td><td><span class="tag tag-green">✅ 支持（已实现）</span></td><td><code>X-Auth-Token</code></td><td>IAM 签发固定 Token（一次性展示、存哈希、可吊销轮换），PDP 查签发记录映射授权范围</td></tr>
+      <tr><td><b>API Key</b></td><td><span class="tag tag-blue">✅ 支持（已声明）</span></td><td><code>X-API-Key</code></td><td>与静态 Token 同机制，适合 SDK/脚本轻量接入</td></tr>
+      <tr><td><b>mTLS / OIDC</b></td><td><span class="tag tag-amber">🔶 演进方向（仅声明，不承诺执行）</span></td><td>证书 / IdP 令牌</td><td>依赖 PKI / 企业 IdP 基建，本期展示声明，接口已预留</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 为什么能支持多种方式</h3>
+  <ol>
+    <li><b>统一凭证体系</b>：所有方式都收敛到「IAM 签发 → 网关/SDK 校验 → PDP 决策」一条主链路，凭据只是入口形态不同；</li>
+    <li><b>JWT 无状态验签</b>：OAuth2 令牌验签廉价、每请求可做（解决「v1 每请求远程鉴权太重」的历史痛点）；</li>
+    <li><b>鉴权与凭据解耦</b>：<b>凭证 = 身份（一次）</b>，<b>能力包申请 = 追加 scope（多次）</b>；每次换取的 JWT 只含已授权 scope——支持多少种鉴权方式，都不影响授权模型；</li>
+    <li><b>双执行点</b>：网关集中校验（零改造）或 SDK 本地校验（任意接入），执行点可换、决策不变。</li>
+  </ol>
+  <div class="note cyan">🔄 关键叙事：这不是"每加一种鉴权方式就加一套鉴权逻辑"，而是<b>把复杂度收敛到统一令牌体系</b>——鉴权方式只解决「身份怎么来」，权限怎么给始终由能力包/预设/scope 决定。</div>
+
+  <h3>3.3 既然 token 都是 IAM 签发的，应用为什么还要声明支持哪些鉴权方式？</h3>
+  <p><b>签发方统一 ≠ 受理方不需要声明。</b>「谁签发」是供给侧的事，「我接受哪种方式接入」是应用自己的<b>受理契约</b>——这是两个层面。</p>
+  <div class="note blue">💡 类比：银行统一发卡（签发方只有一个），但每个商户要声明支持银联 / Visa / 支付宝——发卡统一，但「我接受哪种支付方式」是商户的受理契约。</div>
+  <ol>
+    <li><b>接入向导的选项来源</b>：应用市场发起接入申请时，可选的鉴权方式列表 = 提供方 <code>app.auth</code> 声明；不声明，消费方就不知道该选什么、流程怎么走；</li>
+    <li><b>执行点兼容性（最关键）</b>：网关模式由网关统一验 JWT/Token，应用零改造；<b>SDK 模式验签发生在应用内部</b>——SDK 验 JWT 需要 JWKS/密钥、查静态 Token 需要查签发表，应用必须声明它实际能处理哪种，否则接进来也验不了；</li>
+    <li><b>owner 自主控制</b>：有的应用只愿意开放某一种方式（如只允许 OAuth2、拒绝固定 Token），声明就是契约边界；</li>
+    <li><b>演进展示</b>：mTLS / OIDC 目前 IAM 并不签发，但应用可以声明「未来支持」——如果声明等于「当前能签发」，演进方向就永远不会出现在市场里，叙事就断了。</li>
+  </ol>
+  <div class="keyline">一句话：<b>签发能力 = IAM 供给侧统一；鉴权方式声明 = 应用侧受理契约 + 消费方引导 + 执行点能力 + 演进 roadmap</b>，缺一不可。</div>
+</div>
+
+<!-- 第四章 -->
+<div class="chapter" id="c4">
+  <h2>第四章 · 双方各自要做什么</h2>
+  <p class="lead">一次应用间接入 = 提供方（能力方）声明 + 使用方（消费方）申请，双方职责分离。</p>
+  <div class="cols">
+    <div class="col blue"><h4>🏛️ 提供方（能力方）</h4>
+      <ul>
+        <li><b>注册应用</b>：声明 OpenAPI / 网络信息 / 鉴权方式（云、账号、区域、VPC、安全组、支持哪些鉴权方式）</li>
+        <li><b>接入执行点</b>：入网关（Tier 1，零改造）或集成 SDK（Tier 2）——发布能力的前提</li>
+        <li><b>声明能力包</b>：接口 + 预设 + 数据范围（owner 配置 applicant 可选类型）</li>
+        <li><b>审批</b>：接入申请、能力申请、上架下架的 Owner 确认</li>
+      </ul>
+    </div>
+    <div class="col green"><h4>🔧 使用方（消费方）</h4>
+      <ul>
+        <li><b>发起接入申请（一次）</b>：选目标应用 + 鉴权方式 + 网络打通 → 审批 → <b>拿到凭证</b></li>
+        <li><b>申请能力包（多次）</b>：选预设 + 主体 + 数据范围 → 审批 → <b>追加 scope</b></li>
+        <li><b>调用</b>：凭证换令牌 → 携带令牌调目标接口 → 被网关/SDK 放行或拦截</li>
+        <li><b>凭证维护</b>：轮换、吊销、监控授权状态</li>
+      </ul>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>事项</th><th>提供方</th><th>使用方</th><th>系统（IAM）</th></tr></thead>
+    <tbody>
+      <tr><td>应用注册/声明</td><td>✅ 填写</td><td>—</td><td>存储 + 校验</td></tr>
+      <tr><td>执行点接入</td><td>✅ 网关/SDK</td><td>—</td><td>校验强制路径</td></tr>
+      <tr><td>能力包/预设</td><td>✅ 配置</td><td>—</td><td>校验 + 发布</td></tr>
+      <tr><td>接入申请</td><td>✅ 审批</td><td>✅ 发起</td><td>✅ 签发凭证</td></tr>
+      <tr><td>能力申请</td><td>✅ 审批</td><td>✅ 发起</td><td>✅ 追加 scope / 写策略</td></tr>
+      <tr><td>调用校验</td><td>网关/SDK 执行</td><td>✅ 携带令牌</td><td>✅ PDP 决策 + 留痕</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 第五章 -->
+<div class="chapter" id="c5">
+  <h2>第五章 · 网关接入 vs SDK 接入</h2>
+  <p class="lead">两者共享同一套凭据体系与决策逻辑，差异在执行点位置与改造量。</p>
+  <table>
+    <thead><tr><th>维度</th><th>🌐 网关接入（Tier 1）</th><th>📦 SDK 接入（Tier 2）</th></tr></thead>
+    <tbody>
+      <tr><td>执行点位置</td><td>集中（Traefik 网关，forwardAuth → PDP）</td><td>应用内（SDK/agent 验签 + 本地决策）</td></tr>
+      <tr><td>应用改造量</td><td><b>零</b>（网关统一处理）</td><td>集成 SDK（验签 + 调 PDP / 嵌 bundle）</td></tr>
+      <tr><td>认证（你是谁）</td><td>网关层校验/透传 <code>X-User</code></td><td>应用内验 JWT（JWKS）或信任网关注入头</td></tr>
+      <tr><td>动作级鉴权</td><td>远程 PDP（决策缓存加速）</td><td><b>本地 bundle</b>（Casbin 快照，低延迟/可离线），高风险强制远程</td></tr>
+      <tr><td>数据级鉴权</td><td>远程 OpenFGA（实例/条件）</td><td>同左（远程 OpenFGA）</td></tr>
+      <tr><td>降级行为</td><td>网关集中，PDP 不可用即拦截（fail-closed）</td><td>本地 bundle 仍可动作级决策（stale-but-available）</td></tr>
+      <tr><td>绕过防护</td><td>网关外无法直连受保护应用</td><td>应用自身校验，无网关兜底</td></tr>
+    </tbody>
+  </table>
+  <h3>5.1 流程对比</h3>
+  <div class="cols">
+    <div class="col blue"><h4>🌐 网关模式</h4><ol>
+      <li>调用方带令牌/身份头请求</li>
+      <li>Traefik <code>forwardAuth</code> → PEP：解析 method/path → 权限点 action</li>
+      <li>PDP 决策（缓存/Casbin/条件）→ 200 放行 / 403 拦截</li>
+      <li>放行后转发业务请求到目标应用</li>
+    </ol></div>
+    <div class="col green"><h4>📦 SDK 模式</h4><ol>
+      <li>调用方带 JWT 请求</li>
+      <li>应用内 SDK 验签（认证）</li>
+      <li>动作级：本地 bundle（Casbin）决策；高风险/数据级：远程 PDP / OpenFGA</li>
+      <li>应用内拦截或放行</li>
+    </ol></div>
+  </div>
+  <div class="keyline">相同点：认证在前、凭据体系一致、最终都由同一套策略（Casbin + OpenFGA）做决策。不同点：<b>执行点位置</b>（集中 vs 本地）与<b>可用性策略</b>（fail-closed vs stale-but-available）。</div>
+
+  <h3>5.2 一个签发方、多个验签方：为什么能成立</h3>
+  <p><b>核心原理：验签不需要「问签发方」，验签者只需持有「验证材料」，本地就能算出来。</b>这是密码学签名的性质。</p>
+  <table>
+    <thead><tr><th>实现</th><th>签发</th><th>验签</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><b>对称 HS256</b>（本系统 demo）</td><td>共享密钥</td><td>同一共享密钥本地重算签名</td><td>谁拿到密钥谁就能验；密钥需安全下发到各可信组件（<code>JWT_SECRET</code>）</td></tr>
+      <tr><td><b>非对称 RS256 / ES256 + JWKS</b>（生产标准）</td><td>私钥（仅 IAM 持有）</td><td>公钥（可公开分发，经 JWKS 端点下发）</td><td>公钥不保密，复制一万份也安全；私钥只有 IAM 有，别人伪造不了</td></tr>
+    </tbody>
+  </table>
+  <div class="note blue">💡 类比：央行统一印钞（签发方一个），但每个商户都有验钞机（验签方无数）——验钞是本地动作，不需要打电话问央行；印钞母版（私钥）只有央行有，验钞特征（公钥/验钞机）大家都有。</div>
+  <ul>
+    <li><b>验签 = 本地计算</b>（哈希 + 签名算法验证），零网络往返、无状态、廉价；</li>
+    <li><b>令牌可信 = 验签通过 + exp / aud / iss 检查通过</b>，不需要查数据库、不需要每次回源 IAM；</li>
+    <li>这就是 JWT 的设计目的：<b>签发一次、到处验证</b>——认证本地化（治 v1「每请求远程鉴权太重」的痛点），鉴权才需要决策。</li>
+  </ul>
+  <pre class="codeblock">IAM（签发）                           网关 / SDK（验签）
+私钥 / 共享密钥 ──签发──▶ JWT ──验证──▶ 本地算签名一致 + exp 未过期
+（只有 IAM 能造）                      （任何持验证材料者都能验）</pre>
+
+  <h3>5.3 执行点 PEP 位置是什么意思</h3>
+  <p><b>PEP（Policy Enforcement Point，策略执行点）= 「拦截请求、发起鉴权、执行放行/拦截」的那段逻辑跑在哪。</b></p>
+  <table>
+    <thead><tr><th></th><th>🌐 网关接入</th><th>📦 SDK 接入</th></tr></thead>
+    <tbody>
+      <tr><td>PEP 在哪</td><td><b>网关</b>（Traefik forwardAuth 中间件）</td><td><b>应用内部</b>（应用进程里的 SDK）</td></tr>
+      <tr><td>请求路径</td><td>Client → <b>网关拦截</b> → 调 IAM 决策 → 放行才转发给应用</td><td>Client → <b>应用内 SDK 拦截</b> → 决策 → 应用自己放行/拦截</td></tr>
+      <tr><td>应用改造</td><td>零（应用无感知）</td><td>要集成 SDK</td></tr>
+      <tr><td>流量约束 / 降级</td><td>必须过网关（否则可绕过）；PDP 挂了 fail-closed 全拦</td><td>无集中点，应用自己兜底；本地 bundle 可 stale-but-available</td></tr>
+    </tbody>
+  </table>
+  <pre class="codeblock">网关模式： Client → [ 网关 = PEP：验签 + 调 IAM ] → 应用（不感知鉴权）
+SDK 模式： Client → 应用内 [ SDK = PEP：验签 + 本地bundle/远程IAM ] → 业务逻辑</pre>
+  <div class="keyline">三者各司其职：<b>签发（IAM）集中、验签（PEP 本地化）分散、决策（PDP）集中</b>——IAM 只管发 token 和做决策，验签是任何持验证材料者都能做的廉价本地动作，所以网关能做、应用内 SDK 也能做。</div>
+</div>
+
+<!-- 第六章 -->
+<div class="chapter" id="c6">
+  <h2>第六章 · 端到端工作流（从头到尾）</h2>
+  <p class="lead">三个阶段：接入（一次）→ 授权（多次）→ 调用（每次）。</p>
+
+  <h3>阶段一 · 接入：身份与网络就绪（一次）</h3>
+  <div class="flow">
+    <div class="flow-step"><div class="fs-title">① 提供方注册应用并声明</div><div class="fs-desc">OpenAPI / 网络信息（云/账号/VPC/安全组）/ 鉴权方式；接入网关或 SDK（发布能力的前提 = 至少一条强制路径）</div></div>
+    <div class="flow-step"><div class="fs-title">② 使用方发起接入申请</div><div class="fs-desc">在「应用市场」选择目标应用 + 鉴权方式（如 OAuth2 Client Credentials）+ 网络打通（并入本次申请）</div></div>
+    <div class="flow-step"><div class="fs-title">③ 提供方 Owner + 平台审批</div><div class="fs-desc">SoD：申请人 ≠ 审批人；审批通过即生效</div></div>
+    <div class="flow-step done"><div class="fs-title">④ IAM 签发凭证</div><div class="fs-desc">生成 client_id/client_secret（明文仅展示一次，库中只存哈希）；凭证 = 身份，长期有效可轮换</div></div>
+  </div>
+
+  <h3>阶段二 · 授权：追加 scope（多次）</h3>
+  <div class="flow">
+    <div class="flow-step"><div class="fs-title">① 使用方在「能力市场」申请能力包</div><div class="fs-desc">选预设 → 主体（双主体：grantee=程序，applicant=人代理）→ 数据范围（6 类型表单，自动生成 CEL 表达式）</div></div>
+    <div class="flow-step"><div class="fs-title">② 提供方审批</div><div class="fs-desc">审批链按风险分级（删除=高、M2M=至少中、数据级=中+）</div></div>
+    <div class="flow-step done"><div class="fs-title">③ 生效：追加授权</div><div class="fs-desc">Casbin 策略（动作级）+ OpenFGA 关系/条件（数据级）写入；凭证不变，scope 增加</div></div>
+  </div>
+
+  <h3>阶段三 · 调用：认证 → 鉴权 → 放行（每次）</h3>
+  <div class="flow">
+    <div class="flow-step"><div class="fs-title">① 换取令牌（认证起点）</div><div class="fs-desc"><code>POST /v1/oauth/token</code>（client_credentials）→ 短 TTL JWT（含已授权 scope）</div></div>
+    <div class="flow-step"><div class="fs-title">② 请求进入执行点（认证校验）</div><div class="fs-desc">网关验签/透传身份，或 SDK 验 JWT → 得到可信主体 <code>client:xxx</code></div></div>
+    <div class="flow-step"><div class="fs-title">③ 鉴权：动作级</div><div class="fs-desc">PEP 解析请求 → action → PDP：决策缓存 → Casbin（RBAC）→ ABAC 条件；高风险写强制远程</div></div>
+    <div class="flow-step"><div class="fs-title">④ 鉴权：数据级</div><div class="fs-desc">OpenFGA：tuple 关系（实例）/ condition（CEL 条件，variable 按 grantee 解析）</div></div>
+    <div class="flow-step done"><div class="fs-title">⑤ 放行 / 拦截 + 留痕</div><div class="fs-desc">200 转发业务请求；403 deny-by-default；决策日志（TraceID 贯穿 PEP→PDP）</div></div>
+  </div>
+
+  <h3>6.1 一次调用的完整时序</h3>
+  <div class="seq">
+    <div class="seq-col"><div class="seq-box brand">调用方<br><span style="font-size:11px;font-weight:400">consumer</span></div></div>
+    <div class="seq-col"><div class="seq-arrow">① 换 token</div></div>
+    <div class="seq-col"><div class="seq-box violet">IAM<br><span style="font-size:11px;font-weight:400">签发 JWT</span></div></div>
+    <div class="seq-col"><div class="seq-arrow">② 带 token 请求</div></div>
+    <div class="seq-col"><div class="seq-box">网关 / SDK<br><span style="font-size:11px;font-weight:400">认证</span></div></div>
+    <div class="seq-col"><div class="seq-arrow">③ 鉴权</div></div>
+    <div class="seq-col"><div class="seq-box green">PDP + OpenFGA<br><span style="font-size:11px;font-weight:400">决策</span></div></div>
+    <div class="seq-col"><div class="seq-arrow">④ 放行</div></div>
+    <div class="seq-col"><div class="seq-box">目标应用<br><span style="font-size:11px;font-weight:400">provider</span></div></div>
+  </div>
+
+  <h3>6.2 失败路径与降级（面试加分项）</h3>
+  <table>
+    <thead><tr><th>场景</th><th>行为</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>无令牌 / 令牌过期 / 验签失败</td><td>认证失败</td><td><span class="tag tag-red">401/403 拦截</span></td></tr>
+      <tr><td>身份合法但无对应策略</td><td>鉴权失败</td><td><span class="tag tag-red">403 deny-by-default</span></td></tr>
+      <tr><td>动作级命中缓存</td><td>缓存决策（authz:dec）</td><td><span class="tag tag-green">低延迟放行</span></td></tr>
+      <tr><td>高风险写操作</td><td>强制远程 PDP（force-remote）</td><td><span class="tag tag-blue">绕开本地 bundle</span></td></tr>
+      <tr><td>PDP 短暂不可用（网关模式）</td><td>fail-closed</td><td><span class="tag tag-red">拒绝（安全优先）</span></td></tr>
+      <tr><td>SDK 模式 PDP 不可用</td><td>本地 bundle 动作级决策</td><td><span class="tag tag-green">stale-but-available</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.3 凭证签发：到底谁来做（职责边界）</h3>
+  <p><b>结论：凭证签发必须是 IAM（身份平台）来做；工单是编排载体；办理人（应用负责人）只做审批决策、不做密钥操作。</b>这是「授权与开通分离」最关键的分界。</p>
+  <table>
+    <thead><tr><th>选项</th><th>结论</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr><td><b>A · 工单通过后 IAM 签发</b></td><td><span class="tag tag-green">✅ 推荐（业界标准）</span></td><td>凭证涉及密钥生成/哈希存储/轮换/吊销，必须由身份平台做；且凭证要绑定 IAM 的身份与 scope、进审计</td></tr>
+      <tr><td>B · 工单调用某系统签发</td><td>本质是 A 的变体</td><td>ITSM 是流程状态机+审计载体，不持有密钥能力；「某系统」= IAM/Vault 时等价于 A（工单只触发、不生成）</td></tr>
+      <tr><td>C · 办理人（应用负责人）签发</td><td><span class="tag tag-red">❌ 不推荐</span></td><td>人工接触明文（泄漏面）、无自动轮换/吊销、绕过审计、secret 流转不可控——负责人只做审批决策</td></tr>
+    </tbody>
+  </table>
+  <div class="cols">
+    <div class="col blue"><h4>✅ 正确顺序</h4><ol><li>接入申请 → 提供方 Owner + 平台审批（SoD）</li><li>前置工单：网络打通等落地动作（ITSM 编排）</li><li>工单 done → <b>回调 IAM</b></li><li>IAM 签发凭证（client_id/secret，哈希存储、一次性展示）→ 激活授权</li></ol></div>
+    <div class="col green"><h4>业界佐证</h4><ul><li><b>OAuth2</b>：client 凭证由授权服务器（AS）签发，审批走管理面、签发永远在 AS</li><li><b>HashiCorp Vault</b>：审批通过后由平台调用 Vault 生成动态凭证，ITSM 不碰密钥</li><li><b>AWS</b>：policy attach（审批）与 STS 签发临时凭证（签发）天然分离</li></ul></div>
+  </div>
+  <div class="keyline">审批通过 ≠ 立即签发：要等<b>前置工单 done 回调后</b>，IAM 才签发并激活——签发归 IAM、编排归工单、审批归负责人，三者不越界。</div>
+</div>
+
+<!-- 第七章 -->
+<div class="chapter" id="c7">
+  <h2>第七章 · 业内怎么做 & 我们的定位</h2>
+  <p class="lead">"全包"在商业产品里少见，但在"企业内部一体化权限平台"里是业界主流形态——我们的定位是后者，而且每个模块都有清晰的业内对应物。</p>
+
+  <h3>7.1 业内拆成五个域</h3>
+  <table>
+    <thead><tr><th>能力域</th><th>业内典型产品/做法</th></tr></thead>
+    <tbody>
+      <tr><td>网络接入 / 开通</td><td>云网络平台（VPC/安全组/TGW 编排）、ITSM 工单——权限平台一般不碰网络</td></tr>
+      <tr><td>认证（验签/发 token）</td><td>Okta / Auth0 / Azure AD / Keycloak（IdP + 授权服务器）；API 网关（Kong / APISIX / Envoy / AWS API Gateway）做令牌校验</td></tr>
+      <tr><td>授权（粗粒度）</td><td>AWS IAM / GCP IAM / Azure RBAC；应用内框架（Spring Security / Casbin 库）</td></tr>
+      <tr><td>授权（细粒度/实例级）</td><td>Google Zanzibar → OpenFGA / AuthZed / SpiceDB；Oso / Cerbos</td></tr>
+      <tr><td>应用目录 + 订阅</td><td>Backstage（Spotify）、Azure API Management 的产品 / 订阅 / 密钥</td></tr>
+      <tr><td>审批 + 审计</td><td>独立工单平台（Jira / ServiceNow / 内部 OA）+ 审计系统（CloudTrail / Splunk）</td></tr>
+    </tbody>
+  </table>
+  <p>商业世界里这些是<b>五个市场</b>：IdP 一个产品、授权引擎一个产品、API 网关一个产品、ITSM 一个产品——靠 API 集成拼装。典型企业组合：<b>公司级 IdP + API 网关 + 权限中心 + 网络工单平台</b> 四件套。</p>
+
+  <h3>7.2 我们的定位：企业内部统一权限平台</h3>
+  <p>大厂内部自研的 IAM / 权限中台（Google Zanzibar 只是其中"授权"一块，Stripe / 字节 / 美团都有）正是这种形态：<b>内部可以强约束（所有应用必须接入平台），所以能把 认证 + 授权 + 目录 + 审批 + 开通 串成一条主链路</b>。我们不是"大包大揽"——网络打通由用户在 ITSM 提单、验签由双方系统开发协商，平台只提供便利性入口。</p>
+  <table>
+    <thead><tr><th>我们的模块</th><th>业内的对应物</th></tr></thead>
+    <tbody>
+      <tr><td>IAM 签发 token（`/v1/oauth/token` + JWT/JWKS）</td><td>OAuth2 授权服务器（Keycloak / Auth0）</td></tr>
+      <tr><td>网关 PEP + forwardAuth</td><td>APISIX ext-authz / Envoy ext_authz</td></tr>
+      <tr><td>能力市场 + 订阅 + 凭证</td><td>Azure APIM 的产品 / 订阅 / 密钥</td></tr>
+      <tr><td>Casbin + OpenFGA（Zanzibar 系）</td><td>AWS IAM + OpenFGA / AuthZed</td></tr>
+      <tr><td>网络 / 凭证开通走工单</td><td>ITSM + 云网络编排</td></tr>
+      <tr><td>审计 / 决策日志</td><td>CloudTrail / 决策日志平台</td></tr>
+    </tbody>
+  </table>
+
+  <h3>7.3 真正值得强调的三个设计理念</h3>
+  <ol>
+    <li><b>授权与开通分离</b>：许可决策永远闭环在 IAM；网络打通、凭证签发是"落地动作"走工单（demo 模拟 + 预留 webhook）——业界共识，权限平台不负责网络、但可与网络平台联动；</li>
+    <li><b>决策统一、执行分散</b>：一套策略（Casbin + OpenFGA），网关或 SDK 两种执行点——对应业界"PDP 集中 + PEP 多处"的标准架构；</li>
+    <li><b>凭证与授权分离</b>：接入签发凭证一次、能力包追加 scope 多次——对应 OAuth client registration + APIM subscription 模式。</li>
+  </ol>
+  <div class="note violet">🎤 标准答法：<b>"商业产品是分域的（IdP / 授权引擎 / API 网关 / ITSM 各自独立），靠集成拼装；我们的系统对标企业内部一体化权限平台——把身份、授权、目录、审批、开通串成一条主链路，同时严格保持授权与开通分离，网络/工单这类落地动作通过对接外部平台完成（demo 用模拟 + webhook 预留体现这个边界）。"</b></div>
+</div>
+
+<!-- 第八章 -->
+<div class="chapter" id="c8">
+  <h2>第八章 · OAuth2 与 SSO：协议、模块与单点登录</h2>
+  <p class="lead">把"OAuth2 是不是一个独立系统"、"人的登录（SSO）和程序调用（client_credentials）是什么关系"讲清楚。</p>
+
+  <h3>8.1 OAuth2 是协议，不是系统</h3>
+  <p><b>OAuth2 是一份协议（规范），不是一个系统。</b>业界说的"OAuth2 系统"，本质都是内置 OAuth2 能力的身份平台（IdP / 授权服务器 AS）——Okta、Auth0、Keycloak、Azure AD 都是"身份平台里带一个 OAuth2/OIDC 模块"，而不是单独部署一套"OAuth2 系统"。</p>
+  <pre class="codeblock">资源所有者(人/owner) ──授权──▶ 授权服务器 AS（签发 token）◀──拿令牌── 客户端 Client
+                                    │ 校验 / 放行                │ 带 token 访问
+                                    ▼                           ▼
+                              资源服务器 RS（被访问应用）◀──────────┘</pre>
+  <table>
+    <thead><tr><th>AS 能力清单</th><th>我们的现状</th></tr></thead>
+    <tbody>
+      <tr><td>Client 注册（client_id/secret、哈希存储、轮换）</td><td><span class="tag tag-green">✅ 已有</span></td></tr>
+      <tr><td>Token 端点（client_credentials）</td><td><span class="tag tag-green">✅ 已有</span></td></tr>
+      <tr><td>JWT 签发（短 TTL、带 scope）</td><td><span class="tag tag-green">✅ 已有</span></td></tr>
+      <tr><td>JWKS 端点（资源服务器拉公钥验签）</td><td><span class="tag tag-amber">⏳ 生产化补齐（demo 用 HS256 共享密钥）</span></td></tr>
+      <tr><td>授权码流（人登录）</td><td><span class="tag tag-amber">⏳ 可对接公司 IdP 替代，不自建</span></td></tr>
+      <tr><td>Introspection / 吊销</td><td><span class="tag tag-amber">⏳ 演进</span></td></tr>
+    </tbody>
+  </table>
+  <div class="keyline">IAM 内置 OAuth2 模块 = IAM 就是授权服务器；不需要为 M2M 单独上 Keycloak/Auth0——多一个独立 AS 就多一个身份源，违背统一身份。分工建议：<b>程序身份走 IAM 自建 AS（client_credentials）</b>，<b>人的身份走公司统一 IdP（OIDC 对接）</b>。</div>
+
+  <h3>8.2 SSO：一次登录、处处免登（企业真实架构）</h3>
+  <p>典型企业流程：用户经 <b>EAA（企业应用接入层/网关）</b> → <b>Okta（IdP 身份提供商）</b> 认证 → <b>门户统一认证系统（SP/RP + 会话代理）</b> 把认证结果换成门户会话/JWT → 进入平台中心 → 访问任意内部应用免登。</p>
+  <table>
+    <thead><tr><th>你的组件</th><th>标准角色</th></tr></thead>
+    <tbody>
+      <tr><td>EAA 平台</td><td>企业应用接入层 / 零信任网关（网络接入 + 代理）</td></tr>
+      <tr><td>Okta</td><td>IdP 身份提供商：认证，签发身份断言</td></tr>
+      <tr><td>门户 auth 认证系统</td><td>SP/RP + 会话代理：对接 Okta，向内部应用分发信任</td></tr>
+      <tr><td>内部应用</td><td>SP/RP：信任门户/IdP 的认证结果，不再自己登录</td></tr>
+    </tbody>
+  </table>
+  <p>概念层级：<b>SSO 是目标（体验）</b>，SAML 2.0 / OIDC 是实现它的<b>协议</b>；OIDC = OAuth2 + 身份层（ID token 携带"人是谁"）。</p>
+
+  <h3>8.3 SSO 与 OAuth2 的重合与分工</h3>
+  <table>
+    <thead><tr><th>维度</th><th>门户 SSO（人的场景）</th><th>我们当前的 OAuth2（程序场景）</th></tr></thead>
+    <tbody>
+      <tr><td>对象</td><td><b>人</b>（浏览器会话）</td><td><b>程序</b>（M2M）</td></tr>
+      <tr><td>流程</td><td>OIDC 授权码 / SAML + 会话 Cookie</td><td>client_credentials + JWT</td></tr>
+      <tr><td>身份载体</td><td>ID token / 门户会话 JWT</td><td>access token（程序身份）</td></tr>
+      <tr><td>验签/传播</td><td>门户注入身份头 / 应用校验 token</td><td>网关/SDK 验签 + X-User 注入</td></tr>
+      <tr><td>与权限中心关系</td><td>认证（你是谁）——<b>上游</b></td><td>认证 + 鉴权（全链）</td></tr>
+    </tbody>
+  </table>
+  <div class="note cyan">🔗 关键衔接：门户 SSO 的"认证后给各应用注入身份"与我们网关的 <code>X-User</code> 身份头注入是<b>同一套思想</b>。落地：门户认证成功 → 向各应用/网关注入 X-User → 我们的网关/PDP 继续做鉴权——<b>SSO 解决"人怎么登录"，权限中心解决"能不能访问"</b>，零重叠、严丝合缝。</div>
+  <div class="keyline">统一身份（SSO：人登录）+ 统一授权（权限中心：能不能）+ 统一执行（网关/SDK）——认证与鉴权分离叙事的完整闭环。</div>
+</div>
+
+<!-- 第九章 -->
+<div class="chapter" id="c9">
+  <h2>第九章 · 面试叙事要点</h2>
+  <p class="lead">把上面的细节压缩成可讲的叙事主线。</p>
+  <ul>
+    <li><b>外部化授权四组件</b>：PEP（网关/SDK 执行点）→ PDP（iam-server 决策）→ PAP（管理面：能力/预设/策略）→ PIP（身份与数据源）；</li>
+    <li><b>认证与鉴权分离</b>：JWT 验签无状态每请求可做（治 v1 每请求远程鉴权的痛点）；鉴权走缓存/本地 bundle，仅高风险写强制远程；</li>
+    <li><b>凭证与授权分离</b>：接入申请签发凭证（一次），能力包申请追加 scope（多次），每次 JWT 只含已授权 scope——OAuth client registration + subscription 模式；</li>
+    <li><b>数据级条件授权</b>：OpenFGA（Zanzibar 系）+ CEL condition，范围字段类型系统把表达式收敛为 6 种表单、系统生成并 cel-go 真解析；</li>
+    <li><b>双模式接入</b>：Tier 1 网关（零改造、fail-closed）与 Tier 2 SDK（本地 bundle、stale-but-available），同一套策略两种执行；</li>
+    <li><b>授权与开通分离</b>：网络打通/凭证签发是落地动作（工单），授权决策始终闭环在 IAM 令牌体系。</li>
+  </ul>
+  <div class="note violet">🎤 一句话总结：<b>身份来自 IAM、决策来自 PDP、执行在网关或 SDK，凭证一次、scope 多次、审计全程。</b></div>
+</div>
+
+<!-- 附录 -->
+<div class="chapter" id="c10">
+  <h2>附录 · 术语表</h2>
+  <table>
+    <thead><tr><th>术语</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>AuthN（认证）</td><td>验证「你是谁」：验凭据/令牌/证书，产出可信身份</td></tr>
+      <tr><td>AuthZ（鉴权）</td><td>判断「你能不能」：动作级 + 数据级授权决策</td></tr>
+      <tr><td>PEP</td><td>策略执行点：网关（Traefik forwardAuth）或应用内 SDK，拦截并转发鉴权请求</td></tr>
+      <tr><td>AS（授权服务器）</td><td>OAuth2 核心角色：client 注册、token 签发、校验——是"能力"而非独立系统，可内置于 IAM</td></tr>
+      <tr><td>PDP</td><td>策略决策点：iam-server，返回 allow/deny + 理由</td></tr>
+      <tr><td>PAP</td><td>策略管理点：能力包 / 预设 / 策略 / 授权管理的管理面</td></tr>
+      <tr><td>PIP</td><td>策略信息点：用户 / 组 / 组织 / 应用 / 资源身份数据</td></tr>
+      <tr><td>JWT</td><td>JSON Web Token：无状态访问令牌（HS256 签发、短 TTL、带 scope）</td></tr>
+      <tr><td>SSO</td><td>单点登录：一次认证、多应用免登的体验目标（由 SAML / OIDC 实现）</td></tr>
+      <tr><td>OIDC / SAML</td><td>实现 SSO 的协议：OIDC = OAuth2 + 身份层（ID token）；SAML 为企业传统协议</td></tr>
+      <tr><td>IdP</td><td>身份提供商（如 Okta）：负责人的认证与身份断言</td></tr>
+      <tr><td>OpenFGA</td><td>Zanzibar 系实例级授权引擎（关系 tuple + CEL condition）</td></tr>
+      <tr><td>Casbin</td><td>动作级 RBAC/ABAC 引擎（策略快照 + 本地 bundle）</td></tr>
+      <tr><td>grantee / applicant</td><td>权限作用主体 / 权限申请主体（程序由 owner 人代理申请）</td></tr>
+      <tr><td>scope</td><td>授权范围：能力包申请通过后向凭证身份追加的最小权限集合</td></tr>
+      <tr><td>fail-closed / stale-but-available</td><td>降级策略：集中执行点拒绝优先 / 本地快照可用优先</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<a href="#top" class="backtop">↑</a>
+</div>
+</body>
+</html>

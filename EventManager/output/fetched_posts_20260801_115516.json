@@ -1,0 +1,58 @@
+{
+  "task_id": "65773775-e73b-4bc5-84e7-8508c24e84e3",
+  "executed_at": "2026-08-01T11:55:16.001159+00:00",
+  "total_batches": 1,
+  "results": [
+    {
+      "batch": 1,
+      "source_url": "https://jsonplaceholder.typicode.com/posts?_limit=10&_start=0",
+      "posts_fetched": 10,
+      "posts_processed": 10,
+      "top_words": [
+        [
+          "est",
+          3
+        ],
+        [
+          "eum",
+          3
+        ],
+        [
+          "dolorem",
+          3
+        ],
+        [
+          "aut",
+          2
+        ],
+        [
+          "repellat",
+          2
+        ]
+      ],
+      "sample_posts": [
+        {
+          "id": 1,
+          "title": "sunt aut facere repellat provident occaecati excepturi optio reprehenderit",
+          "body_length": 158,
+          "word_count": 9,
+          "user_id": 1
+        },
+        {
+          "id": 2,
+          "title": "qui est esse",
+          "body_length": 206,
+          "word_count": 3,
+          "user_id": 1
+        },
+        {
+          "id": 3,
+          "title": "ea molestias quasi exercitationem repellat qui ipsa sit aut",
+          "body_length": 164,
+          "word_count": 9,
+          "user_id": 1
+        }
+      ]
+    }
+  ]
+}

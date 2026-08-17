@@ -1,0 +1,14 @@
+{
+  "name": "发布管理",
+  "description": "部署策略详解、发布模式概览、内部 Spug 真实架构及 Demo 实现对比",
+  "icon": "🚀",
+  "sort": 2,
+  "articles": {
+    "deploy-strategies": { "title": "部署策略详解", "description": "滚动更新、蓝绿部署、灰度发布、重建/红黑/影子部署全面对比，含 K8s 配置示例与面试高频题", "tags": ["部署", "K8s", "面试"], "updated": "2026-08-01" },
+    "release-modes": { "title": "发布方式概览", "description": "常规发布、增量发布、补偿发布、快速发布、回滚发布、紧急发布、定时发布", "tags": ["发布模式", "全览"], "updated": "2026-07-26" },
+    "demo-comparison": { "title": "Demo 实现对比", "description": "真实 Spug vs Demo 系统在各层面的实现差异", "tags": ["对比", "Demo"], "updated": "2026-07-26" },
+    "local-demo-setup": { "title": "本地模拟发布 — 环境配置与应用手册", "description": "本地三服务架构配置指南、demo 应用注册、环境/审批策略配置、Dockerfile 与 deployment.yaml 编写指南、CI/CD 流程详解", "tags": ["配置手册", "Demo", "本地环境"], "updated": "2026-08-01" },
+    "local-env-troubleshooting": { "title": "本地环境配置问题总结与排障报告", "description": "5 个关键问题的排查修复全过程、本地部署 vs 真实部署完整对比、完整流程演示", "tags": ["排障", "Demo", "本地环境", "对比"], "updated": "2026-07-31" },
+    "orbstack-cd-troubleshooting": { "title": "OrbStack 部署问题排查复盘", "description": "kubectl 递归引用根因分析、entrypoint 机制解析、Dockerfile vs Entrypoint 职责分离、OrbStack K8s 容器内访问最佳实践", "tags": ["排障", "OrbStack", "Docker", "K8s", "复盘"], "updated": "2026-08-01" }
+  }
+}

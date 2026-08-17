@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; line-height: 1.6; }
+  h1 { font-size: 22px; border-bottom: 2px solid #1677ff; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1677ff; margin-top: 28px; }
+  h3 { font-size: 15px; color: #333; margin-top: 20px; }
+  .card { border: 1px solid #e2e5f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fff; }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+  th, td { border: 1px solid #e2e5f0; padding: 8px 12px; text-align: left; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:hover { background: #f6f8fa; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 12px; color: #d46b08; }
+  pre { background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 13px; overflow-x: auto; }
+  ul, ol { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .alert-info { background: #e6f4ff; border: 1px solid #91caff; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+  .alert-info h3 { margin: 0 0 6px 0; color: #1677ff; font-size: 14px; }
+  .alert-info p { margin: 0; color: #333; font-size: 13px; }
+  .svg-container { background: #f6f8fa; padding: 16px; border-radius: 8px; text-align: center; margin-bottom: 16px; }
+  .svg-container svg { max-width: 100%; height: auto; }
+  .svg-caption { font-size: 12px; color: #999; margin-top: 8px; display: block; }
+  .tag { display: inline-block; background: #f0f0f0; border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #666; margin-right: 4px; }
+  .tag-green { background: #f6ffed; color: #389e0d; }
+  .tag-blue { background: #e6f4ff; color: #1677ff; }
+  .tag-orange { background: #fff7e6; color: #d46b08; }
+  .tag-red { background: #fff2f0; color: #f5222d; }
+  .flex-row { display: flex; gap: 16px; margin-bottom: 16px; }
+  .flex-card { flex: 1; border-radius: 6px; padding: 12px; }
+  .flex-card.blue { background: #f0f5ff; }
+  .flex-card.green { background: #f6ffed; }
+  .flex-card.orange { background: #fff7e6; }
+  .flex-card.purple { background: #f9f0ff; }
+</style>
+<style>
+
+/* ===== 文章自包含导航 (由 add_article_toc.py 注入) ===== */
+/* 注意: 不使用 scroll-behavior: smooth，srcdoc sandbox iframe 内动画会导致 scroll 事件不可靠 */
+[id] { scroll-margin-top: 14px; }
+.doc-layout { display: flex; gap: 28px; align-items: flex-start; }
+.doc-toc {
+  width: 236px; flex-shrink: 0; box-sizing: border-box;
+  position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+  padding: 8px 4px 24px 0; border-right: 1px solid #eef0f6;
+}
+.doc-toc.is-hidden { display: none; }
+.doc-toc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 10px 10px; font-size: 13px; font-weight: 700; color: #4a5568;
+  letter-spacing: .5px;
+}
+.doc-toc-hide {
+  cursor: pointer; border: none; background: transparent; color: #a0aec0;
+  font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.doc-toc-hide:hover { color: #1a202c; background: #f1f5f9; }
+.doc-toc-nav { display: flex; flex-direction: column; gap: 1px; }
+.doc-toc-nav a {
+  display: block; padding: 6px 10px; border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0; color: #4a5568; text-decoration: none;
+  font-size: 13px; line-height: 1.5; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; transition: all .15s;
+}
+.doc-toc-nav a:hover { color: #1677ff; background: #f0f6ff; }
+.doc-toc-nav a.active {
+  color: #1677ff; background: #e6f4ff; border-left-color: #1677ff; font-weight: 600;
+}
+.doc-toc-show {
+  display: none; position: sticky; top: 8px; z-index: 30;
+  border: 1px solid #c7d7f5; background: #fff; color: #1677ff;
+  font-size: 13px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(22,119,255,.15);
+}
+.doc-toc-show.is-visible { display: inline-block; }
+.doc-main { flex: 1; min-width: 0; }
+@media (max-width: 820px) {
+  .doc-layout { flex-direction: column; gap: 12px; }
+  .doc-toc {
+    position: static; width: 100%; max-height: 220px;
+    border-right: none; border-bottom: 1px solid #eef0f6;
+  }
+}
+</style>
+</head>
+<body>
+<div class="doc-layout">
+  <button class="doc-toc-show" id="doc-toc-show" type="button">📑 目录</button>
+  <aside class="doc-toc" id="doc-toc">
+  <div class="doc-toc-head">
+    <span class="doc-toc-title">📑 本文章节</span>
+    <button class="doc-toc-hide" id="doc-toc-hide" type="button" title="收起目录">✕</button>
+  </div>
+  <nav class="doc-toc-nav">
+    <a href="#sec-1">1. 总体架构对比</a>
+    <a href="#sec-2">2. 部署策略实现对比</a>
+    <a href="#sec-3">3. 发布模式实现对比</a>
+    <a href="#sec-4">4. 流水线各阶段模拟说明</a>
+    <a href="#sec-5">5. 审批流程对比</a>
+    <a href="#sec-6">6. 如何启用真实 K8s 部署</a>
+  </nav>
+</aside>
+  <main class="doc-main">
+
+
+<h1>Demo 实现对比</h1>
+
+<p style="font-size: 13px; color: #666;">本文详细对比真实 Spug 发布系统与当前 Demo 系统在各方面的实现差异，帮助理解 Demo 系统的定位与能力边界。</p>
+
+<!-- ========== 1. 总体架构对比 ========== -->
+<h2 id="sec-1">1. 总体架构对比</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">对比维度</th>
+        <th style="width: 40%;">真实 Spug 系统</th>
+        <th style="width: 45%;">本 Demo 系统</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>技术栈</strong></td>
+        <td>Python (Django) + React</td>
+        <td>Python (Django REST Framework) + React + TypeScript</td>
+      </tr>
+      <tr>
+        <td><strong>部署方式</strong></td>
+        <td>主机 Agent 模式（SSH）</td>
+        <td>支持 EC2（SSH）和 K8s（kubectl）双模式</td>
+      </tr>
+      <tr>
+        <td><strong>发布能力</strong></td>
+        <td>5 种发布模式</td>
+        <td>7 种发布模式（含紧急发布、定时发布）</td>
+      </tr>
+      <tr>
+        <td><strong>部署策略</strong></td>
+        <td>基本滚动更新</td>
+        <td>6 种部署策略（滚动/蓝绿/灰度/重建/红黑/影子）</td>
+      </tr>
+      <tr>
+        <td><strong>K8s 支持</strong></td>
+        <td>不支持原生 K8s 集成</td>
+        <td>支持 K8s 原生操作（通过 k8s_client）</td>
+      </tr>
+      <tr>
+        <td><strong>审批流程</strong></td>
+        <td>基本审批</td>
+        <td>多级审批 + 紧急通道 + 定时发布</td>
+      </tr>
+      <tr>
+        <td><strong>面试学习</strong></td>
+        <td>运维实践</td>
+        <td>系统设计 + 部署策略 + 面试指南</td>
+      </tr>
+      <tr>
+        <td><strong>定位</strong></td>
+        <td>生产级运维工具</td>
+        <td>教学演示 + 面试准备系统</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== 2. 部署策略实现对比 ========== -->
+<h2 id="sec-2">2. 部署策略实现对比</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">功能</th>
+        <th style="width: 30%;">真实实现</th>
+        <th style="width: 35%;">Demo 实现</th>
+        <th style="width: 20%;">差异等级</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>滚动更新</strong></td>
+        <td>K8s Deployment 原生 RollingUpdate 策略，真实控制 maxSurge / maxUnavailable，逐个替换 Pod</td>
+        <td>通过 kubectl set image 或 patch deployment 实现分批更新，真实操作 K8s 资源，支持 maxSurge / maxUnavailable 参数</td>
+        <td><span class="tag tag-green">可真实</span></td>
+      </tr>
+      <tr>
+        <td><strong>蓝绿部署</strong></td>
+        <td>通过 Service selector 切换、Ingress 流量切换等真实网络层操作</td>
+        <td>通过 K8s Service selector 或 Istio VirtualService 切换实现，支持自动/手动切换，保留两套完整环境</td>
+        <td><span class="tag tag-orange">仅模拟</span></td>
+      </tr>
+      <tr>
+        <td><strong>灰度发布</strong></td>
+        <td>通过 Service Mesh（Istio）、Nginx 灰度、或 K8s Service 权重分配实现精细流量控制</td>
+        <td>通过 K8s 多 Service + 标签选择器模拟灰度比例，支持分批扩缩容，但不具备真实流量权重控制</td>
+        <td><span class="tag tag-orange">仅模拟</span></td>
+      </tr>
+      <tr>
+        <td><strong>重建部署</strong></td>
+        <td>K8s Deployment Recreate 策略，先销毁全部旧 Pod 再创建新 Pod，会有短暂停机</td>
+        <td>通过 kubectl rollout restart 或强制重建 Deployment 模拟，实现逻辑完整</td>
+        <td><span class="tag tag-red">未实现</span></td>
+      </tr>
+      <tr>
+        <td><strong>红黑部署</strong></td>
+        <td>Netflix Spinnaker 模式，同时运行两套完整集群，通过 Load Balancer 切换流量</td>
+        <td>通过 Service 切换和副本数控制模拟红黑部署逻辑，展示概念原理</td>
+        <td><span class="tag tag-red">未实现</span></td>
+      </tr>
+      <tr>
+        <td><strong>影子部署</strong></td>
+        <td>真实流量镜像（Traffic Mirroring / Shadowing），影子实例接收请求副本但不影响响应</td>
+        <td>通过模拟流量复制和数据对比展示影子部署概念，不具备真实流量镜像能力</td>
+        <td><span class="tag tag-red">未实现</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== 3. 发布模式实现对比 ========== -->
+<h2 id="sec-3">3. 发布模式实现对比</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">模式</th>
+        <th style="width: 30%;">真实实现</th>
+        <th style="width: 35%;">Demo 实现</th>
+        <th style="width: 20%;">差异等级</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>常规发布</strong></td>
+        <td>完整 CI/CD 流水线，从代码提交到生产发布全流程自动化</td>
+        <td>流水线阶段已定义，核心逻辑可执行，但部分阶段（编译、测试）为模拟跳过</td>
+        <td><span class="tag tag-orange">流程简化</span></td>
+      </tr>
+      <tr>
+        <td><strong>增量发布</strong></td>
+        <td>仅编译和推送变更部分的代码或模块，增量升级运行中的服务</td>
+        <td>流水线中有增量发布阶段定义，但实际执行逻辑为空，仅占位展示概念</td>
+        <td><span class="tag tag-orange">逻辑未实现</span></td>
+      </tr>
+      <tr>
+        <td><strong>补偿发布</strong></td>
+        <td>发布失败后自动或手动发起补偿流程，回退到上一个稳定版本</td>
+        <td>流水线有补偿发布阶段定义，未实现真实补偿逻辑，需手动触发回滚</td>
+        <td><span class="tag tag-orange">逻辑未实现</span></td>
+      </tr>
+      <tr>
+        <td><strong>快速发布</strong></td>
+        <td>跳过构建和测试阶段，直接使用预构建的镜像快速上线紧急修复</td>
+        <td>流水线中有快速发布阶段定义，简化了流程但未完全跳过构建模拟</td>
+        <td><span class="tag tag-orange">逻辑未实现</span></td>
+      </tr>
+      <tr>
+        <td><strong>回滚发布</strong></td>
+        <td>支持自动回滚到任意历史版本，保留完整版本历史</td>
+        <td>支持版本记录和回滚操作，通过重新部署指定版本镜像实现，部分可用</td>
+        <td><span class="tag tag-orange">部分实现</span></td>
+      </tr>
+      <tr>
+        <td><strong>紧急发布</strong></td>
+        <td>绕过标准审批流程，通过紧急通道直接发布到生产，事后补审批</td>
+        <td>Demo 定义紧急发布模式但审批 bypass 逻辑未实现，需手动审批</td>
+        <td><span class="tag tag-red">未实现</span></td>
+      </tr>
+      <tr>
+        <td><strong>定时发布</strong></td>
+        <td>支持指定时间窗口或定时任务自动执行发布，具备时间冲突检测</td>
+        <td>Demo 中定义了定时发布模式，但定时调度和执行引擎未实现</td>
+        <td><span class="tag tag-red">未实现</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== 4. 流水线各阶段模拟说明 ========== -->
+<h2 id="sec-4">4. 流水线各阶段模拟说明</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 14%;">阶段</th>
+        <th style="width: 28%;">真实实现</th>
+        <th style="width: 38%;">Demo 实现</th>
+        <th style="width: 20%;">真实程度</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>代码提交</strong></td>
+        <td>开发者通过 Git 推送代码到远程仓库，触发 Webhook</td>
+        <td>Demo 创建发布时手动输入 Git 提交信息，不连接真实仓库</td>
+        <td><span class="tag tag-orange">模拟</span></td>
+      </tr>
+      <tr>
+        <td><strong>代码审查</strong></td>
+        <td>自动或手动 Code Review，结合 CI 检查</td>
+        <td>审批流程中人工审核发布内容，无自动化代码审查</td>
+        <td><span class="tag tag-orange">模拟</span></td>
+      </tr>
+      <tr>
+        <td><strong>构建编译</strong></td>
+        <td>CI 服务器（Jenkins/GitLab CI）真实执行编译打包</td>
+        <td>流水线标记"编译完成"，不执行真实编译，仅传递版本信息</td>
+        <td><span class="tag tag-orange">模拟</span></td>
+      </tr>
+      <tr>
+        <td><strong>单元测试</strong></td>
+        <td>CI 流水线中执行自动化测试用例，失败则阻断发布</td>
+        <td>流水线标记"测试通过"，不执行真实测试，直接进入下一阶段</td>
+        <td><span class="tag tag-orange">模拟</span></td>
+      </tr>
+      <tr>
+        <td><strong>镜像打包</strong></td>
+        <td>Docker build 生成新版本的容器镜像</td>
+        <td>通过 Docker SDK 或 kubectl 构建并打包镜像，连接真实 Docker 环境</td>
+        <td><span class="tag tag-green">可真实</span></td>
+      </tr>
+      <tr>
+        <td><strong>镜像推送</strong></td>
+        <td>推送镜像到 Docker Registry / ECR</td>
+        <td>支持配置真实 Registry 地址，推送镜像到指定仓库</td>
+        <td><span class="tag tag-green">可真实</span></td>
+      </tr>
+      <tr>
+        <td><strong>部署开发</strong></td>
+        <td>自动部署到开发环境，供开发者自测</td>
+        <td>通过 k8s_client 真实操作 K8s 资源部署到指定命名空间</td>
+        <td><span class="tag tag-green">可真实</span></td>
+      </tr>
+      <tr>
+        <td><strong>部署测试</strong></td>
+        <td>自动部署到测试环境，供 QA 测试</td>
+        <td>通过 k8s_client 真实操作 K8s 资源部署到测试命名空间</td>
+        <td><span class="tag tag-green">可真实</span></td>
+      </tr>
+      <tr>
+        <td><strong>预发审批</strong></td>
+        <td>多级审批流程，自动通知审批人</td>
+        <td>Demo 审批流程已实现，支持多级审批和审批通知，但审批人操作为手动确认</td>
+        <td><span class="tag tag-orange">模拟</span></td>
+      </tr>
+      <tr>
+        <td><strong>部署预发</strong></td>
+        <td>部署到预发（Staging）环境，模拟生产验证</td>
+        <td>通过 k8s_client 真实操作 K8s 资源部署到预发命名空间</td>
+        <td><span class="tag tag-green">可真实</span></td>
+      </tr>
+      <tr>
+        <td><strong>生产发布</strong></td>
+        <td>部署到生产环境，结合部署策略控制发布节奏</td>
+        <td>通过 k8s_client 结合部署策略（滚动/蓝绿等）真实操作生产命名空间</td>
+        <td><span class="tag tag-green">可真实</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== 5. 审批流程对比 ========== -->
+<h2 id="sec-5">5. 审批流程对比</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">对比维度</th>
+        <th style="width: 40%;">真实审批流程</th>
+        <th style="width: 45%;">Demo 审批流程</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>审批层级</strong></td>
+        <td>支持自定义多级审批链，可根据应用、环境、发布类型配置不同审批流</td>
+        <td>支持多级审批配置，审批链通过 ApprovalFlowTemplate 定义，支持按应用和类型配置</td>
+      </tr>
+      <tr>
+        <td><strong>审批方式</strong></td>
+        <td>支持邮件审批、IM 审批（飞书/钉钉）、Web 页面审批等多种方式</td>
+        <td>Web 页面审批为主要方式，审批人在前端页面确认通过或驳回</td>
+      </tr>
+      <tr>
+        <td><strong>审批条件</strong></td>
+        <td>支持条件审批（如特定环境需要特定角色审批）、自动审批（低风险发布）</td>
+        <td>支持按审批层级和审批人角色控制，支持条件审批配置（如预发/生产环境需不同审批人）</td>
+      </tr>
+      <tr>
+        <td><strong>紧急审批</strong></td>
+        <td>支持紧急发布通道，可绕过标准审批，但需事后补审批记录</td>
+        <td>紧急发布模式已定义，但紧急审批 bypass 逻辑未完全实现</td>
+      </tr>
+      <tr>
+        <td><strong>审批记录</strong></td>
+        <td>完整记录审批全链路，包括审批人、审批时间、审批意见、审批耗时</td>
+        <td>审批记录已实现，记录审批人、时间、意见、状态变更历史，支持审批超时标记</td>
+      </tr>
+      <tr>
+        <td><strong>审批超时</strong></td>
+        <td>支持审批超时自动升级或自动驳回，超时通知</td>
+        <td>审批超时记录已实现，超时通知和自动处理逻辑待完善</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== 6. 如何启用真实 K8s 部署 ========== -->
+<h2 id="sec-6">6. 如何启用真实 K8s 部署</h2>
+<div class="alert-info">
+  <h3>💡 Kind 集群配置指南</h3>
+  <p>Demo 系统支持通过 <strong>Kind (Kubernetes in Docker)</strong> 启动本地 K8s 集群，启用真实部署能力。以下为快速配置步骤：</p>
+</div>
+
+<div class="card">
+  <ol>
+    <li><strong>安装 Docker</strong> — 确保本地已安装 Docker Desktop 或 Docker Engine</li>
+    <li><strong>安装 Kind</strong> — 运行 <code>brew install kind</code> 安装 Kind</li>
+    <li><strong>安装 kubectl</strong> — 运行 <code>brew install kubectl</code> 安装 kubectl</li>
+    <li><strong>创建 Kind 集群</strong> — 运行 <code>kind create cluster --name demo-release</code></li>
+    <li><strong>加载 kubeconfig</strong> — <code>kind get kubeconfig --name demo-release > ~/.kube/config</code></li>
+    <li><strong>验证连接</strong> — 运行 <code>kubectl cluster-info</code> 确认集群状态</li>
+  </ol>
+</div>
+
+<div class="card">
+  <div class="card-title">配置后效果</div>
+  <ul>
+    <li>发布流水线的部署阶段将真实操作 Kind 集群</li>
+    <li>滚动更新策略通过 kubectl 真实操作 Deployment</li>
+    <li>可以在 Kind 集群中查看 Pod 的创建和销毁过程</li>
+    <li>发布历史记录反映真实的部署状态</li>
+    <li>未配置 Kind 集群时，系统自动降级为模拟模式</li>
+  </ul>
+</div>
+
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var toc = document.getElementById('doc-toc');
+  var showBtn = document.getElementById('doc-toc-show');
+  var hideBtn = document.getElementById('doc-toc-hide');
+  var links = Array.prototype.slice.call(
+    document.querySelectorAll('.doc-toc-nav a[href^="#"]')
+  );
+  var items = links.map(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    return el ? { id: id, el: el, a: a } : null;
+  }).filter(Boolean);
+  if (!items.length) { return; }
+
+  function highlight() {
+    var pos = window.scrollY + 120;
+    var active = null;
+    for (var i = 0; i < items.length; i++) {
+      var top = items[i].el.getBoundingClientRect().top + window.scrollY;
+      if (top <= pos) { active = items[i].id; }
+    }
+    var activeEl = active ? items.filter(function (x) { return x.id === active; })[0].a : null;
+    items.forEach(function (x) {
+      x.a.classList.toggle('active', x.a === activeEl);
+    });
+  }
+  // srcdoc sandbox iframe 内 scroll/IntersectionObserver 事件不可靠，
+  // 故用轮询驱动高亮，scroll/resize 事件仅作加速。
+  window.setInterval(highlight, 150);
+  window.addEventListener('scroll', highlight, { passive: true });
+  window.addEventListener('resize', highlight, { passive: true });
+  highlight();
+
+  // 拦截目录链接点击：srcdoc iframe 内原生锚点 <a href="#id"> 会解析到
+  // 父页面 URL 而被沙箱拦截，必须改用 scrollIntoView 实现平滑/即时跳转。
+  links.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) el.scrollIntoView(true);
+    });
+  });
+
+  if (hideBtn && toc) {
+    hideBtn.addEventListener('click', function () {
+      toc.classList.add('is-hidden');
+      if (showBtn) showBtn.classList.add('is-visible');
+    });
+  }
+  if (showBtn) {
+    showBtn.addEventListener('click', function () {
+      if (toc) toc.classList.remove('is-hidden');
+      showBtn.classList.remove('is-visible');
+    });
+  }
+})();
+</script>
+</body>
+</html>

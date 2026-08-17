@@ -1,0 +1,35 @@
+<h1>技术栈</h1>
+
+<h2>一、后端</h2>
+<table>
+<thead><tr><th>技术</th><th>用途</th></tr></thead>
+<tbody>
+<tr><td>Python 3.12 + Django 5</td><td>Web 框架、ORM、Admin</td></tr>
+<tr><td>Django REST Framework</td><td>REST API、ViewSet、序列化、认证</td></tr>
+<tr><td>django-fsm / django-fsm-log</td><td>实例状态机 + 状态流转日志</td></tr>
+<tr><td>django-filter</td><td>列表筛选/搜索</td></tr>
+<tr><td>drf-spectacular</td><td>OpenAPI Schema 与 Swagger</td></tr>
+<tr><td>django-simplejwt</td><td>JWT 认证（人员 + 程序凭证）</td></tr>
+<tr><td>SQLite（演示）/ PostgreSQL（生产）</td><td>数据存储</td></tr>
+</tbody>
+</table>
+
+<h2>二、前端</h2>
+<table>
+<thead><tr><th>技术</th><th>用途</th></tr></thead>
+<tbody>
+<tr><td>Vue 3 + Vite</td><td>工程框架与构建</td></tr>
+<tr><td>Element Plus</td><td>主 UI 组件库</td></tr>
+<tr><td>Arco Design</td><td>部分图表/看板组件</td></tr>
+<tr><td>form-create（@form-create/element-ui）</td><td>基于 Schema 的动态表单渲染</td></tr>
+<tr><td>Pinia</td><td>状态管理</td></tr>
+<tr><td>ECharts</td><td>数据可视化</td></tr>
+</tbody>
+</table>
+
+<h2>三、流程设计器与部署</h2>
+<ul>
+<li><strong>Beeflow</strong>：开源的流程设计器，产出树形 <code>nodeConfig</code>，前端做深度改造（节点类型映射、条件/网关转换、办理任务配置）。</li>
+<li><strong>Docker Compose</strong>：<code>api</code> + <code>frontend</code> 两个服务，本地/演示一键拉起。</li>
+<li><strong>反向代理</strong>：Nginx 托管静态资源并转发 API，配置本地域名 <code>*.workflow.orb.local</code>。</li>
+</ul>

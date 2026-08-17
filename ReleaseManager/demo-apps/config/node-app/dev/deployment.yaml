@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-app
+  namespace: release-demo
+  labels:
+    app: node-app
+    language: node
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-app
+  template:
+    metadata:
+      labels:
+        app: node-app
+        track: stable
+    spec:
+      containers:
+      - name: node-app
+        image: node-app:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        env:
+        - name: APP_VERSION
+          value: "1.0.0"
+        - name: ENV
+          value: "dev"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "300m"
+            memory: "256Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-app
+  namespace: release-demo
+spec:
+  selector:
+    app: node-app
+    track: stable
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP

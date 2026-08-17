@@ -1,0 +1,816 @@
+@import './variables.scss';
+
+// Beeflow 流程设计器图标字体
+@font-face {
+  font-family: iconfont-approval-admin;
+  src: url('./fonts/approval-admin.woff2') format('woff2'),
+       url('./fonts/approval-admin.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
+.iconfont-approval-admin {
+  font-family: iconfont-approval-admin !important;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 100%;
+}
+
+// 全局样式重置
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  font-size: $font-size-base;
+  color: $text-primary;
+  background-color: $bg-color;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+// ============================================================
+// 设计系统：统一 Arco Design Vue 与 Element Plus 品牌色
+// 让流程设计器（Arco）与应用主体（Element Plus）视觉一致
+// ============================================================
+:root,
+body {
+  --primary-1: #e8f3ff;
+  --primary-2: #d4e9ff;
+  --primary-3: #a9d6ff;
+  --primary-4: #7dc0ff;
+  --primary-5: #52a9ff;
+  --primary-6: #409eff;
+  --primary-7: #2f7ff0;
+  --primary-8: #1f62dd;
+  --primary-9: #144ac0;
+  --primary-10: #0c339b;
+
+  --border-radius-small: 4px;
+  --border-radius-medium: 8px;
+  --border-radius-large: 12px;
+
+  // 统一的弱化文字色（满足可读性对比度）
+  --color-text-3: #4E5969;
+  --color-text-4: #86909C;
+
+  // 统一的边框与分隔色
+  --color-border-2: #E5E6EB;
+  --color-border-3: #F2F3F5;
+
+  // 工单模块语义色
+  --ticket-bg: #F7F8FA;
+  --ticket-card-bg: #FFFFFF;
+  --ticket-card-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  --ticket-card-shadow-hover: 0 4px 12px rgba(0,0,0,0.06);
+  --ticket-card-border: #E5E6EB;
+  --ticket-radius: 12px;
+  --ticket-radius-sm: 6px;
+
+  --ticket-tag-warning-bg: #FFF7E8;
+  --ticket-tag-warning-color: #FF7D00;
+  --ticket-tag-primary-bg: #E8F3FF;
+  --ticket-tag-primary-color: #1677FF;
+  --ticket-tag-success-bg: #E8FFEA;
+  --ticket-tag-success-color: #00B42A;
+  --ticket-tag-danger-bg: #FFECE8;
+  --ticket-tag-danger-color: #F53F3F;
+  --ticket-tag-info-bg: #F2F3F5;
+  --ticket-tag-info-color: #86909C;
+}
+
+// 键盘可访问性：全局可见焦点环
+:focus-visible {
+  outline: 2px solid var(--primary-6);
+  outline-offset: 2px;
+}
+
+// Arco 组件圆角与 Element Plus 保持一致
+.arco-drawer,
+.arco-modal,
+.arco-popover-inner {
+  border-radius: 8px;
+}
+
+// 可点击元素统一指针样式
+.arco-radio,
+.arco-checkbox,
+.arco-select,
+.arco-link,
+.node-wrap-box,
+.add-node-btn {
+  cursor: pointer;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: $bg-color;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $border-color;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: $text-secondary;
+}
+
+// 链接样式
+a {
+  color: $primary-color;
+  text-decoration: none;
+  
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// 图片
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+// 表格
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+// 通用类
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-primary {
+  color: $primary-color;
+}
+
+.text-success {
+  color: $success-color;
+}
+
+.text-warning {
+  color: $warning-color;
+}
+
+.text-danger {
+  color: $danger-color;
+}
+
+.text-info {
+  color: $info-color;
+}
+
+.mt-xs {
+  margin-top: $spacing-xs;
+}
+
+.mt-sm {
+  margin-top: $spacing-sm;
+}
+
+.mt-md {
+  margin-top: $spacing-md;
+}
+
+.mt-lg {
+  margin-top: $spacing-lg;
+}
+
+.mt-xl {
+  margin-top: $spacing-xl;
+}
+
+.mb-xs {
+  margin-bottom: $spacing-xs;
+}
+
+.mb-sm {
+  margin-bottom: $spacing-sm;
+}
+
+.mb-md {
+  margin-bottom: $spacing-md;
+}
+
+.mb-lg {
+  margin-bottom: $spacing-lg;
+}
+
+.mb-xl {
+  margin-bottom: $spacing-xl;
+}
+
+.p-xs {
+  padding: $spacing-xs;
+}
+
+.p-sm {
+  padding: $spacing-sm;
+}
+
+.p-md {
+  padding: $spacing-md;
+}
+
+.p-lg {
+  padding: $spacing-lg;
+}
+
+.p-xl {
+  padding: $spacing-xl;
+}
+
+// Flexbox 工具类
+.flex {
+  display: flex;
+}
+
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-start {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.flex-end {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.gap-xs {
+  gap: $spacing-xs;
+}
+
+.gap-sm {
+  gap: $spacing-sm;
+}
+
+.gap-md {
+  gap: $spacing-md;
+}
+
+.gap-lg {
+  gap: $spacing-lg;
+}
+
+// ============================================================
+// Element Plus 组件样式覆盖（2026 设计规范）
+// ============================================================
+
+// 卡片
+.el-card {
+  border-radius: $border-radius-large;
+  border: 1px solid $border-color;
+  box-shadow: $box-shadow-card;
+
+  &__header {
+    padding: 16px 24px;
+    border-bottom: 1px solid $border-color;
+  }
+
+  &__body {
+    padding: 24px;
+  }
+}
+
+// 按钮
+.el-button {
+  border-radius: $border-radius;
+  font-weight: $font-weight-medium;
+  transition: transform $transition-fast, box-shadow $transition-base;
+
+  &--primary {
+    box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
+
+    &:hover:not(.is-disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(64, 158, 255, 0.35);
+    }
+  }
+
+  &.is-link {
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+// 输入框
+.el-input {
+  &__wrapper {
+    border-radius: $border-radius;
+    transition: box-shadow $transition-base;
+
+    &:hover {
+      box-shadow: 0 0 0 1px $border-light inset;
+    }
+
+    &.is-focus {
+      box-shadow: 0 0 0 1px $primary-color inset;
+    }
+  }
+}
+
+.el-textarea {
+  &__inner {
+    border-radius: $border-radius;
+    transition: box-shadow $transition-base;
+
+    &:hover {
+      box-shadow: 0 0 0 1px $border-light inset;
+    }
+
+    &:focus {
+      box-shadow: 0 0 0 1px $primary-color inset;
+    }
+  }
+}
+
+// 下拉选择 / 日期等（共享 input 圆角）
+.el-select__wrapper {
+  border-radius: $border-radius;
+}
+
+// 对话框
+.el-dialog {
+  border-radius: $border-radius-xl;
+}
+
+// 折叠面板
+.el-collapse {
+  border-radius: $border-radius-large;
+  border-color: $border-color;
+
+  .el-collapse-item__header {
+    font-weight: $font-weight-medium;
+    color: $text-primary;
+  }
+}
+
+// 页面过渡
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.slide-fade-leave-active {
+  transition: all 0.2s cubic-bezier(1, 0.5, 0.8, 1);
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateX(20px);
+  opacity: 0;
+}
+
+// ============================================================
+// 全局设计系统组件类（2026 UI 升级）
+// ============================================================
+
+// 页面背景
+.app-main {
+  background: var(--ticket-bg, #F7F8FA);
+}
+
+// 页面标题区
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.page-header-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--border-radius-medium, 8px);
+  background: linear-gradient(135deg, #409EFF, #66B1FF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 20px;
+}
+.page-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #1D2129);
+  margin: 0;
+  line-height: 1.3;
+}
+.page-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary, #1D2129);
+  margin: 0 0 4px;
+  line-height: 1.3;
+}
+.page-header-desc {
+  font-size: 13px;
+  color: var(--text-secondary, #86909C);
+  margin: 2px 0 0;
+}
+.page-header p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary, #86909C);
+}
+
+// 统计卡片网格
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: #fff;
+  border-radius: var(--ticket-radius, 12px);
+  padding: 20px 24px;
+  box-shadow: var(--ticket-card-shadow, 0 1px 2px rgba(0,0,0,0.04));
+  border: 1px solid var(--ticket-card-border, #E5E6EB);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 4px 0 0 4px;
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ticket-card-shadow-hover, 0 4px 12px rgba(0,0,0,0.06));
+}
+.stat-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.stat-label {
+  font-size: 13px;
+  color: var(--text-secondary, #86909C);
+  font-weight: 500;
+}
+.stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--border-radius-medium, 8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary, #1D2129);
+  line-height: 1.2;
+}
+.stat-footer {
+  font-size: 12px;
+  color: var(--text-placeholder, #C9CDD4);
+  margin-top: 4px;
+}
+
+// 区块卡片
+.section-card,
+.content-card {
+  background: #fff;
+  border-radius: var(--ticket-radius, 12px);
+  box-shadow: var(--ticket-card-shadow, 0 1px 2px rgba(0,0,0,0.04));
+  border: 1px solid var(--ticket-card-border, #E5E6EB);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.section-header,
+.content-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid #F2F3F5;
+}
+.section-title,
+.content-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #1D2129);
+}
+.section-title__bar,
+.content-card-bar {
+  width: 3px;
+  height: 16px;
+  background: #409EFF;
+  border-radius: 2px;
+}
+.section-body,
+.content-card-body {
+  padding: 20px 24px;
+}
+
+// 筛选卡片
+.filter-card {
+  background: #fff;
+  border-radius: var(--ticket-radius, 12px);
+  box-shadow: var(--ticket-card-shadow, 0 1px 2px rgba(0,0,0,0.04));
+  border: 1px solid var(--ticket-card-border, #E5E6EB);
+  margin-bottom: 20px;
+  overflow: hidden;
+  padding: 20px 24px;
+}
+
+// 表格卡片
+.table-card {
+  background: #fff;
+  border-radius: var(--ticket-radius, 12px);
+  box-shadow: var(--ticket-card-shadow, 0 1px 2px rgba(0,0,0,0.04));
+  border: 1px solid var(--ticket-card-border, #E5E6EB);
+  overflow: hidden;
+}
+.table-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid #F2F3F5;
+}
+.table-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #1D2129);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.table-count {
+  font-size: 12px;
+  color: var(--text-secondary, #86909C);
+  background: #F2F3F5;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+// 状态标签
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.status-tag__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.status-tag--running,
+.status-tag--processing { background: #E8F3FF; color: #1677FF; }
+.status-tag--running .status-tag__dot,
+.status-tag--processing .status-tag__dot { background: #1677FF; animation: tagPulse 2s infinite; }
+.status-tag--suspended,
+.status-tag--pending { background: #FFF7E8; color: #FF7D00; }
+.status-tag--suspended .status-tag__dot,
+.status-tag--pending .status-tag__dot { background: #FF7D00; animation: tagPulse 2s infinite; }
+.status-tag--completed { background: #E8FFEA; color: #00B42A; }
+.status-tag--completed .status-tag__dot { background: #00B42A; }
+.status-tag--terminated,
+.status-tag--cancelled { background: #F2F3F5; color: #86909C; }
+.status-tag--terminated .status-tag__dot,
+.status-tag--cancelled .status-tag__dot { background: #86909C; }
+.status-tag--rejected { background: #FFECE8; color: #F53F3F; }
+.status-tag--rejected .status-tag__dot { background: #F53F3F; }
+.status-tag--draft { background: #F2F3F5; color: #86909C; }
+.status-tag--published { background: #E8FFEA; color: #00B42A; }
+.status-tag--disabled { background: #F2F3F5; color: #C9CDD4; }
+.status-tag--active { background: #E8FFEA; color: #00B42A; }
+.status-tag--inactive { background: #F2F3F5; color: #86909C; }
+
+@keyframes tagPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+// 优先级标签
+.priority-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.priority-tag__bar {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+// 分页
+.pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-top: 1px solid #F2F3F5;
+}
+.pagination-info {
+  font-size: 13px;
+  color: var(--text-secondary, #86909C);
+  strong {
+    color: var(--text-primary, #1D2129);
+    font-weight: 600;
+  }
+}
+
+// 操作列
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.action-divider {
+  width: 1px;
+  height: 14px;
+  background: #E5E6EB;
+  margin: 0 4px;
+}
+
+// 表格链接
+.ticket-link,
+.table-link {
+  font-weight: 500;
+  color: var(--text-primary, #1D2129);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.ticket-link:hover,
+.table-link:hover {
+  color: #409EFF;
+}
+
+// 时间文本
+.time-text {
+  font-size: 13px;
+  color: var(--text-secondary, #86909C);
+}
+
+// 空状态
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+}
+.empty-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 16px;
+  background: #F7F8FA;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-placeholder, #C9CDD4);
+}
+.empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1D2129);
+  margin: 0 0 4px;
+}
+.empty-desc {
+  font-size: 13px;
+  color: var(--text-secondary, #86909C);
+  margin: 0;
+}
+
+// Element Plus 表格覆盖
+.el-table {
+  --el-table-border-color: #F2F3F5;
+  --el-table-header-bg-color: #FAFBFC;
+}
+.el-table th.el-table__cell {
+  background: #FAFBFC !important;
+  color: #86909C !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.el-table .el-table__row {
+  transition: background 0.15s;
+}
+
+// Element Plus 卡片覆盖
+.el-card {
+  border-radius: var(--ticket-radius, 12px);
+  border: 1px solid var(--ticket-card-border, #E5E6EB);
+  box-shadow: var(--ticket-card-shadow, 0 1px 2px rgba(0,0,0,0.04));
+}
+.el-card__header {
+  border-bottom: 1px solid #F2F3F5;
+  font-weight: 600;
+}
+
+// Element Plus 分页覆盖
+.el-pagination.is-background .el-pager li:not(.is-disabled).is-active {
+  background: #409EFF;
+}
+
+// Element Plus Tabs 覆盖
+.el-tabs__header {
+  margin-bottom: 0;
+}
+.el-tabs__nav-wrap::after {
+  height: 1px;
+  background: #F2F3F5;
+}
+
+// 响应式工具
+@media (max-width: 900px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

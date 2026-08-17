@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>权限申请流程 Demo v3 - 条件表达式 + 引擎能力展示</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --bg-card: #141414; --bg-hover: #1a1a1a;
+    --border: #262626; --text: #e5e5e5; --text-secondary: #a3a3a3; --text-muted: #737373;
+    --accent: #3b82f6; --accent-light: #60a5fa; --accent-bg: rgba(59,130,246,0.1);
+    --success: #22c55e; --success-bg: rgba(34,197,94,0.1);
+    --warning: #f59e0b; --warning-bg: rgba(245,158,11,0.1);
+    --danger: #ef4444; --purple: #a855f7; --purple-bg: rgba(168,85,247,0.1);
+    --radius: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  .container { max-width: 880px; margin: 0 auto; padding: 24px 20px; }
+  .header { margin-bottom: 28px; }
+  .header h1 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+  .header .subtitle { color: var(--text-secondary); font-size: 14px; }
+
+  /* 进度条 */
+  .progress-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 28px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+  .progress-step { display: flex; align-items: center; gap: 8px; flex: 1; }
+  .progress-step .step-num { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; background: var(--bg-hover); border: 2px solid var(--border); color: var(--text-muted); }
+  .progress-step.active .step-num { background: var(--accent); border-color: var(--accent); color: white; }
+  .progress-step.completed .step-num { background: var(--success); border-color: var(--success); color: white; }
+  .progress-step .step-label { font-size: 12px; color: var(--text-muted); }
+  .progress-step.active .step-label { color: var(--text); font-weight: 500; }
+  .progress-step.completed .step-label { color: var(--success); }
+  .progress-divider { flex: 0 0 16px; height: 1px; background: var(--border); }
+
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .card-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+
+  /* 能力卡片 */
+  .capability-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .capability-card { padding: 16px; background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.2s; }
+  .capability-card:hover { border-color: var(--text-muted); }
+  .capability-card.selected { border-color: var(--accent); background: var(--accent-bg); }
+  .capability-card .cap-icon { font-size: 28px; margin-bottom: 8px; }
+  .capability-card .cap-name { font-size: 15px; font-weight: 600; }
+  .capability-card .cap-app { font-size: 11px; color: var(--text-muted); }
+  .capability-card .cap-desc { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+  .capability-card .cap-tags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .capability-card .cap-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--bg-hover); color: var(--text-muted); }
+
+  /* 权限组合 */
+  .preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .preset-card { padding: 16px; background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.2s; }
+  .preset-card:hover { border-color: var(--text-muted); }
+  .preset-card.selected { border-color: var(--accent); background: var(--accent-bg); }
+  .preset-card .preset-icon { font-size: 24px; margin-bottom: 8px; }
+  .preset-card .preset-name { font-size: 14px; font-weight: 600; }
+  .preset-card .preset-desc { font-size: 11px; color: var(--text-secondary); margin: 4px 0 8px; }
+  .preset-card .preset-ops { font-size: 11px; color: var(--text-muted); }
+  .preset-card .op-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 2px; background: var(--bg-hover); border-radius: 4px; }
+  .preset-card .op-item .method { font-weight: 600; color: var(--accent); }
+
+  /* 数据范围 - 核心改动 */
+  .scope-options { display: flex; flex-direction: column; gap: 12px; }
+  .scope-option { background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.2s; overflow: hidden; }
+  .scope-option:hover { border-color: var(--text-muted); }
+  .scope-option.selected { border-color: var(--accent); }
+  .scope-header { display: flex; align-items: flex-start; gap: 14px; padding: 16px; }
+  .scope-option .scope-icon { font-size: 28px; margin-top: 2px; }
+  .scope-option .scope-info { flex: 1; }
+  .scope-option .scope-info .name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .scope-option .scope-info .desc { font-size: 12px; color: var(--text-secondary); }
+  .scope-option .scope-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg-hover); color: var(--text-muted); }
+
+  /* 条件表达式面板 */
+  .scope-expression {
+    border-top: 1px solid var(--border);
+    padding: 14px 16px;
+    background: rgba(59,130,246,0.03);
+  }
+  .scope-option.selected .scope-expression { background: rgba(59,130,246,0.06); }
+  .expr-title { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .expr-block { margin-bottom: 10px; }
+  .expr-block:last-child { margin-bottom: 0; }
+  .expr-label { font-size: 11px; color: var(--accent); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .expr-label .engine-tag { font-size: 9px; padding: 1px 5px; border-radius: 3px; background: var(--accent-bg); color: var(--accent); }
+  .expr-code {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    padding: 10px 12px;
+    background: #0d1117;
+    border-radius: 6px;
+    color: #c9d1d9;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .expr-code .kw { color: #ff7b72; }
+  .expr-code .fn { color: #d2a8ff; }
+  .expr-code .str { color: #a5d6ff; }
+  .expr-code .var { color: #ffa657; }
+  .expr-code .cmt { color: #8b949e; font-style: italic; }
+  .expr-code .op { color: #79c0ff; }
+  .expr-hint { font-size: 11px; color: var(--text-muted); margin-top: 8px; padding: 8px 10px; background: var(--bg-hover); border-radius: 4px; }
+
+  /* 实例/维度选择 */
+  .sub-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .sub-section-title { font-size: 13px; font-weight: 500; margin-bottom: 10px; }
+  .instance-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .instance-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.15s; }
+  .instance-item:hover { background: var(--bg-hover); }
+  .instance-item.selected { background: var(--accent-bg); border-color: var(--accent); }
+  .instance-item .checkbox { width: 18px; height: 18px; border: 2px solid var(--text-muted); border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .instance-item.selected .checkbox { background: var(--accent); border-color: var(--accent); }
+  .instance-item.selected .checkbox::after { content: "✓"; color: white; font-size: 12px; }
+  .instance-item .inst-info { flex: 1; }
+  .instance-item .inst-name { font-size: 13px; font-weight: 500; font-family: monospace; }
+  .instance-item .inst-meta { font-size: 11px; color: var(--text-muted); }
+  .instance-item .inst-owner { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg-hover); color: var(--text-muted); }
+  .dimension-options { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dimension-chip { padding: 8px 14px; background: var(--bg); border: 2px solid var(--border); border-radius: 20px; cursor: pointer; font-size: 13px; }
+  .dimension-chip:hover { border-color: var(--text-muted); }
+  .dimension-chip.selected { border-color: var(--accent); background: var(--accent-bg); color: var(--accent-light); }
+
+  /* 预览 */
+  .preview-section { background: var(--bg); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .preview-section .section-title { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .preview-row { display: flex; gap: 12px; padding: 6px 0; }
+  .preview-row .label { width: 80px; font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+  .preview-row .value { font-size: 13px; flex: 1; }
+  .preview-row .value.mono { font-family: monospace; background: var(--bg-hover); padding: 2px 8px; border-radius: 4px; display: inline-block; }
+
+  /* 审批流 */
+  .approval-flow { background: var(--bg); border-radius: var(--radius); padding: 16px; margin-top: 16px; }
+  .approval-flow .flow-title { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .flow-steps { position: relative; padding-left: 24px; }
+  .flow-steps::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+  .flow-step { position: relative; padding: 12px 0; }
+  .flow-step::before { content: ''; position: absolute; left: -20px; top: 18px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg-card); border: 2px solid var(--border); }
+  .flow-step.active::before { border-color: var(--accent); background: var(--accent); }
+  .flow-step.completed::before { border-color: var(--success); background: var(--success); }
+  .flow-step .step-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .flow-step .step-title { font-size: 13px; font-weight: 500; }
+  .flow-step .step-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+  .flow-step .step-badge.current { background: var(--accent-bg); color: var(--accent); }
+  .flow-step .step-badge.waiting { background: var(--bg-hover); color: var(--text-muted); }
+  .flow-step .step-desc { font-size: 12px; color: var(--text-muted); }
+
+  .btn { padding: 10px 20px; font-size: 14px; font-weight: 500; border: none; border-radius: var(--radius); cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-light); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
+  .btn-success { background: var(--success); color: white; }
+  .btn-group { display: flex; gap: 12px; margin-top: 20px; }
+  .hidden { display: none; }
+  .fade-in { animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .info-box { padding: 12px 14px; border-radius: var(--radius); font-size: 12px; margin-bottom: 16px; }
+  .info-box.blue { background: var(--accent-bg); border: 1px solid rgba(59,130,246,0.3); color: var(--accent-light); }
+  .info-box.purple { background: var(--purple-bg); border: 1px solid rgba(168,85,247,0.3); color: var(--purple); }
+  .info-box.green { background: var(--success-bg); border: 1px solid rgba(34,197,94,0.3); color: var(--success); }
+
+  .success-card { background: var(--bg-card); border: 2px solid var(--success); border-radius: var(--radius); overflow: hidden; }
+  .success-header { padding: 20px; background: var(--success-bg); text-align: center; }
+  .success-header .icon { font-size: 48px; margin-bottom: 8px; }
+  .success-header .title { font-size: 18px; font-weight: 600; color: var(--success); }
+  .success-body { padding: 20px; }
+  .approval-simulation { margin-top: 20px; padding: 16px; background: var(--bg); border-radius: var(--radius); }
+  .approval-simulation .sim-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--warning); }
+  .approval-action { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
+  .approval-action .actor-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-bg); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .approval-action .actor-info { flex: 1; }
+  .approval-action .actor-name { font-size: 13px; font-weight: 500; }
+  .approval-action .actor-role { font-size: 11px; color: var(--text-muted); }
+  .approval-action .action-btn { padding: 6px 14px; font-size: 12px; font-weight: 500; border: none; border-radius: 4px; cursor: pointer; }
+  .approval-action .action-btn.approve { background: var(--success); color: white; }
+  .approval-action .action-btn.reject { background: var(--danger); color: white; }
+  .approval-action .action-btn.done { background: var(--bg-hover); color: var(--success); cursor: default; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🔐 权限申请流程 Demo v3</h1>
+    <div class="subtitle">能力打包 → 权限组合 → <strong>条件表达式</strong> → 审批流 —— 展示 Casbin + OpenFGA 引擎能力</div>
+  </div>
+
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-step active" data-step="1"><div class="step-num">1</div><div class="step-label">选择能力</div></div>
+    <div class="progress-divider"></div>
+    <div class="progress-step" data-step="2"><div class="step-num">2</div><div class="step-label">权限组合</div></div>
+    <div class="progress-divider"></div>
+    <div class="progress-step" data-step="3"><div class="step-num">3</div><div class="step-label">数据范围</div></div>
+    <div class="progress-divider"></div>
+    <div class="progress-step" data-step="4"><div class="step-num">4</div><div class="step-label">确认申请</div></div>
+  </div>
+
+  <!-- Step 1 -->
+  <div id="step1" class="fade-in">
+    <div class="info-box blue">
+      💡 <strong>场景</strong>：你是研发一部的鲍勃，需要申请主机管理权限。从权限市场选择应用打包发布的能力。
+    </div>
+    <div class="card">
+      <div class="card-title">选择要申请的能力包</div>
+      <div class="card-desc">应用开发者将功能打包成"能力"发布到权限市场，申请者按需申请</div>
+      <div class="capability-grid" id="capabilityGrid"></div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div id="step2" class="hidden">
+    <div class="info-box purple">
+      📦 <strong>能力包</strong>是接口权限的预设组合，无需逐个勾选接口
+    </div>
+    <div class="card">
+      <div class="card-title">选择权限组合</div>
+      <div class="card-desc" id="step2Desc"></div>
+      <div class="preset-grid" id="presetGrid"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="goStep(1)">← 上一步</button>
+      <button class="btn btn-primary" id="step2Next" onclick="goStep(3)" disabled>下一步 →</button>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div id="step3" class="hidden">
+    <div class="info-box green">
+      ⚡ <strong>条件表达式</strong>展示底层引擎如何实现数据范围控制 —— Casbin 条件 + OpenFGA 关系
+    </div>
+    <div class="card">
+      <div class="card-title">选择数据访问范围</div>
+      <div class="card-desc" id="step3Desc"></div>
+      <div class="scope-options" id="scopeOptions"></div>
+      <div id="instanceSection" class="sub-section hidden">
+        <div class="sub-section-title">选择具体实例：</div>
+        <div class="instance-list" id="instanceList"></div>
+      </div>
+      <div id="dimensionSection" class="sub-section hidden">
+        <div class="sub-section-title">选择组织维度：</div>
+        <div class="dimension-options" id="dimensionOptions"></div>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="goStep(2)">← 上一步</button>
+      <button class="btn btn-primary" id="step3Next" onclick="goStep(4)" disabled>下一步 →</button>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div id="step4" class="hidden">
+    <div class="card">
+      <div class="card-title">📋 申请单预览</div>
+      <div class="card-desc">确认以下信息后提交申请</div>
+      <div id="previewContent"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="goStep(3)">← 上一步</button>
+      <button class="btn btn-success" onclick="submitRequest()">✓ 提交申请</button>
+    </div>
+  </div>
+
+  <!-- Step 5: 审批流 -->
+  <div id="step5" class="hidden">
+    <div class="success-card">
+      <div class="success-header">
+        <div class="icon">📨</div>
+        <div class="title">申请已提交</div>
+        <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">申请单号 #REQ-20260804-001</div>
+      </div>
+      <div class="success-body">
+        <div id="approvalFlowContent"></div>
+        <div class="approval-simulation" id="approvalSimulation">
+          <div class="sim-title">🎮 模拟审批（点击审批按钮体验流程）</div>
+          <div id="approvalActions"></div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="resetDemo()">重新演示</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 能力数据 - 包含条件表达式配置
+const capabilities = [
+  {
+    id: 1,
+    name: "主机管理",
+    icon: "🖥️",
+    app_name: "CMDB",
+    data_model: "host",
+    description: "主机资源的完整生命周期管理",
+    status: "published",
+    // 数据模型的字段定义 - 决定哪些条件可用
+    model_fields: [
+      { name: "owner_id", type: "string", desc: "资源负责人", indexed: true },
+      { name: "org_id", type: "string", desc: "所属组织", indexed: true },
+      { name: "env", type: "enum", desc: "环境", values: ["prod", "staging", "dev"], indexed: true },
+      { name: "status", type: "enum", desc: "状态", values: ["running", "stopped", "maintenance"] }
+    ],
+    presets: [
+      {
+        id: "readonly",
+        name: "只读查看",
+        icon: "👁️",
+        desc: "查看主机列表和详情",
+        ops: [
+          { name: "查看列表", method: "GET", path: "/api/v1/hosts", action: "cmdb:host:list" },
+          { name: "查看详情", method: "GET", path: "/api/v1/hosts/:id", action: "cmdb:host:read" }
+        ],
+        allowed_scopes: ["all", "owner", "dimension", "instance"]
+      },
+      {
+        id: "operator",
+        name: "运维操作",
+        icon: "🔧",
+        desc: "查看 + 创建 + 更新",
+        ops: [
+          { name: "查看列表", method: "GET", path: "/api/v1/hosts", action: "cmdb:host:list" },
+          { name: "查看详情", method: "GET", path: "/api/v1/hosts/:id", action: "cmdb:host:read" },
+          { name: "创建主机", method: "POST", path: "/api/v1/hosts", action: "cmdb:host:create" },
+          { name: "更新主机", method: "PUT", path: "/api/v1/hosts/:id", action: "cmdb:host:update" }
+        ],
+        allowed_scopes: ["all", "owner", "dimension", "instance"]
+      },
+      {
+        id: "full",
+        name: "完整管理",
+        icon: "⚡",
+        desc: "全部操作权限",
+        ops: [
+          { name: "查看列表", method: "GET", path: "/api/v1/hosts", action: "cmdb:host:list" },
+          { name: "查看详情", method: "GET", path: "/api/v1/hosts/:id", action: "cmdb:host:read" },
+          { name: "创建主机", method: "POST", path: "/api/v1/hosts", action: "cmdb:host:create" },
+          { name: "更新主机", method: "PUT", path: "/api/v1/hosts/:id", action: "cmdb:host:update" },
+          { name: "删除主机", method: "DELETE", path: "/api/v1/hosts/:id", action: "cmdb:host:delete" }
+        ],
+        allowed_scopes: ["all", "owner", "dimension", "instance"]
+      }
+    ]
+  },
+  {
+    id: 2,
+    name: "公共资源池",
+    icon: "☁️",
+    app_name: "CloudPortal",
+    data_model: "public_resource",
+    description: "公共云资源（无 owner 概念，按账号和标签过滤）",
+    status: "published",
+    model_fields: [
+      { name: "account_id", type: "string", desc: "云账号", indexed: true },
+      { name: "tag_dept", type: "string", desc: "部门标签", indexed: true },
+      { name: "tag_env", type: "enum", desc: "环境标签", values: ["prod", "staging", "dev"] },
+      { name: "region", type: "enum", desc: "地域", values: ["cn-east", "cn-north", "cn-south"] }
+    ],
+    presets: [
+      {
+        id: "viewer",
+        name: "资源查看",
+        icon: "👁️",
+        desc: "查看公共资源列表",
+        ops: [
+          { name: "查看列表", method: "GET", path: "/api/v1/resources", action: "cloud:resource:list" },
+          { name: "查看详情", method: "GET", path: "/api/v1/resources/:id", action: "cloud:resource:read" }
+        ],
+        allowed_scopes: ["all", "account", "tag", "instance"]
+      },
+      {
+        id: "manager",
+        name: "资源管理",
+        icon: "⚡",
+        desc: "完整的资源管理权限",
+        ops: [
+          { name: "查看列表", method: "GET", path: "/api/v1/resources", action: "cloud:resource:list" },
+          { name: "查看详情", method: "GET", path: "/api/v1/resources/:id", action: "cloud:resource:read" },
+          { name: "创建资源", method: "POST", path: "/api/v1/resources", action: "cloud:resource:create" },
+          { name: "释放资源", method: "DELETE", path: "/api/v1/resources/:id", action: "cloud:resource:delete" }
+        ],
+        allowed_scopes: ["all", "account", "tag", "instance"]
+      }
+    ]
+  }
+];
+
+// 实例数据
+const instances = {
+  host: [
+    { id: 1, name: "web-01", ip: "10.0.1.101", env: "prod", owner: "alice", org_id: "dev-1" },
+    { id: 2, name: "web-02", ip: "10.0.1.102", env: "prod", owner: "alice", org_id: "dev-1" },
+    { id: 3, name: "web-03", ip: "10.0.1.103", env: "staging", owner: "bob", org_id: "dev-1" },
+    { id: 4, name: "db-master", ip: "10.0.2.101", env: "prod", owner: "carol", org_id: "dev-2" },
+    { id: 5, name: "db-slave", ip: "10.0.2.102", env: "prod", owner: "carol", org_id: "dev-2" },
+    { id: 6, name: "cache-01", ip: "10.0.3.101", env: "prod", owner: "bob", org_id: "ops" },
+  ],
+  public_resource: [
+    { id: 1, name: "ecs-prod-01", account: "acc-001", dept: "研发部", env: "prod", region: "cn-east" },
+    { id: 2, name: "ecs-prod-02", account: "acc-001", dept: "研发部", env: "prod", region: "cn-east" },
+    { id: 3, name: "rds-staging", account: "acc-001", dept: "研发部", env: "staging", region: "cn-north" },
+    { id: 4, name: "ecs-ops-01", account: "acc-002", dept: "运维部", env: "prod", region: "cn-south" },
+  ]
+};
+
+// 组织维度
+const dimensions = [
+  { id: "dev-1", name: "研发一部", level: 2 },
+  { id: "dev-2", name: "研发二部", level: 2 },
+  { id: "ops", name: "运维中心", level: 1 },
+];
+
+// 数据范围配置 - 包含条件表达式
+const scopeConfigs = {
+  // ==================== 主机管理的范围 ====================
+  all: {
+    icon: "🌍",
+    name: "所有数据",
+    desc: "可以访问该类型的所有数据，无任何限制",
+    engine: "casbin",
+    expressions: [
+      {
+        label: "Casbin 策略",
+        engine: "Casbin",
+        code: `p, bob, cmdb, cmdb:host:list, *, allow
+p, bob, cmdb, cmdb:host:read, *, allow`
+      },
+      {
+        label: "数据层",
+        engine: "无限制",
+        code: `// 无需数据层过滤
+// Casbin 动作级通过即可访问所有实例`
+      }
+    ],
+    hint: "无需 OpenFGA，仅 Casbin 动作级授权即可"
+  },
+  owner: {
+    icon: "👤",
+    name: "仅我创建的",
+    desc: "只能访问自己创建或拥有的数据",
+    engine: "openfga",
+    expressions: [
+      {
+        label: "Casbin 策略（动作级）",
+        engine: "Casbin",
+        code: `p, bob, cmdb, cmdb:host:list, *, allow
+p, bob, cmdb, cmdb:host:read, *, allow`
+      },
+      {
+        label: "OpenFGA 关系（实例级）",
+        engine: "OpenFGA",
+        code: `// 授权模型定义
+type host
+  relations
+    define owner: [user]
+    define reader: [user] or owner
+
+// 写入关系 tuple
+(host:host-01, owner, user:bob)   // bob 拥有 web-03
+(host:cache-01, owner, user:bob)  // bob 拥有 cache-01
+
+// Check 查询
+Check(user:bob, reader, host:host-01)  → true  // 是 owner
+Check(user:bob, reader, host:db-master) → false // 不是 owner`
+      },
+      {
+        label: "实际效果",
+        engine: "组合",
+        code: `// PDP 决策流程：
+// 1. Casbin: bob 有 cmdb:host:read 权限？ → ✅
+// 2. OpenFGA: bob 是 host-01 的 owner？ → ✅ → allow
+// 3. OpenFGA: bob 是 db-master 的 owner？ → ❌ → deny`
+      }
+    ],
+    hint: "利用 owner_id 字段建立 OpenFGA 关系，动态判定"
+  },
+  dimension: {
+    icon: "🏢",
+    name: "按组织过滤",
+    desc: "只能访问所属组织范围内的数据",
+    engine: "openfga",
+    expressions: [
+      {
+        label: "Casbin 策略（动作级）",
+        engine: "Casbin",
+        code: `p, bob, cmdb, cmdb:host:list, *, allow
+p, bob, cmdb, cmdb:host:read, *, allow`
+      },
+      {
+        label: "OpenFGA 关系（组织维度）",
+        engine: "OpenFGA",
+        code: `// 授权模型 - 组织维度
+type host
+  relations
+    define org: [group]
+    define member: [user] or member from org
+    define reader: [user] or member
+
+// 关系 tuple
+(group:dev-1, member, user:bob)        // bob 属于研发一部
+(host:web-01, org, group:dev-1)        // web-01 属于研发一部
+(host:web-03, org, group:dev-1)        // web-03 属于研发一部
+(host:db-master, org, group:dev-2)     // db-master 属于研发二部
+
+// Check 查询
+Check(user:bob, reader, host:web-01)    → true  // 同组织
+Check(user:bob, reader, host:db-master) → false // 不同组织`
+      },
+      {
+        label: "Filter 查询（列表过滤）",
+        engine: "OpenFGA",
+        code: `// ListObjects: bob 能看到哪些主机？
+ListObjects(user:bob, reader, host)
+→ [host:web-01, host:web-02, host:web-03, host:cache-01]
+// 自动过滤掉研发二部的 db-master、db-slave`
+      }
+    ],
+    hint: "通过 org_id 字段建立组织关系，实现组织级隔离"
+  },
+  instance: {
+    icon: "📌",
+    name: "选择具体实例",
+    desc: "明确指定可以访问哪些数据实例",
+    engine: "openfga",
+    expressions: [
+      {
+        label: "Casbin 策略（动作级）",
+        engine: "Casbin",
+        code: `p, bob, cmdb, cmdb:host:read, *, allow`
+      },
+      {
+        label: "OpenFGA 关系（实例授权）",
+        engine: "OpenFGA",
+        code: `// 直接授权 tuple（显式指定）
+(host:web-01, reader, user:bob)
+(host:db-master, reader, user:bob)
+
+// Check 查询
+Check(user:bob, reader, host:web-01)    → true  // 已授权
+Check(user:bob, reader, host:web-02)    → false // 未授权
+Check(user:bob, reader, host:cache-01)  → false // 未授权`
+      }
+    ],
+    hint: "显式写入 OpenFGA tuple，精确控制每个实例的访问权限"
+  },
+
+  // ==================== 公共资源池的范围 ====================
+  account: {
+    icon: "🔑",
+    name: "按云账号",
+    desc: "只能访问指定云账号下的资源",
+    engine: "openfga",
+    expressions: [
+      {
+        label: "Casbin 策略（动作级）",
+        engine: "Casbin",
+        code: `p, bob, cloud, cloud:resource:list, *, allow
+p, bob, cloud, cloud:resource:read, *, allow`
+      },
+      {
+        label: "OpenFGA 关系（账号维度）",
+        engine: "OpenFGA",
+        code: `// 授权模型 - 账号维度（公共资源无 owner，用 account 替代）
+type public_resource
+  relations
+    define account: [cloud_account]
+    define member: [user] or member from account
+    define reader: [user] or member
+
+// 关系 tuple
+(cloud_account:acc-001, member, user:bob)    // bob 属于 acc-001
+(public_resource:ecs-01, account, cloud_account:acc-001)
+(public_resource:ecs-ops, account, cloud_account:acc-002)
+
+// Check 查询
+Check(user:bob, reader, public_resource:ecs-01)    → true
+Check(user:bob, reader, public_resource:ecs-ops)    → false`
+      }
+    ],
+    hint: "公共资源无 owner 概念，改用 account_id 建立关系"
+  },
+  tag: {
+    icon: "🏷️",
+    name: "按标签过滤",
+    desc: "按部门标签、环境标签等属性过滤",
+    engine: "casbin_abac",
+    expressions: [
+      {
+        label: "Casbin 策略（ABAC 条件）",
+        engine: "Casbin",
+        code: `// ABAC 条件策略 - 基于资源属性
+p, bob, cloud, cloud:resource:read,
+  { resource.tag_dept == user.attributes.dept },
+  allow
+
+// 含义：bob 只能访问部门标签与自己部门匹配的资源`
+      },
+      {
+        label: "条件表达式（组合）",
+        engine: "Casbin ABAC",
+        code: `// 多条件组合
+p, bob, cloud, cloud:resource:read,
+  { 
+    resource.tag_dept == user.attributes.dept 
+    AND resource.tag_env != "prod" 
+  },
+  allow
+
+// 含义：bob 只能访问自己部门的非生产环境资源`
+      }
+    ],
+    hint: "Casbin ABAC 条件引擎，基于资源属性动态判断，无需预写 tuple"
+  }
+};
+
+// 审批链配置
+const approvalChain = {
+  readonly: [{ name: "alice", role: "应用 Owner", desc: "CMDB 应用负责人" }],
+  operator: [
+    { name: "alice", role: "应用 Owner", desc: "CMDB 应用负责人" },
+    { name: "carol", role: "部门主管", desc: "研发二部组长（交叉审批）" },
+  ],
+  full: [
+    { name: "alice", role: "应用 Owner", desc: "CMDB 应用负责人" },
+    { name: "carol", role: "部门主管", desc: "研发二部组长（交叉审批）" },
+    { name: "admin", role: "安全审批", desc: "高风险操作需安全审批" },
+  ],
+  viewer: [{ name: "admin", role: "云管管理员", desc: "CloudPortal 管理员" }],
+  manager: [
+    { name: "admin", role: "云管管理员", desc: "CloudPortal 管理员" },
+    { name: "carol", role: "部门主管", desc: "交叉审批" },
+  ]
+};
+
+let state = { step: 1, capability: null, preset: null, scope: null, selectedInstances: [], selectedDimension: null, approvalState: [] };
+
+function init() { renderCapabilities(); }
+
+function renderCapabilities() {
+  document.getElementById('capabilityGrid').innerHTML = capabilities.filter(c => c.status === 'published').map(cap => `
+    <div class="capability-card ${state.capability?.id === cap.id ? 'selected' : ''}" onclick="selectCapability(${cap.id})">
+      <div class="cap-icon">${cap.icon}</div>
+      <div class="cap-name">${cap.name}</div>
+      <div class="cap-app">${cap.app_name} · ${cap.data_model}</div>
+      <div class="cap-desc">${cap.description}</div>
+      <div class="cap-tags">${cap.presets.map(p => `<span class="cap-tag">${p.icon} ${p.name}</span>`).join('')}</div>
+    </div>
+  `).join('');
+}
+
+function selectCapability(id) {
+  state.capability = capabilities.find(c => c.id === id);
+  state.preset = null; state.scope = null; state.selectedInstances = []; state.selectedDimension = null;
+  goStep(2);
+}
+
+function renderPresets() {
+  const cap = state.capability;
+  document.getElementById('step2Desc').textContent = `「${cap.name}」包含以下权限组合：`;
+  document.getElementById('presetGrid').innerHTML = cap.presets.map(p => `
+    <div class="preset-card ${state.preset?.id === p.id ? 'selected' : ''}" onclick="selectPreset('${p.id}')">
+      <div class="preset-icon">${p.icon}</div>
+      <div class="preset-name">${p.name}</div>
+      <div class="preset-desc">${p.desc}</div>
+      <div class="preset-ops">${p.ops.map(op => `<span class="op-item"><span class="method">${op.method}</span> ${op.name}</span>`).join('')}</div>
+    </div>
+  `).join('');
+}
+
+function selectPreset(id) {
+  state.preset = state.capability.presets.find(p => p.id === id);
+  state.scope = null; state.selectedInstances = []; state.selectedDimension = null;
+  renderPresets();
+  document.getElementById('step2Next').disabled = false;
+}
+
+function renderScopes() {
+  const preset = state.preset;
+  document.getElementById('step3Desc').textContent = `「${preset.name}」支持以下数据范围，展开查看条件表达式：`;
+  document.getElementById('scopeOptions').innerHTML = preset.allowed_scopes.map(scope => {
+    const cfg = scopeConfigs[scope];
+    if (!cfg) return '';
+    const model = state.capability.data_model;
+    return `
+      <div class="scope-option ${state.scope === scope ? 'selected' : ''}" onclick="selectScope('${scope}')">
+        <div class="scope-header">
+          <div class="scope-icon">${cfg.icon}</div>
+          <div class="scope-info">
+            <div class="name">${cfg.name}</div>
+            <div class="desc">${cfg.desc}</div>
+          </div>
+          <div class="scope-badge">${scope}</div>
+        </div>
+        <div class="scope-expression">
+          <div class="expr-title">条件表达式（底层引擎实现）</div>
+          ${cfg.expressions.map(expr => `
+            <div class="expr-block">
+              <div class="expr-label">${expr.label} <span class="engine-tag">${expr.engine}</span></div>
+              <div class="expr-code">${highlightCode(expr.code)}</div>
+            </div>
+          `).join('')}
+          <div class="expr-hint">💡 ${cfg.hint}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  updateScopeUI();
+  updateStep3Button();
+}
+
+function highlightCode(code) {
+  return code
+    .replace(/\/\/.*/g, '<span class="cmt">$&</span>')
+    .replace(/\b(type|define|relations|p,|and|or|from|Check|ListObjects)\b/g, '<span class="kw">$&</span>')
+    .replace(/\b(allow|deny|true|false)\b/g, '<span class="str">$&</span>')
+    .replace(/\b(user|host|group|cloud_account|public_resource|resource):/g, '<span class="var">$1</span>:')
+    .replace(/→/g, '<span class="op">→</span>');
+}
+
+function selectScope(scope) {
+  state.scope = scope;
+  state.selectedInstances = []; state.selectedDimension = null;
+  renderScopes();
+}
+
+function updateScopeUI() {
+  document.getElementById('instanceSection').classList.toggle('hidden', state.scope !== 'instance');
+  document.getElementById('dimensionSection').classList.toggle('hidden', state.scope !== 'dimension');
+  if (state.scope === 'instance') renderInstances();
+  if (state.scope === 'dimension') renderDimensions();
+}
+
+function renderInstances() {
+  const model = state.capability.data_model;
+  const insts = instances[model] || [];
+  document.getElementById('instanceList').innerHTML = insts.map(inst => {
+    const isHost = model === 'host';
+    return `
+      <div class="instance-item ${state.selectedInstances.includes(inst.id) ? 'selected' : ''}" onclick="toggleInstance(${inst.id})">
+        <div class="checkbox"></div>
+        <div class="inst-info">
+          <div class="inst-name">${inst.name}</div>
+          <div class="inst-meta">${isHost ? inst.ip : inst.account} · ${isHost ? inst.env : inst.env} · ${isHost ? inst.org_id : inst.dept}</div>
+        </div>
+        <div class="inst-owner">${isHost ? 'owner: '+inst.owner : 'region: '+inst.region}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleInstance(id) {
+  const idx = state.selectedInstances.indexOf(id);
+  if (idx === -1) state.selectedInstances.push(id); else state.selectedInstances.splice(idx, 1);
+  renderInstances();
+  updateStep3Button();
+}
+
+function renderDimensions() {
+  document.getElementById('dimensionOptions').innerHTML = dimensions.map(d => `
+    <div class="dimension-chip ${state.selectedDimension === d.id ? 'selected' : ''}" onclick="selectDimension('${d.id}')" style="margin-left: ${d.level * 16}px">
+      ${d.name}
+    </div>
+  `).join('');
+}
+
+function selectDimension(id) {
+  state.selectedDimension = state.selectedDimension === id ? null : id;
+  renderDimensions();
+  updateStep3Button();
+}
+
+function updateStep3Button() {
+  const btn = document.getElementById('step3Next');
+  if (state.scope === 'instance') btn.disabled = state.selectedInstances.length === 0;
+  else if (state.scope === 'dimension') btn.disabled = !state.selectedDimension;
+  else btn.disabled = !state.scope;
+}
+
+function renderPreview() {
+  const cap = state.capability, preset = state.preset, scope = state.scope;
+  const cfg = scopeConfigs[scope];
+  let scopeText = cfg.name;
+  if (scope === 'instance') {
+    const insts = instances[cap.data_model] || [];
+    scopeText += `（${state.selectedInstances.map(id => insts.find(i => i.id === id)?.name).filter(Boolean).join('、')}）`;
+  } else if (scope === 'dimension') {
+    scopeText += `（${dimensions.find(d => d.id === state.selectedDimension)?.name}）`;
+  }
+  const chain = approvalChain[preset.id] || approvalChain.readonly;
+
+  document.getElementById('previewContent').innerHTML = `
+    <div class="preview-section">
+      <div class="section-title">能力信息</div>
+      <div class="preview-row"><div class="label">能力包</div><div class="value">${cap.icon} ${cap.name}</div></div>
+      <div class="preview-row"><div class="label">应用</div><div class="value">${cap.app_name}</div></div>
+      <div class="preview-row"><div class="label">数据模型</div><div class="value mono">${cap.data_model}</div></div>
+      <div class="preview-row"><div class="label">模型字段</div><div class="value">${cap.model_fields.map(f => `<span class="mono" style="margin-right:6px">${f.name}</span>`).join('')}</div></div>
+    </div>
+    <div class="preview-section">
+      <div class="section-title">权限组合</div>
+      <div class="preview-row"><div class="label">组合</div><div class="value">${preset.icon} ${preset.name}</div></div>
+      <div class="preview-row"><div class="label">接口权限</div><div class="value">${preset.ops.map(op => `<span class="mono">${op.action}</span>`).join(' ')}</div></div>
+    </div>
+    <div class="preview-section">
+      <div class="section-title">数据范围 + 条件表达式</div>
+      <div class="preview-row"><div class="label">范围</div><div class="value">${scopeText}</div></div>
+      <div class="preview-row"><div class="label">引擎</div><div class="value">${cfg.engine === 'openfga' ? 'OpenFGA（关系引擎）' : cfg.engine === 'casbin_abac' ? 'Casbin ABAC（条件引擎）' : 'Casbin（动作级）'}</div></div>
+    </div>
+    <div class="approval-flow">
+      <div class="flow-title">审批流程（${chain.length} 人审批）</div>
+      <div class="flow-steps">
+        <div class="flow-step active"><div class="step-header"><div class="step-title">提交申请</div><div class="step-badge current">当前</div></div><div class="step-desc">你（bob）提交了权限申请</div></div>
+        ${chain.map(a => `<div class="flow-step"><div class="step-header"><div class="step-title">${a.role}</div><div class="step-badge waiting">待审批</div></div><div class="step-desc">${a.desc}</div></div>`).join('')}
+        <div class="flow-step"><div class="step-header"><div class="step-title">授权生效</div></div><div class="step-desc">全部审批通过后自动生效</div></div>
+      </div>
+    </div>
+  `;
+}
+
+function goStep(step) {
+  for (let i = 1; i <= 5; i++) { const el = document.getElementById(`step${i}`); if (el) el.classList.add('hidden'); }
+  document.querySelectorAll('.progress-step').forEach(s => { const n = parseInt(s.dataset.step); s.classList.remove('active','completed'); if (n < step) s.classList.add('completed'); if (n === step) s.classList.add('active'); });
+  state.step = step;
+  const t = document.getElementById(`step${step}`); t.classList.remove('hidden'); t.classList.add('fade-in');
+  switch(step) { case 1: renderCapabilities(); break; case 2: renderPresets(); break; case 3: renderScopes(); break; case 4: renderPreview(); break; }
+}
+
+function submitRequest() {
+  state.approvalState = (approvalChain[state.preset.id] || approvalChain.readonly).map(a => ({ ...a, action: null }));
+  goStep(5); renderApprovalFlow();
+}
+
+function renderApprovalFlow() {
+  const chain = state.approvalState;
+  document.getElementById('approvalFlowContent').innerHTML = `
+    <div class="approval-flow">
+      <div class="flow-title">审批进度</div>
+      <div class="flow-steps">
+        <div class="flow-step ${chain.every(a => a.action === 'approved') ? 'completed' : 'active'}">
+          <div class="step-header"><div class="step-title">提交申请</div><div class="step-badge current">✓</div></div><div class="step-desc">bob 提交了权限申请</div>
+        </div>
+        ${chain.map((a, i) => {
+          let cls = '', badge = '待审批';
+          if (a.action === 'approved') { cls = 'completed'; badge = '✓ 已通过'; }
+          if (a.action === 'rejected') { cls = ''; badge = '✗ 已驳回'; }
+          return `<div class="flow-step ${cls}"><div class="step-header"><div class="step-title">${a.role}</div><div class="step-badge ${cls === 'completed' ? 'current' : 'waiting'}">${badge}</div></div><div class="step-desc">${a.desc}</div></div>`;
+        }).join('')}
+        <div class="flow-step ${chain.every(a => a.action === 'approved') ? 'completed' : ''}">
+          <div class="step-header"><div class="step-title">授权生效</div><div class="step-badge ${chain.every(a => a.action === 'approved') ? 'current' : 'waiting'}">${chain.every(a => a.action === 'approved') ? '✓ 已生效' : '等待中'}</div></div><div class="step-desc">${chain.every(a => a.action === 'approved') ? '权限已生效' : '全部审批通过后自动生效'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  const next = chain.find(a => a.action === null);
+  if (next && !chain.some(a => a.action === 'rejected')) {
+    const i = chain.indexOf(next);
+    document.getElementById('approvalActions').innerHTML = `
+      <div class="approval-action">
+        <div class="actor-avatar">👤</div>
+        <div class="actor-info"><div class="actor-name">${next.name}</div><div class="actor-role">${next.role} · ${next.desc}</div></div>
+        <button class="action-btn approve" onclick="approveReq(${i},'approved')">✓ 通过</button>
+        <button class="action-btn reject" onclick="approveReq(${i},'rejected')">✗ 驳回</button>
+      </div>`;
+  } else {
+    const ok = chain.every(a => a.action === 'approved');
+    document.getElementById('approvalActions').innerHTML = `
+      <div class="approval-action">
+        <div class="actor-avatar">${ok ? '✅' : '❌'}</div>
+        <div class="actor-info"><div class="actor-name">${ok ? '审批完成' : '审批已驳回'}</div><div class="actor-role">${ok ? '所有审批人已通过，权限已生效' : '申请已被驳回'}</div></div>
+        <button class="action-btn done">${ok ? '已生效' : '已驳回'}</button>
+      </div>`;
+  }
+}
+
+function approveReq(i, action) { state.approvalState[i].action = action; renderApprovalFlow(); }
+function resetDemo() { state = { step: 1, capability: null, preset: null, scope: null, selectedInstances: [], selectedDimension: null, approvalState: [] }; goStep(1); }
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+/* ============================================================
+   Permission Center — 方案 A · 云原生企业蓝
+   参考: Cloudflare Dashboard / Okta Admin / Grafana
+   ============================================================ */
+
+:root {
+  /* 品牌蓝 */
+  --brand: #2f6fed;
+  --brand-strong: #1e5ad7;
+  --brand-soft: #eaf1fe;
+  --brand-softer: #f4f8ff;
+
+  /* 中性色（同时兼容旧变量名，全站自动生效） */
+  --bg: #f5f7fa;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #eef1f6;
+  --bg-hover: #f0f4fb;
+  --bg-card: #ffffff;
+  --bg-inset: #f8fafc;
+  --text: #1a2233;
+  --text-secondary: #5b6472;
+  --text-tertiary: #8b94a3;
+  --border: #e3e8ef;
+  --border-strong: #c9d2df;
+
+  /* 强调色（旧视图大量使用 --accent，映射到品牌蓝） */
+  --accent: #2f6fed;
+  --accent-hover: #1e5ad7;
+  --accent-text: #ffffff;
+  --accent-soft: #eaf1fe;
+
+  /* 语义色 */
+  --success: #16a34a;  --success-bg: #e9f9ef;
+  --warning: #d97706;  --warning-bg: #fef4e6;
+  --danger:  #dc2626;  --danger-bg:  #fdecec;
+  --info:    #0891b2;  --info-bg:    #e6f7fb;
+  --purple:  #7c3aed;  --purple-bg:  #f1eaff;
+
+  /* 效果 */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(26,34,51,.05), 0 1px 3px rgba(26,34,51,.06);
+  --shadow-md: 0 4px 12px rgba(26,34,51,.07), 0 2px 4px rgba(26,34,51,.04);
+  --shadow-lg: 0 12px 32px rgba(26,34,51,.10);
+  --shadow: 0 1px 3px rgba(26,34,51,.06);
+
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC', sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', 'Cascadia Code', Menlo, monospace;
+}
+
+/* ---- 暗色（Grafana 风格） ---- */
+html.dark {
+  --brand: #4d82f0;
+  --brand-strong: #6f9af5;
+  --brand-soft: #1d2b4d;
+  --brand-softer: #16213b;
+
+  --bg: #0f1524;
+  --bg-secondary: #141c2e;
+  --bg-tertiary: #1c2740;
+  --bg-hover: #182238;
+  --bg-card: #141c2e;
+  --bg-inset: #101828;
+  --text: #e6ebf5;
+  --text-secondary: #9aa7bd;
+  --text-tertiary: #6b7891;
+  --border: #26324d;
+  --border-strong: #37466b;
+
+  --accent: #4d82f0;
+  --accent-hover: #6f9af5;
+  --accent-text: #ffffff;
+  --accent-soft: #1d2b4d;
+
+  --success: #3ecf6e;  --success-bg: #12301f;
+  --warning: #f0a33c;  --warning-bg: #33240f;
+  --danger:  #f0616d;  --danger-bg:  #35161b;
+  --info:    #38bdf8;  --info-bg:    #0f2a38;
+  --purple:  #a78bfa;  --purple-bg:  #241a3d;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.35);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.45);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,.55);
+  --shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+
+/* ---- 基础 ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background .2s, color .2s;
+}
+a { text-decoration: none; color: inherit; }
+button { font-family: inherit; }
+::selection { background: var(--brand-soft); color: var(--brand-strong); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- Element Plus 变量映射（亮色） ---- */
+:root {
+  --el-color-primary: #2f6fed;
+  --el-color-primary-light-3: #6f9af5;
+  --el-color-primary-light-5: #9db9f8;
+  --el-color-primary-light-7: #c5d6fb;
+  --el-color-primary-light-8: #d9e4fc;
+  --el-color-primary-light-9: #eaf1fe;
+  --el-color-primary-dark-2: #1e5ad7;
+  --el-color-success: #16a34a; --el-color-success-light-9: #e9f9ef;
+  --el-color-warning: #d97706; --el-color-warning-light-9: #fef4e6;
+  --el-color-danger: #dc2626;  --el-color-danger-light-9: #fdecec;
+  --el-color-error: #dc2626;   --el-color-error-light-9: #fdecec;
+  --el-bg-color: #ffffff;
+  --el-bg-color-overlay: #ffffff;
+  --el-bg-color-page: #f5f7fa;
+  --el-text-color-primary: #1a2233;
+  --el-text-color-regular: #5b6472;
+  --el-text-color-secondary: #8b94a3;
+  --el-text-color-placeholder: #a6afbf;
+  --el-border-color: #e3e8ef;
+  --el-border-color-light: #e8edf4;
+  --el-border-color-lighter: #eef1f6;
+  --el-fill-color-blank: #ffffff;
+  --el-fill-color-light: #f8fafc;
+  --el-fill-color-lighter: #f0f4fb;
+  --el-fill-color: #eef1f6;
+  --el-mask-color: rgba(15,23,42,.45);
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+  --el-box-shadow-light: 0 4px 12px rgba(26,34,51,.08);
+}
+
+/* Element Plus 变量映射（暗色） */
+html.dark {
+  --el-color-primary: #4d82f0;
+  --el-color-primary-light-3: #6f9af5;
+  --el-color-primary-light-5: #3f6ec9;
+  --el-color-primary-light-7: #2b4f96;
+  --el-color-primary-light-8: #223f7a;
+  --el-color-primary-light-9: #1d2b4d;
+  --el-color-primary-dark-2: #6f9af5;
+  --el-bg-color: #141c2e;
+  --el-bg-color-overlay: #1c2740;
+  --el-bg-color-page: #0f1524;
+  --el-text-color-primary: #e6ebf5;
+  --el-text-color-regular: #b9c3d6;
+  --el-text-color-secondary: #9aa7bd;
+  --el-text-color-placeholder: #6b7891;
+  --el-border-color: #26324d;
+  --el-border-color-light: #2a3754;
+  --el-border-color-lighter: #26324d;
+  --el-fill-color-blank: #141c2e;
+  --el-fill-color-light: #182238;
+  --el-fill-color-lighter: #1c2740;
+  --el-fill-color: #1c2740;
+  --el-mask-color: rgba(0,0,0,.65);
+}
+
+/* ---- 通用工具类 ---- */
+.mono { font-family: var(--font-mono); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }

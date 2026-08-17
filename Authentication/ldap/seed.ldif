@@ -1,0 +1,49 @@
+# OpenLDAP 演示目录树（osixia/openldap 启动时通过 entrypoint 复制到 custom 目录导入）
+# 顶层域名：dc=devops,dc=com；组织单元 ou=people 下放置演示用户
+# 演示用户密码均为明文 demo1234（Demo 用；生产必须用 {SSHA}/{SSHA512} 哈希）
+
+dn: ou=people,dc=devops,dc=com
+objectClass: organizationalUnit
+ou: people
+
+dn: uid=zhangsan,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: zhangsan
+cn: 张三
+sn: 张
+displayName: 张三
+mail: zhangsan@devops.com
+departmentNumber: 研发部
+uidNumber: 1001
+gidNumber: 1001
+homeDirectory: /home/zhangsan
+userPassword: demo1234
+
+dn: uid=lisi,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: lisi
+cn: 李四
+sn: 李
+displayName: 李四
+mail: lisi@devops.com
+departmentNumber: 运维部
+uidNumber: 1002
+gidNumber: 1002
+homeDirectory: /home/lisi
+userPassword: demo1234
+
+dn: uid=wangwu,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: wangwu
+cn: 王五
+sn: 王
+displayName: 王五
+mail: wangwu@devops.com
+departmentNumber: 测试部
+uidNumber: 1003
+gidNumber: 1003
+homeDirectory: /home/wangwu
+userPassword: demo1234

@@ -1,0 +1,12 @@
+# Traefik 静态配置（v3）：file provider 动态加载路由
+entryPoints:
+  web:
+    address: ":9080"
+
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+log:
+  level: INFO

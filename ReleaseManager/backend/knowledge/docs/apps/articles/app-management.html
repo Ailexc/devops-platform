@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>应用管理知识文档</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; line-height: 1.6; }
+  h1 { font-size: 22px; border-bottom: 2px solid #1677ff; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1677ff; margin-top: 28px; }
+  h3 { font-size: 15px; color: #333; margin-top: 20px; }
+  .card { border: 1px solid #e2e5f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fff; }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+  th, td { border: 1px solid #e2e5f0; padding: 8px 12px; text-align: left; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:hover { background: #f6f8fa; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 12px; color: #d46b08; }
+  pre { background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 13px; overflow-x: auto; }
+  ul, ol { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .alert-info { background: #e6f4ff; border: 1px solid #91caff; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+  .alert-info h3 { margin: 0 0 6px 0; color: #1677ff; font-size: 14px; }
+  .alert-info p { margin: 0; color: #333; font-size: 13px; }
+  .alert-warning { background: #fff7e6; border: 1px solid #ffd591; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+  .alert-warning h3 { margin: 0 0 6px 0; color: #d46b08; font-size: 14px; }
+  .alert-warning p { margin: 0; color: #333; font-size: 13px; }
+  .tag { display: inline-block; background: #f0f0f0; border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #666; margin-right: 4px; }
+  .tag-green { background: #f6ffed; color: #389e0d; }
+  .tag-blue { background: #e6f4ff; color: #1677ff; }
+  .tag-orange { background: #fff7e6; color: #d46b08; }
+  .tag-red { background: #fff2f0; color: #f5222d; }
+  .tag-purple { background: #f9f0ff; color: #722ed1; }
+  .flex-row { display: flex; gap: 16px; margin-bottom: 16px; }
+  .flex-card { flex: 1; border-radius: 6px; padding: 12px; }
+  .flex-card.blue { background: #f0f5ff; }
+  .flex-card.green { background: #f6ffed; }
+  .flex-card.orange { background: #fff7e6; }
+  .flex-card.purple { background: #f9f0ff; }
+</style>
+<style>
+
+/* ===== 文章自包含导航 (由 add_article_toc.py 注入) ===== */
+/* 注意: 不使用 scroll-behavior: smooth，srcdoc sandbox iframe 内动画会导致 scroll 事件不可靠 */
+[id] { scroll-margin-top: 14px; }
+.doc-layout { display: flex; gap: 28px; align-items: flex-start; }
+.doc-toc {
+  width: 236px; flex-shrink: 0; box-sizing: border-box;
+  position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+  padding: 8px 4px 24px 0; border-right: 1px solid #eef0f6;
+}
+.doc-toc.is-hidden { display: none; }
+.doc-toc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 10px 10px; font-size: 13px; font-weight: 700; color: #4a5568;
+  letter-spacing: .5px;
+}
+.doc-toc-hide {
+  cursor: pointer; border: none; background: transparent; color: #a0aec0;
+  font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.doc-toc-hide:hover { color: #1a202c; background: #f1f5f9; }
+.doc-toc-nav { display: flex; flex-direction: column; gap: 1px; }
+.doc-toc-nav a {
+  display: block; padding: 6px 10px; border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0; color: #4a5568; text-decoration: none;
+  font-size: 13px; line-height: 1.5; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; transition: all .15s;
+}
+.doc-toc-nav a:hover { color: #1677ff; background: #f0f6ff; }
+.doc-toc-nav a.active {
+  color: #1677ff; background: #e6f4ff; border-left-color: #1677ff; font-weight: 600;
+}
+.doc-toc-show {
+  display: none; position: sticky; top: 8px; z-index: 30;
+  border: 1px solid #c7d7f5; background: #fff; color: #1677ff;
+  font-size: 13px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(22,119,255,.15);
+}
+.doc-toc-show.is-visible { display: inline-block; }
+.doc-main { flex: 1; min-width: 0; }
+@media (max-width: 820px) {
+  .doc-layout { flex-direction: column; gap: 12px; }
+  .doc-toc {
+    position: static; width: 100%; max-height: 220px;
+    border-right: none; border-bottom: 1px solid #eef0f6;
+  }
+}
+</style>
+</head>
+<body>
+<div class="doc-layout">
+  <button class="doc-toc-show" id="doc-toc-show" type="button">📑 目录</button>
+  <aside class="doc-toc" id="doc-toc">
+  <div class="doc-toc-head">
+    <span class="doc-toc-title">📑 本文章节</span>
+    <button class="doc-toc-hide" id="doc-toc-hide" type="button" title="收起目录">✕</button>
+  </div>
+  <nav class="doc-toc-nav">
+    <a href="#s1">1. 应用管理核心概念</a>
+    <a href="#s2">2. 应用与环境的绑定关系</a>
+    <a href="#s3">3. 应用元信息设计</a>
+    <a href="#s4">4. 应用管理功能全景（本 Demo）</a>
+    <a href="#s5">5. 真实 Spug 的演进</a>
+    <a href="#s6">6. 面试重点</a>
+  </nav>
+</aside>
+  <main class="doc-main">
+
+
+<h1>📦 应用管理知识文档</h1>
+
+<!-- ============================================================ -->
+<!-- s1. 应用管理核心概念 -->
+<!-- ============================================================ -->
+<h2 id="s1">1. 应用管理核心概念</h2>
+
+<div class="card">
+  <div class="card-title">什么是应用（Application）？</div>
+  <p>在发布系统中，<code>Application</code> 是服务部署和运维管理的基本单元。一个「应用」对应一个可独立部署、独立运行的服务实例，它关联了<strong>代码仓库、构建配置、部署配置、环境配置</strong>等所有与发布运维相关的元信息。</p>
+  <p>应用是发布系统数据模型的核心枢纽，串联起「代码 → 构建 → 制品 → 部署 → 运维」整个 CI/CD 流程。</p>
+</div>
+
+<div class="card">
+  <div class="card-title">应用管理 vs 发布管理：两个模块的职责划分</div>
+  <table>
+    <thead>
+      <tr><th style="width:16%;">对比维度</th><th>应用管理</th><th>发布管理</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>关注点</strong></td><td>应用的「配置」：谁来管、怎么部署、部署到哪里</td><td>应用的「变更」：改了什么、何时上线、如何上线</td></tr>
+      <tr><td><strong>核心对象</strong></td><td>应用、环境、部署配置</td><td>发布单、流水线、发布策略</td></tr>
+      <tr><td><strong>操作频率</strong></td><td>低频（新建/修改应用配置时）</td><td>高频（每次功能上线都需要）</td></tr>
+      <tr><td><strong>典型角色</strong></td><td>应用负责人、架构师</td><td>开发工程师、SRE、审批人</td></tr>
+      <tr><td><strong>权限特征</strong></td><td>编辑权限（配置变更）</td><td>操作权限（执行发布）</td></tr>
+    </tbody>
+  </table>
+  <div class="alert-info">
+    <h3>💡 设计要点</h3>
+    <p>将「配置管理」和「变更操作」分离，是发布系统设计的核心原则之一。应用管理关注「是什么」，发布管理关注「怎么变」，两者职责清晰、边界明确。</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">应用的生命周期</div>
+  <p>
+    <span class="tag tag-blue">创建</span> →
+    <span class="tag tag-orange">配置</span> →
+    <span class="tag tag-green">发布</span> →
+    <span class="tag tag-red">运维</span> →
+    <span class="tag">下线</span>
+  </p>
+  <ul>
+    <li><strong>创建：</strong>注册应用基本信息（名称、编码、开发语言、Git 仓库、负责人等）。</li>
+    <li><strong>配置：</strong>为各环境配置部署参数（集群、命名空间、副本数、部署策略等）。</li>
+    <li><strong>发布：</strong>通过发布单将应用的新版本部署到目标环境。</li>
+    <li><strong>运维：</strong>日常的监控、扩缩容、重启、回滚等运维操作。</li>
+    <li><strong>下线：</strong>应用不再需要时，从环境中移除并归档。</li>
+  </ul>
+  <p>每个阶段都有对应的操作入口和权限控制，确保应用从创建到下线的全流程可管理、可追溯。</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- s2. 应用与环境的绑定关系 -->
+<!-- ============================================================ -->
+<h2 id="s2">2. 应用与环境的绑定关系</h2>
+
+<div class="card">
+  <div class="card-title">一个应用对应多个环境</div>
+  <p>在发布系统中，一个应用通常需要部署到多个环境：</p>
+  <p>
+    <span class="tag tag-blue">dev</span>
+    <span class="tag tag-green">test1</span>
+    <span class="tag tag-green">test2</span>
+    <span class="tag tag-green">test3</span>
+    <span class="tag tag-green">test4</span>
+    <span class="tag tag-orange">pre</span>
+    <span class="tag tag-red">prod</span>
+  </p>
+  <p>每个环境独立部署运行：开发环境（dev）用于开发自测，测试环境（test1-4）用于 QA 测试，预发环境（pre）用于上线前最终验证，生产环境（prod）面向真实用户。</p>
+</div>
+
+<div class="card">
+  <div class="card-title">每个环境的配置独立</div>
+  <table>
+    <thead>
+      <tr><th style="width:20%;">配置项</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>集群</strong></td><td>不同环境可能部署在不同的 K8s 集群或 EC2 集群中</td></tr>
+      <tr><td><strong>命名空间</strong></td><td>K8s 环境下，每个环境对应独立的 Namespace，实现资源隔离</td></tr>
+      <tr><td><strong>副本数</strong></td><td>测试环境通常 1-2 个副本，生产环境需要更多副本保障高可用</td></tr>
+      <tr><td><strong>部署策略</strong></td><td>测试环境可用滚动更新快速迭代，生产环境可能需要灰度发布逐步放量</td></tr>
+      <tr><td><strong>资源配置</strong></td><td>测试环境资源配额较低，生产环境资源充足（CPU / 内存限制）</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">环境配置的继承与覆盖机制</div>
+  <p>为减少重复配置，系统支持环境配置的继承关系。例如 test1-test4 可以继承 test 基础配置，仅覆盖差异部分（如数据库连接串、域名等）。生产环境配置通常独立维护，不与测试环境共享任何敏感信息。</p>
+</div>
+
+<div class="card">
+  <div class="card-title">为什么需要环境隔离？</div>
+  <ul>
+    <li><strong>安全隔离：</strong>测试环境的 Bug 或异常不会影响生产环境真实用户。</li>
+    <li><strong>资源隔离：</strong>测试负载不会抢占生产环境的 CPU、内存、网络等资源。</li>
+    <li><strong>数据隔离：</strong>测试环境使用测试数据库，不会污染生产数据。</li>
+    <li><strong>权限隔离：</strong>不同环境有不同的访问和操作权限，生产环境操作需要更严格的审批。</li>
+    <li><strong>并行验证：</strong>多个测试环境（test1-4）可以同时验证不同版本或不同功能特性。</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<!-- s3. 应用元信息设计 -->
+<!-- ============================================================ -->
+<h2 id="s3">3. 应用元信息设计</h2>
+
+<div class="card">
+  <div class="card-title">基础属性</div>
+  <table>
+    <thead>
+      <tr><th style="width:22%;">字段</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>name</code> 名称</td><td>应用的可读名称，如「用户中心」</td></tr>
+      <tr><td><code>code</code> 编码</td><td>应用的唯一标识符，如「user-center」</td></tr>
+      <tr><td><code>language</code> 开发语言</td><td>Python / Go / Node.js / Java 等</td></tr>
+      <tr><td><code>repo_url</code> / <code>repo_branch</code></td><td>Git 仓库地址与默认分支，用于关联 CI 构建</td></tr>
+      <tr><td><code>owner_ids</code> 负责人</td><td>应用的第一责任人列表，负责应用配置和发布审批</td></tr>
+      <tr><td><code>priority</code> / <code>sla</code> / <code>security_level</code></td><td>优先级（p0-p3）、可用性 SLA（99.9% 等）、安全等级</td></tr>
+      <tr><td><code>is_core</code> / <code>tech_stack</code></td><td>是否核心应用、技术栈列表</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">构建配置（双镜像设计）</div>
+  <table>
+    <thead>
+      <tr><th style="width:28%;">配置项</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>builder_image</code> 环境基础镜像</td><td>包含编译工具链的镜像（JDK+Maven、Node.js+npm），用于 CI 阶段的代码编译和构建</td></tr>
+      <tr><td><code>base_image</code> 应用基础镜像</td><td>预装应用运行所需环境的镜像（JRE、Python 运行时），不含编译工具，作为最终运行镜像的基础层</td></tr>
+    </tbody>
+  </table>
+  <p>这与「双镜像设计」理念一致：构建镜像负责编译，应用基础镜像负责运行，两者解耦使最终镜像体积更小、安全性更高。系统通过 <code>ImageRegistry</code>（镜像注册表）按开发语言管理默认的双镜像配置。</p>
+</div>
+
+<div class="card">
+  <div class="card-title">部署配置（AppEnvConfig，按环境独立）</div>
+  <table>
+    <thead>
+      <tr><th style="width:26%;">配置项</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>environment</code> 环境</td><td>dev / test / pre / prod 等，一个应用可配置多套</td></tr>
+      <tr><td><code>cluster</code> / <code>namespace</code></td><td>目标 K8s 集群 / EC2 集群，以及 K8s Namespace</td></tr>
+      <tr><td><code>deploy_strategy</code> 部署策略</td><td>滚动更新 / 蓝绿部署 / 灰度发布（灰度有 <code>canary_percent</code> 比例）</td></tr>
+      <tr><td><code>replicas</code> 副本数</td><td>Pod 或实例数量</td></tr>
+      <tr><td><code>image_repo</code> / <code>container_port</code></td><td>镜像仓库地址、容器端口（默认 8080）</td></tr>
+      <tr><td><code>health_check_path</code> 健康检查</td><td>健康检查路径（默认 <code>/health</code>）与超时时间</td></tr>
+      <tr><td><code>cpu_limit</code> / <code>memory_limit</code></td><td>CPU / 内存资源配额限制</td></tr>
+      <tr><td><code>auto_rollback</code> 自动回滚</td><td>发布失败时是否自动回滚</td></tr>
+    </tbody>
+  </table>
+  <p>每个环境一份独立配置，通过 <code>unique_together (application, environment)</code> 保证应用在单环境只有一份配置。</p>
+</div>
+
+<div class="card">
+  <div class="card-title">权限关联</div>
+  <ul>
+    <li><strong>所属业务线：</strong>应用归属的业务线决定了权限继承的基础范围，同一业务线的成员默认拥有该业务线下应用的查看权限。</li>
+    <li><strong>负责人：</strong>应用的第一责任人，拥有该应用的编辑权限，同时也是发布审批的默认审批人。</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<!-- s4. 应用管理功能全景（本 Demo） -->
+<!-- ============================================================ -->
+<h2 id="s4">4. 应用管理功能全景（本 Demo）</h2>
+
+<div class="card">
+  <div class="card-title">应用列表页</div>
+  <ul>
+    <li>以卡片/表格形式展示应用列表，支持按业务线、应用编码筛选。</li>
+    <li>展示应用的核心信息：名称、编码、语言、负责人、状态、所属业务线。</li>
+    <li>入口：从列表点击进入应用详情，或直接「新建发布」进入发布流程。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="card-title">应用详情页</div>
+  <ul>
+    <li><strong>基本信息：</strong>应用名称、编码、开发语言、双镜像（环境基础镜像 / 应用基础镜像）、仓库地址、描述、创建时间等。</li>
+    <li><strong>环境配置 Tab：</strong>按环境（dev/test/pre/prod）分组展示部署配置，包括集群、命名空间、部署策略、副本数、镜像仓库、容器端口、健康检查、资源配额、自动回滚等。</li>
+    <li><strong>编辑 Drawer：</strong>修改描述、状态、负责人、双镜像配置；配置变更若命中审批策略则走审批流（<code>requires_approval</code> 时显示审批流预览）。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="card-title">与发布、运维的联动</div>
+  <table>
+    <thead>
+      <tr><th style="width:22%;">联动能力</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>新建发布</strong></td><td>从应用详情直接进入「新建发布」，自动带入应用与环境配置</td></tr>
+      <tr><td><strong>部署策略</strong></td><td>环境配置决定该环境默认的部署策略（滚动/蓝绿/灰度），发布单可覆盖</td></tr>
+      <tr><td><strong>运维操作</strong></td><td>扩缩容（scale）、重启（restart）、停机/启动（stop/start）、流量摘挂（traffic）</td></tr>
+      <tr><td><strong>发布历史</strong></td><td>应用维度查看该应用的发布记录、CI/CD 日志、自动验证结果</td></tr>
+    </tbody>
+  </table>
+  <div class="alert-info">
+    <h3>💡 Demo 中的约定</h3>
+    <p>蓝绿部署新建 <code>{app}-blue</code> 环境（Pod 标签 <code>track=blue</code>），旧环境 <code>track=stable</code> 保留回滚；灰度新建 <code>{app}-canary</code> 独立 Service 入口。详见《部署策略详解》。</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- s5. 真实 Spug 的演进 -->
+<!-- ============================================================ -->
+<h2 id="s5">5. 真实 Spug 的演进</h2>
+
+<div class="card">
+  <div class="card-title">V1 版本：以发布记录为中心</div>
+  <ul>
+    <li>应用信息散落在各发布记录中，没有统一的应用管理入口。</li>
+    <li>查看应用配置时需要先找到该应用的发布记录，再从发布记录中查看。</li>
+    <li>修改应用配置需要重新创建发布单，操作路径长、效率低。</li>
+    <li>应用的「配置」和「发布」强耦合，难以独立管理。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="card-title">V2 版本：以应用为中心</div>
+  <ul>
+    <li>新增独立的「应用管理」模块，以应用为中心组织信息。</li>
+    <li>应用详情页统一展示所有环境配置和发布历史，一目了然。</li>
+    <li>操作面板将发布、回滚、重启等操作集中在应用详情页，一键触达。</li>
+    <li>配置变更与发布操作解耦，修改配置不需要创建发布单。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="card-title">权限分离</div>
+  <table>
+    <thead>
+      <tr><th style="width:24%;">模块</th><th style="width:24%;">权限特征</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>发布管理</strong></td><td>只读 + 操作</td><td>查看发布历史，执行发布、回滚、重启等操作</td></tr>
+      <tr><td><strong>应用管理</strong></td><td>编辑配置</td><td>修改应用的基本信息、环境部署配置、构建配置等</td></tr>
+    </tbody>
+  </table>
+  <div class="alert-info">
+    <h3>💡 设计要点</h3>
+    <p>将「配置管理」和「变更操作」分离，是发布系统设计的核心原则之一。应用管理关注「是什么」，发布管理关注「怎么变」，两者职责清晰、边界明确。</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- s6. 面试重点 -->
+<!-- ============================================================ -->
+<h2 id="s6">6. 面试重点</h2>
+
+<div class="card">
+  <p><span class="tag tag-green">Q1</span> <strong>应用管理模块的核心职责是什么？</strong></p>
+  <p>应用管理模块负责应用的全生命周期管理，包括：注册应用基本信息（名称、编码、语言、仓库）、管理应用的部署配置（集群、命名空间、副本数、部署策略）、维护应用与环境的绑定关系、控制应用的权限归属（业务线 + 负责人）。它是发布系统的「配置中心」，为发布管理提供基础的元数据支撑。</p>
+</div>
+
+<div class="card">
+  <p><span class="tag tag-green">Q2</span> <strong>一个应用如何管理多个环境的配置？环境之间如何隔离？</strong></p>
+  <p>一个应用通过「环境配置」表关联多个环境（dev/test1-4/pre/prod），每个环境有独立的集群、命名空间、副本数、部署策略等配置。环境之间通过以下方式隔离：① 部署在不同的 K8s 集群或 Namespace 中实现资源隔离；② 使用不同的数据库实例实现数据隔离；③ 通过 RBAC 权限控制实现操作隔离；④ 支持配置继承机制，子环境继承父环境配置并覆盖差异项，减少重复配置。</p>
+</div>
+
+<div class="card">
+  <p><span class="tag tag-green">Q3</span> <strong>应用管理和发布管理的权限如何划分？</strong></p>
+  <p>应用管理授予「编辑配置」权限，允许修改应用的基本信息、环境部署配置、构建配置等；发布管理授予「只读 + 操作」权限，允许查看发布历史和配置，执行发布、回滚、重启等操作。这种设计将「配置管理」和「变更操作」分离，各角色职责清晰。应用负责人通常拥有应用管理的编辑权限，而开发工程师和 SRE 拥有发布管理的操作权限。</p>
+</div>
+
+<div class="card">
+  <p><span class="tag tag-green">Q4</span> <strong>应用的生命周期管理包含哪些阶段？</strong></p>
+  <p>应用的生命周期分为五个阶段：<strong>创建</strong>（注册应用基本信息）→ <strong>配置</strong>（为各环境配置部署参数）→ <strong>发布</strong>（通过发布单将新版本部署到目标环境）→ <strong>运维</strong>（日常监控、扩缩容、重启、回滚等）→ <strong>下线</strong>（从环境中移除并归档）。每个阶段都有对应的操作入口和权限控制，确保应用从创建到下线的全流程可管理、可追溯。</p>
+</div>
+
+<div class="card">
+  <p><span class="tag tag-green">Q5</span> <strong>新建一个应用时，需要配置哪些信息？</strong></p>
+  <p>新建应用需要配置三类信息：① <strong>基础属性</strong>（名称、编码、描述、开发语言、Git 仓库地址、业务线、负责人）；② <strong>构建配置</strong>（环境基础镜像、应用基础镜像）；③ <strong>部署配置</strong>（部署模式 EC2/K8s、部署策略滚动/蓝绿/灰度、目标集群、命名空间、副本数、资源配额等）。此外还需要为各环境（dev/test/pre/prod）分别配置差异化参数，如环境变量、配置文件、健康检查策略等。</p>
+</div>
+
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var toc = document.getElementById('doc-toc');
+  var showBtn = document.getElementById('doc-toc-show');
+  var hideBtn = document.getElementById('doc-toc-hide');
+  var links = Array.prototype.slice.call(
+    document.querySelectorAll('.doc-toc-nav a[href^="#"]')
+  );
+  var items = links.map(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    return el ? { id: id, el: el, a: a } : null;
+  }).filter(Boolean);
+  if (!items.length) { return; }
+
+  function highlight() {
+    var pos = window.scrollY + 120;
+    var active = null;
+    for (var i = 0; i < items.length; i++) {
+      var top = items[i].el.getBoundingClientRect().top + window.scrollY;
+      if (top <= pos) { active = items[i].id; }
+    }
+    var activeEl = active ? items.filter(function (x) { return x.id === active; })[0].a : null;
+    items.forEach(function (x) {
+      x.a.classList.toggle('active', x.a === activeEl);
+    });
+  }
+  // srcdoc sandbox iframe 内 scroll/IntersectionObserver 事件不可靠，
+  // 故用轮询驱动高亮，scroll/resize 事件仅作加速。
+  window.setInterval(highlight, 150);
+  window.addEventListener('scroll', highlight, { passive: true });
+  window.addEventListener('resize', highlight, { passive: true });
+  highlight();
+
+  // 拦截目录链接点击：srcdoc iframe 内原生锚点 <a href="#id"> 会解析到
+  // 父页面 URL 而被沙箱拦截，必须改用 scrollIntoView 实现平滑/即时跳转。
+  links.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) el.scrollIntoView(true);
+    });
+  });
+
+  if (hideBtn && toc) {
+    hideBtn.addEventListener('click', function () {
+      toc.classList.add('is-hidden');
+      if (showBtn) showBtn.classList.add('is-visible');
+    });
+  }
+  if (showBtn) {
+    showBtn.addEventListener('click', function () {
+      if (toc) toc.classList.remove('is-hidden');
+      showBtn.classList.remove('is-visible');
+    });
+  }
+})();
+</script>
+</body>
+</html>

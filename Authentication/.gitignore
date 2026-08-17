@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.db
+data/
+
+# Node
+node_modules/
+dist/
+
+# 运行时密钥与数据库
+.jwt_keys/
+
+# 环境
+.env
+.env.local
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,73 @@
+# ──────────────────────────────────────────────────────────────────
+# Frontend — Nginx 托管 Vue.js SPA
+# 作用: 提供前端页面，代理 API 请求到后端
+# ──────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: cmdb
+  labels:
+    app: cmdb
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cmdb
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: cmdb
+        component: frontend
+    spec:
+      containers:
+        - name: nginx
+          image: cmdb-frontend:latest
+          ports:
+            - containerPort: 80
+          # 使用 ConfigMap 中的 nginx.conf 覆盖默认配置
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+          resources:
+            requests:
+              cpu: "0.1"
+              memory: "64Mi"
+            limits:
+              cpu: "0.3"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 20
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: cmdb-config
+            items:
+              - key: nginx.conf
+                path: default.conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: cmdb
+spec:
+  type: ClusterIP
+  selector:
+    app: cmdb
+    component: frontend
+  ports:
+    - port: 80
+      targetPort: 80

@@ -1,0 +1,13 @@
+# Backend .dockerignore
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+.git/
+.gitignore
+*.md
+*.html
+*.sqlite3
+db.sqlite3
+config/executor_private.pem

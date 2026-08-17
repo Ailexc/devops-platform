@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>工单详情升级 Demo</title>
+  <style>
+    :root {
+      --primary: #409EFF;
+      --primary-light: #ECF5FF;
+      --primary-dark: #337ECC;
+      --success: #67C23A;
+      --warning: #E6A23C;
+      --danger: #F56C6C;
+      --info: #909399;
+      --text-primary: #1D2129;
+      --text-regular: #4E5969;
+      --text-secondary: #86909C;
+      --text-placeholder: #C9CDD4;
+      --bg-page: #F7F8FA;
+      --bg-card: #FFFFFF;
+      --border-color: #E5E6EB;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg-page);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+    .page { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    .compare-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .compare-label.after { background: #F0F9EB; color: var(--success); border: 1px solid #E1F3D8; }
+
+    /* ===================== 页面标题 ===================== */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .page-header-left { display: flex; align-items: center; gap: 12px; }
+    .page-header-back {
+      width: 36px; height: 36px; border-radius: var(--radius-md);
+      border: 1px solid var(--border-color); background: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 16px; color: var(--text-regular);
+      transition: all 0.2s;
+    }
+    .page-header-back:hover { border-color: var(--primary); color: var(--primary); }
+    .page-header h1 { font-size: 20px; font-weight: 700; }
+    .page-header-desc { font-size: 13px; color: var(--text-secondary); }
+
+    /* ===================== 状态条 ===================== */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 24px;
+      background: white;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+      margin-bottom: 20px;
+    }
+    .status-bar-info { display: flex; align-items: center; gap: 12px; flex: 1; }
+    .status-bar-meta { display: flex; gap: 24px; font-size: 13px; color: var(--text-secondary); }
+    .status-bar-meta span { display: flex; align-items: center; gap: 4px; }
+    .status-bar-actions { display: flex; gap: 8px; }
+
+    .tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;
+    }
+    .tag-warning { background: #FFF7E8; color: #FF7D00; }
+    .tag-success { background: #E8FFEA; color: #00B42A; }
+    .tag-primary { background: #E8F3FF; color: #1677FF; }
+    .tag-danger { background: #FFECE8; color: #F53F3F; }
+    .tag-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .tag-warning .tag-dot { background: #FF7D00; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+    .priority-bar { width: 3px; height: 16px; border-radius: 2px; display: inline-block; }
+    .priority-bar.high { background: var(--danger); }
+
+    /* ===================== 按钮 ===================== */
+    .btn {
+      height: 36px; padding: 0 16px; border-radius: var(--radius-sm);
+      border: none; font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(64,158,255,0.3); }
+    .btn-primary:hover { background: #66B1FF; box-shadow: 0 4px 12px rgba(64,158,255,0.4); }
+    .btn-success { background: var(--success); color: white; box-shadow: 0 2px 6px rgba(103,194,58,0.3); }
+    .btn-success:hover { background: #85CE61; }
+    .btn-danger { background: var(--danger); color: white; box-shadow: 0 2px 6px rgba(245,108,108,0.3); }
+    .btn-danger:hover { background: #F78989; }
+    .btn-warning { background: var(--warning); color: white; }
+    .btn-outline { background: white; color: var(--text-regular); border: 1px solid var(--border-color); }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .btn-ghost { background: transparent; color: var(--text-regular); border: 1px solid transparent; }
+    .btn-ghost:hover { background: #F7F8FA; }
+
+    /* ===================== 布局 ===================== */
+    .detail-layout {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    /* ===================== 卡片 ===================== */
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #F2F3F5;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-body { padding: 20px 24px; }
+
+    /* ===================== Tabs ===================== */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid #F2F3F5;
+      padding: 0 24px;
+      background: #FAFBFC;
+    }
+    .tab {
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tab:hover { color: var(--primary); }
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 600;
+    }
+    .tab-badge {
+      font-size: 11px;
+      background: var(--danger);
+      color: white;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-weight: 600;
+      min-width: 18px;
+      text-align: center;
+    }
+
+    /* ===================== 描述列表 ===================== */
+    .desc-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+    .desc-item {
+      padding: 14px 0;
+      border-bottom: 1px solid #F7F8FA;
+      display: flex;
+      gap: 12px;
+    }
+    .desc-item:nth-child(odd) { padding-right: 24px; }
+    .desc-item:nth-child(even) { padding-left: 24px; border-left: 1px solid #F7F8FA; }
+    .desc-item.full { grid-column: 1 / -1; padding-right: 0; border-left: none; }
+    .desc-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      min-width: 70px;
+      flex-shrink: 0;
+    }
+    .desc-value {
+      font-size: 14px;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    /* ===================== 时间线 ===================== */
+    .timeline { padding: 4px 0; }
+    .timeline-item {
+      display: flex;
+      gap: 16px;
+      padding-bottom: 24px;
+      position: relative;
+    }
+    .timeline-item:last-child { padding-bottom: 0; }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 32px;
+      bottom: 0;
+      width: 2px;
+      background: #F2F3F5;
+    }
+    .timeline-item:last-child::before { display: none; }
+    .timeline-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+    .timeline-dot.blue { background: #E8F3FF; color: var(--primary); }
+    .timeline-dot.green { background: #E8FFEA; color: var(--success); }
+    .timeline-dot.orange { background: #FFF7E8; color: var(--warning); }
+    .timeline-dot.gray { background: #F2F3F5; color: var(--info); }
+    .timeline-content { flex: 1; min-width: 0; }
+    .timeline-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+    .timeline-desc { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+    .timeline-time { font-size: 12px; color: var(--text-placeholder); margin-top: 4px; }
+
+    /* ===================== 评论气泡 ===================== */
+    .comment-list { display: flex; flex-direction: column; gap: 20px; }
+    .comment-bubble {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .comment-bubble.self { flex-direction: row-reverse; }
+    .comment-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+    }
+    .avatar-blue { background: linear-gradient(135deg, #409EFF, #66B1FF); }
+    .avatar-green { background: linear-gradient(135deg, #67C23A, #85CE61); }
+    .avatar-orange { background: linear-gradient(135deg, #E6A23C, #EBB563); }
+    .avatar-red { background: linear-gradient(135deg, #F56C6C, #F89898); }
+    .comment-bubble-content { max-width: 280px; }
+    .comment-bubble-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .comment-bubble.self .comment-bubble-meta { flex-direction: row-reverse; }
+    .comment-bubble-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+    .comment-bubble-time { font-size: 11px; color: var(--text-placeholder); }
+    .comment-bubble-box {
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-regular);
+      position: relative;
+    }
+    .comment-bubble:not(.self) .comment-bubble-box {
+      background: #F2F3F5;
+      border-top-left-radius: 4px;
+    }
+    .comment-bubble.self .comment-bubble-box {
+      background: var(--primary);
+      color: white;
+      border-top-right-radius: 4px;
+    }
+
+    /* 评论输入 */
+    .comment-input-area {
+      border-top: 1px solid #F2F3F5;
+      padding: 16px 24px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .comment-textarea {
+      flex: 1;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      font-size: 13px;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.2s;
+      min-height: 40px;
+    }
+    .comment-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(64,158,255,0.15); }
+
+    /* ===================== 抽屉 ===================== */
+    .drawer-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+    .drawer {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: 440px;
+      max-width: 90vw;
+      background: white;
+      z-index: 1001;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      box-shadow: -8px 0 32px rgba(0,0,0,0.12);
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #F2F3F5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .drawer-title { font-size: 16px; font-weight: 700; }
+    .drawer-close {
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      border: none; background: transparent; cursor: pointer;
+      font-size: 18px; color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .drawer-close:hover { background: #F7F8FA; }
+    .drawer-body { flex: 1; padding: 24px; overflow-y: auto; }
+    .drawer-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #F2F3F5;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* 抽屉内表单 */
+    .drawer-form-group { margin-bottom: 20px; }
+    .drawer-form-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .drawer-form-label .required { color: var(--danger); }
+    .drawer-textarea {
+      width: 100%;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 14px;
+      resize: vertical;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.2s;
+      min-height: 100px;
+    }
+    .drawer-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(64,158,255,0.15); }
+    .drawer-textarea::placeholder { color: var(--text-placeholder); }
+
+    /* 操作确认提示 */
+    .action-confirm {
+      background: #F7F8FA;
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .action-confirm-icon {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .action-confirm-icon.green { background: #E8FFEA; color: var(--success); }
+    .action-confirm-icon.red { background: #FFECE8; color: var(--danger); }
+    .action-confirm-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .action-confirm-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+    /* ===================== 响应式 ===================== */
+    @media (max-width: 900px) {
+      .detail-layout { grid-template-columns: 1fr; }
+      .desc-grid { grid-template-columns: 1fr; }
+      .desc-item:nth-child(even) { padding-left: 0; border-left: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="compare-label after">
+      <span>✨</span>
+      <span>升级后 Demo — 工单详情页</span>
+    </div>
+
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-header-back">←</div>
+        <div>
+          <h1>服务器扩容申请 — 生产环境</h1>
+          <div class="page-header-desc">TK-2026-0805-001 · IT 资源申请</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 状态条 -->
+    <div class="status-bar">
+      <div class="status-bar-info">
+        <span class="tag tag-warning"><span class="tag-dot"></span>待处理</span>
+        <span class="priority-bar high"></span>
+        <span style="font-size:13px; color:var(--danger); font-weight:600;">高优先级</span>
+      </div>
+      <div class="status-bar-meta">
+        <span>👤 张三</span>
+        <span>🕐 2026-08-05 09:30</span>
+        <span>📋 第 1 步 / 共 3 步</span>
+      </div>
+      <div class="status-bar-actions">
+        <button class="btn btn-success" onclick="openDrawer('approve')">✓ 通过</button>
+        <button class="btn btn-danger" onclick="openDrawer('reject')">✗ 拒绝</button>
+        <button class="btn btn-outline" onclick="openDrawer('delegate')">↗ 转办</button>
+      </div>
+    </div>
+
+    <!-- 两栏布局 -->
+    <div class="detail-layout">
+      <!-- 左侧：主内容 -->
+      <div>
+        <div class="card">
+          <!-- Tabs -->
+          <div class="tabs">
+            <div class="tab active" onclick="switchTab(this, 'tab1')">📝 基本信息</div>
+            <div class="tab" onclick="switchTab(this, 'tab2')">🕐 流程追踪</div>
+            <div class="tab" onclick="switchTab(this, 'tab3')">💬 评论 <span class="tab-badge">3</span></div>
+          </div>
+
+          <!-- Tab 1: 基本信息 -->
+          <div id="tab1" class="tab-content">
+            <div class="card-body">
+              <div class="desc-grid">
+                <div class="desc-item full">
+                  <span class="desc-label">工单标题</span>
+                  <span class="desc-value">服务器扩容申请 — 生产环境</span>
+                </div>
+                <div class="desc-item">
+                  <span class="desc-label">流程模版</span>
+                  <span class="desc-value">IT 资源申请</span>
+                </div>
+                <div class="desc-item">
+                  <span class="desc-label">工单编号</span>
+                  <span class="desc-value" style="font-family:'SF Mono',Monaco,monospace; font-size:13px;">TK-2026-0805-001</span>
+                </div>
+                <div class="desc-item">
+                  <span class="desc-label">优先级</span>
+                  <span class="desc-value"><span class="priority-bar high"></span>&nbsp;高</span>
+                </div>
+                <div class="desc-item">
+                  <span class="desc-label">创建人</span>
+                  <span class="desc-value">张三</span>
+                </div>
+                <div class="desc-item">
+                  <span class="desc-label">创建时间</span>
+                  <span class="desc-value">2026-08-05 09:30:00</span>
+                </div>
+                <div class="desc-item">
+                  <span class="desc-label">更新时间</span>
+                  <span class="desc-value">2026-08-05 10:15:00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 表单数据 -->
+            <div class="card-body" style="border-top: 1px solid #F2F3F5;">
+              <div style="font-size:14px; font-weight:600; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                <span style="width:3px; height:16px; background:var(--primary); border-radius:2px; display:inline-block;"></span>
+                表单数据
+              </div>
+              <div class="desc-grid">
+                <div class="desc-item">
+                  <span class="desc-label">申请类型</span>
+                  <span class="desc-value">服务器扩容</span>
+                </div>
+                <div class="desc-item">
+                  <span class="desc-label">目标环境</span>
+                  <span class="desc-value">生产环境</span>
+                </div>
+                <div class="desc-item">
+                  <span class="desc-label">CPU 核数</span>
+                  <span class="desc-value">8 核 → 16 核</span>
+                </div>
+                <div class="desc-item">
+                  <span class="desc-label">内存</span>
+                  <span class="desc-value">16 GB → 32 GB</span>
+                </div>
+                <div class="desc-item full">
+                  <span class="desc-label">申请原因</span>
+                  <span class="desc-value">当前生产环境数据库服务器负载持续偏高，高峰期 CPU 使用率达到 92%，内存使用率 88%，已多次触发告警。为保障服务稳定性，申请对 db-prod-01 进行资源扩容。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: 流程追踪 -->
+          <div id="tab2" class="tab-content" style="display:none;">
+            <div class="card-body">
+              <div class="timeline">
+                <div class="timeline-item">
+                  <div class="timeline-dot green">✓</div>
+                  <div class="timeline-content">
+                    <div class="timeline-title">工单已创建</div>
+                    <div class="timeline-desc">张三 发起了「服务器扩容申请」</div>
+                    <div class="timeline-time">2026-08-05 09:30</div>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot blue">⏳</div>
+                  <div class="timeline-content">
+                    <div class="timeline-title">直属主管审批</div>
+                    <div class="timeline-desc">等待 李四 审批中...</div>
+                    <div class="timeline-time">2026-08-05 09:31</div>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot gray">◯</div>
+                  <div class="timeline-content">
+                    <div class="timeline-title">IT 部门确认</div>
+                    <div class="timeline-desc">等待 IT 部门确认资源可用性</div>
+                    <div class="timeline-time">—</div>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot gray">◯</div>
+                  <div class="timeline-content">
+                    <div class="timeline-title">运维执行</div>
+                    <div class="timeline-desc">执行服务器扩容操作</div>
+                    <div class="timeline-time">—</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 3: 评论 -->
+          <div id="tab3" class="tab-content" style="display:none;">
+            <div class="card-body">
+              <div class="comment-list">
+                <!-- 他人评论 -->
+                <div class="comment-bubble">
+                  <div class="comment-avatar avatar-blue">李</div>
+                  <div class="comment-bubble-content">
+                    <div class="comment-bubble-meta">
+                      <span class="comment-bubble-name">李四</span>
+                      <span class="comment-bubble-time">10:15</span>
+                    </div>
+                    <div class="comment-bubble-box">
+                      收到，我先看下当前资源池的使用情况，确认是否有足够的空闲资源可以分配。
+                    </div>
+                  </div>
+                </div>
+                <!-- 自己的评论 -->
+                <div class="comment-bubble self">
+                  <div class="comment-avatar avatar-green">张</div>
+                  <div class="comment-bubble-content">
+                    <div class="comment-bubble-meta">
+                      <span class="comment-bubble-name">张三</span>
+                      <span class="comment-bubble-time">10:20</span>
+                    </div>
+                    <div class="comment-bubble-box">
+                      好的，如果资源不足的话，是否可以先申请临时的云服务器过渡一下？
+                    </div>
+                  </div>
+                </div>
+                <!-- 他人评论 -->
+                <div class="comment-bubble">
+                  <div class="comment-avatar avatar-blue">李</div>
+                  <div class="comment-bubble-content">
+                    <div class="comment-bubble-meta">
+                      <span class="comment-bubble-name">李四</span>
+                      <span class="comment-bubble-time">10:35</span>
+                    </div>
+                    <div class="comment-bubble-box">
+                      已确认资源池还有 8 核 CPU 和 16GB 内存可用，可以直接扩容，不需要临时方案。
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- 评论输入 -->
+            <div class="comment-input-area">
+              <textarea class="comment-textarea" placeholder="输入评论内容..." rows="1"></textarea>
+              <button class="btn btn-primary">发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：侧边信息 -->
+      <div>
+        <!-- 操作历史 -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header">
+            <span>📋 操作历史</span>
+          </div>
+          <div class="card-body" style="padding: 12px 24px;">
+            <div class="timeline">
+              <div class="timeline-item">
+                <div class="timeline-dot green" style="width:24px;height:24px;font-size:11px;">✓</div>
+                <div class="timeline-content">
+                  <div class="timeline-title" style="font-size:13px;">张三 发起工单</div>
+                  <div class="timeline-time">08-05 09:30</div>
+                </div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot orange" style="width:24px;height:24px;font-size:11px;">💬</div>
+                <div class="timeline-content">
+                  <div class="timeline-title" style="font-size:13px;">李四 添加了评论</div>
+                  <div class="timeline-time">08-05 10:15</div>
+                </div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot blue" style="width:24px;height:24px;font-size:11px;">⏳</div>
+                <div class="timeline-content">
+                  <div class="timeline-title" style="font-size:13px;">流转至 李四 审批</div>
+                  <div class="timeline-time">08-05 10:16</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 参与人 -->
+        <div class="card">
+          <div class="card-header">
+            <span>👥 参与人</span>
+          </div>
+          <div class="card-body">
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div class="comment-avatar avatar-green" style="width:32px;height:32px;font-size:12px;">张</div>
+                <div>
+                  <div style="font-size:13px; font-weight:600;">张三</div>
+                  <div style="font-size:11px; color:var(--text-secondary);">发起人</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div class="comment-avatar avatar-blue" style="width:32px;height:32px;font-size:12px;">李</div>
+                <div>
+                  <div style="font-size:13px; font-weight:600;">李四</div>
+                  <div style="font-size:11px; color:var(--text-secondary);">当前审批人</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div class="comment-avatar avatar-orange" style="width:32px;height:32px;font-size:12px;">王</div>
+                <div>
+                  <div style="font-size:13px; font-weight:600;">王五</div>
+                  <div style="font-size:11px; color:var(--text-secondary);">IT 部门</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 抽屉：审批通过 ===================== -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <div class="drawer-title" id="drawerTitle">审批通过</div>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <!-- 确认提示 -->
+      <div class="action-confirm" id="drawerConfirm">
+        <div class="action-confirm-icon green" id="drawerConfirmIcon">✓</div>
+        <div>
+          <div class="action-confirm-title" id="drawerConfirmTitle">确认通过此工单？</div>
+          <div class="action-confirm-desc" id="drawerConfirmDesc">通过后将流转至下一步骤</div>
+        </div>
+      </div>
+
+      <!-- 处理意见 -->
+      <div class="drawer-form-group">
+        <div class="drawer-form-label">
+          处理意见 <span class="required">*</span>
+        </div>
+        <textarea class="drawer-textarea" placeholder="请输入处理意见（必填）..."></textarea>
+      </div>
+
+      <!-- 转办人（仅转办时显示） -->
+      <div class="drawer-form-group" id="assigneeGroup" style="display:none;">
+        <div class="drawer-form-label">
+          转办给 <span class="required">*</span>
+        </div>
+        <select style="width:100%; height:40px; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0 12px; font-size:14px; outline:none;">
+          <option value="">请选择转办人</option>
+          <option>王五 — IT 部门</option>
+          <option>赵六 — 运维组</option>
+          <option>钱七 — 架构组</option>
+        </select>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-ghost" onclick="closeDrawer()">取消</button>
+      <button class="btn" id="drawerSubmitBtn" onclick="closeDrawer()">确认通过</button>
+    </div>
+  </div>
+
+  <script>
+    // Tab 切换
+    function switchTab(el, tabId) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+      document.getElementById(tabId).style.display = 'block';
+    }
+
+    // 抽屉控制
+    function openDrawer(type) {
+      const overlay = document.getElementById('drawerOverlay');
+      const drawer = document.getElementById('drawer');
+      const title = document.getElementById('drawerTitle');
+      const confirmIcon = document.getElementById('drawerConfirmIcon');
+      const confirmTitle = document.getElementById('drawerConfirmTitle');
+      const confirmDesc = document.getElementById('drawerConfirmDesc');
+      const submitBtn = document.getElementById('drawerSubmitBtn');
+      const assigneeGroup = document.getElementById('assigneeGroup');
+
+      if (type === 'approve') {
+        title.textContent = '审批通过';
+        confirmIcon.textContent = '✓';
+        confirmIcon.className = 'action-confirm-icon green';
+        confirmTitle.textContent = '确认通过此工单？';
+        confirmDesc.textContent = '通过后将流转至下一步骤「IT 部门确认」';
+        submitBtn.className = 'btn btn-success';
+        submitBtn.textContent = '确认通过';
+        assigneeGroup.style.display = 'none';
+      } else if (type === 'reject') {
+        title.textContent = '拒绝工单';
+        confirmIcon.textContent = '✗';
+        confirmIcon.className = 'action-confirm-icon red';
+        confirmTitle.textContent = '确认拒绝此工单？';
+        confirmDesc.textContent = '拒绝后工单将终止，发起人可重新提交';
+        submitBtn.className = 'btn btn-danger';
+        submitBtn.textContent = '确认拒绝';
+        assigneeGroup.style.display = 'none';
+      } else if (type === 'delegate') {
+        title.textContent = '转办工单';
+        confirmIcon.textContent = '↗';
+        confirmIcon.className = 'action-confirm-icon';
+        confirmIcon.style.background = '#FFF7E8';
+        confirmIcon.style.color = '#FF7D00';
+        confirmTitle.textContent = '将此工单转办给他人？';
+        confirmDesc.textContent = '转办后审批权将转移给指定人员';
+        submitBtn.className = 'btn btn-warning';
+        submitBtn.textContent = '确认转办';
+        assigneeGroup.style.display = 'block';
+      }
+
+      overlay.classList.add('open');
+      drawer.classList.add('open');
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawerOverlay').classList.remove('open');
+      document.getElementById('drawer').classList.remove('open');
+    }
+  </script>
+</body>
+</html>

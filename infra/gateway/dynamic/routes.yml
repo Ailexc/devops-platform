@@ -1,0 +1,93 @@
+# ============================================================
+# 统一网关动态路由：Host 规则 → 各系统 frontend（devops-net 服务名）
+# 各目标容器必须已加入 devops-net 网络
+# ============================================================
+http:
+  routers:
+    portal:
+      rule: "Host(`devops.orb.local`) || Host(`portal.devops.orb.local`)"
+      entryPoints: ["web"]
+      service: portal
+
+    cloud:
+      rule: "Host(`cloud.devops.orb.local`)"
+      entryPoints: ["web"]
+      service: cloud
+
+    event:
+      rule: "Host(`event.devops.orb.local`)"
+      entryPoints: ["web"]
+      service: event
+
+    iam:
+      rule: "Host(`iam.devops.orb.local`)"
+      entryPoints: ["web"]
+      service: iam
+
+    release:
+      rule: "Host(`release.devops.orb.local`)"
+      entryPoints: ["web"]
+      service: release
+
+    cmdb:
+      rule: "Host(`cmdb.devops.orb.local`)"
+      entryPoints: ["web"]
+      service: cmdb
+
+    workflow:
+      rule: "Host(`workflow.devops.orb.local`)"
+      entryPoints: ["web"]
+      service: workflow
+
+    # 认证 API 直连（调试/演示用）
+    api-auth:
+      rule: "Host(`api.auth.devops.orb.local`)"
+      entryPoints: ["web"]
+      service: auth-api
+
+    # Traefik Dashboard
+    traefik:
+      rule: "Host(`traefik.devops.orb.local`)"
+      entryPoints: ["web"]
+      service: api@internal
+
+  services:
+    portal:
+      loadBalancer:
+        servers:
+          - url: "http://authentication-portal:80"
+
+    cloud:
+      loadBalancer:
+        servers:
+          - url: "http://cloud_manager_nginx:80"
+
+    event:
+      loadBalancer:
+        servers:
+          - url: "http://cmdb-event-frontend:80"
+
+    iam:
+      loadBalancer:
+        servers:
+          - url: "http://permission-center-frontend:80"
+
+    release:
+      loadBalancer:
+        servers:
+          - url: "http://release-frontend:80"
+
+    cmdb:
+      loadBalancer:
+        servers:
+          - url: "http://cmdb-task-frontend:80"
+
+    workflow:
+      loadBalancer:
+        servers:
+          - url: "http://workflow-frontend:80"
+
+    auth-api:
+      loadBalancer:
+        servers:
+          - url: "http://authentication-auth-backend:8000"

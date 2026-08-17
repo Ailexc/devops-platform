@@ -1,0 +1,14 @@
+{
+  "name": "权限管理",
+  "description": "权限模型设计、四层架构实现、业界方案对比及面试题库",
+  "icon": "🔐",
+  "sort": 1,
+  "articles": {
+    "abac-standard-intro": {
+      "title": "ABAC 标准架构详解",
+      "description": "ABAC 四组件架构、XACML/Rego/AWS IAM/Zanzibar 深度对比",
+      "tags": ["业界", "完整版"],
+      "updated": "2026-07-26"
+    }
+  }
+}

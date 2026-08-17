@@ -1,0 +1,64 @@
+services:
+  # ============================================================
+  # 数据层已统一：PostgreSQL(devops_workflow) + Redis(devops-redis)
+  # 由根目录 infra/docker-compose.yml 提供（devops-net 网络）
+  # ============================================================
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: workflow-api
+    command: >
+      sh -c "python wait_for_db.py &&
+             python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.dev
+      - DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_workflow
+      - REDIS_URL=redis://devops-redis:6379/6
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-key-change-in-production}
+      - ALLOWED_HOSTS=api.workflow.orb.local,frontend.workflow.orb.local,workflow-api,.devops.orb.local
+      # AI 配置（密钥仅通过环境变量注入，不落库）
+      - AI_DEFAULT_PROVIDER=${AI_DEFAULT_PROVIDER:-xiaomi}
+      - AI_XIAOMI_API_KEY=${AI_XIAOMI_API_KEY:-}
+      - AI_XIAOMI_API_BASE=${AI_XIAOMI_API_BASE:-}
+      - AI_OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
+      - AI_OPENAI_API_BASE=${AI_OPENAI_API_BASE:-}
+      - AI_DEEPSEEK_API_KEY=${AI_DEEPSEEK_API_KEY:-}
+      - AI_DEEPSEEK_API_BASE=${AI_DEEPSEEK_API_BASE:-}
+      - AI_ZHIPU_API_KEY=${AI_ZHIPU_API_KEY:-}
+      - AI_ZHIPU_API_BASE=${AI_ZHIPU_API_BASE:-}
+      - AI_QWEN_API_KEY=${AI_QWEN_API_KEY:-}
+      - AI_QWEN_API_BASE=${AI_QWEN_API_BASE:-}
+      - AI_OLLAMA_API_BASE=${AI_OLLAMA_API_BASE:-}
+    labels:
+      dev.orbstack.domains: api.workflow.orb.local
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+    networks:
+      - workflow_net
+      - devops-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: workflow-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    labels:
+      dev.orbstack.domains: frontend.workflow.orb.local
+    depends_on:
+      - api
+    networks:
+      - workflow_net
+      - devops-net
+
+networks:
+  workflow_net:
+    driver: bridge
+  devops-net:              # 统一基础设施网络（根目录 infra/docker-compose.yml）
+    external: true

@@ -1,0 +1,45 @@
+# 发布自动验证脚本（声明式）
+# 由 executor op=verify 读取执行：模板注入 → 按发布策略过滤 → 逐项检查 → 结构化结果
+#
+# 模板变量（引擎注入）:
+#   {app}     应用 code（如 node-app）
+#   {version} 发布单版本号
+#   {env}     环境 code（如 dev）
+#   {ns}      集群真实 namespace（release-demo）
+#
+# strategy 字段: 可省略（所有发布都执行）或指定 rolling / blue_green / canary（仅该策略发布执行）
+checks:
+  - name: 部署状态
+    type: k8s_deploy_ready          # Deployment READY 数检查
+
+  - name: 健康检查
+    type: http
+    path: /health
+    expect_contains: '"status":"ok"'
+
+  - name: 版本验证
+    type: http_json
+    strategy: [rolling, blue_green] # 滚动/蓝绿主入口应更新为新版本；灰度不检查主入口
+    path: /
+    jsonpath: version
+    expect_equal: "{version}"
+
+  - name: 蓝绿流量切换
+    type: k8s_service_selector
+    strategy: blue_green            # 仅蓝绿发布执行
+    expect_track: blue              # Service selector 应指向 blue 环境
+
+  - name: 主入口保持旧版本
+    type: http_json
+    strategy: canary                # 灰度：主入口应仍为旧版本
+    path: /
+    jsonpath: version
+    expect_not_equal: "{version}"   # 主入口不应是新版本
+
+  - name: 灰度独立入口
+    type: http_json
+    strategy: canary                # 仅灰度发布执行
+    service: "{app}-canary"         # 金丝雀独立 Service 入口
+    path: /
+    jsonpath: version
+    expect_equal: "{version}"

@@ -1,0 +1,19 @@
+{
+  "task_id": "c67d4cfa-3b02-4f94-8b93-af7f7405ab0e",
+  "executed_at": "2026-08-01T11:48:29.934751+00:00",
+  "total_reports": 1,
+  "reports": [
+    {
+      "report_id": "RPT-20260801-001",
+      "generated_at": "2026-08-01T11:48:29.934582+00:00",
+      "data_points": 3969,
+      "metrics": {
+        "avg_response_time_ms": 67.24,
+        "error_rate": 0.029,
+        "throughput_rps": 248.9,
+        "p99_latency_ms": 719.33
+      },
+      "summary": "在 4.5 秒内处理了 4833 个数据点"
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+// ============================================================
+// 设计系统变量（2026 流程设计器改进）
+// ============================================================
+
+// ---------------- 颜色系统 ----------------
+// 主色
+$primary-color: #409EFF;
+$primary-light: #ECF5FF;
+$primary-dark: #337ECC;
+
+// 语义色
+$success-color: #67C23A;
+$warning-color: #E6A23C;
+$danger-color: #F56C6C;
+$info-color: #909399;
+
+// 中性色（升级后推荐使用）
+$text-primary: #1D2129;
+$text-regular: #4E5969;
+$text-secondary: #86909C;
+$text-placeholder: #C9CDD4;
+
+// 背景色
+$bg-color: #F7F8FA;
+$bg-page: #FFFFFF;
+$bg-card: #FFFFFF;
+
+// 边框色
+$border-color: #E5E6EB;
+$border-light: #F2F3F5;
+$border-dark: #C9CDD4;
+
+// ---------------- 工单模块专用变量 ----------------
+// 状态色（带背景）
+$tag-warning-bg: #FFF7E8;
+$tag-warning-text: #FF7D00;
+$tag-primary-bg: #E8F3FF;
+$tag-primary-text: #1677FF;
+$tag-success-bg: #E8FFEA;
+$tag-success-text: #00B42A;
+$tag-danger-bg: #FFECE8;
+$tag-danger-text: #F53F3F;
+$tag-info-bg: #F2F3F5;
+$tag-info-text: #86909C;
+$border-dark: #DCDFE6;
+
+// 阴影
+$box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+$box-shadow-light: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+$box-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.04);
+
+// ---------------- 圆角 ----------------
+$border-radius-xs: 2px;
+$border-radius: 6px;
+$border-radius-large: 8px;
+$border-radius-xl: 12px;
+
+// ---------------- 间距系统（8px 基准） ----------------
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+$spacing-xxl: 48px;
+
+// ---------------- 字体 ----------------
+// 字体大小
+$font-size-xs: 12px;
+$font-size-sm: 14px;
+$font-size-base: 14px;
+$font-size-md: 14px;
+$font-size-lg: 16px;
+$font-size-xl: 18px;
+$font-size-xxl: 20px;
+$font-size-title: 24px;
+
+// 字重
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+
+// ---------------- 行高 ----------------
+$line-height-tight: 1.25;
+$line-height-normal: 1.5;
+$line-height-loose: 1.75;
+
+// ---------------- 响应式断点 ----------------
+$breakpoint-xs: 480px;
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;
+$breakpoint-xxl: 1600px;
+
+// ---------------- 过渡动画 ----------------
+$transition-fast: 0.15s ease;
+$transition-base: 0.2s ease;
+$transition-slow: 0.3s ease;
+
+// ---------------- 兼容旧变量名 ----------------
+$bg-color-light: $primary-light;
+$bg-color-dark: #001529;
+$border-color-light: $border-light;
+$border-color-lighter: $border-color;
+$font-size-sm-legacy: 13px; // 旧 13px 字号保留

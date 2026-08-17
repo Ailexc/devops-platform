@@ -1,0 +1,80 @@
+# ============================================================
+# DevOpsPlatform —— 统一基础设施（PostgreSQL + Redis + RabbitMQ）
+# 所有业务项目共享这一套数据层 / 消息层：
+#   - PostgreSQL: devops-postgres（一实例多库，见 scripts/bootstrap.sh 建库）
+#   - Redis:      devops-redis（各项目按 db index 隔离）
+#   - RabbitMQ:   devops-rabbitmq（统一消息队列，Celery broker，AMQP）
+# 网络：devops-net（业务容器加入后可直连）
+# 端口：25432 / 26379 / 25672 / 25673 为宿主机调试口（刻意避开 5432/6379/5672）
+# ============================================================
+name: devops-infra
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: devops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: devops
+      POSTGRES_PASSWORD: devops
+      POSTGRES_DB: devops
+    ports:
+      - "25432:5432"          # 宿主机调试口
+    volumes:
+      - devops-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devops -d devops"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - devops-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: devops-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "26379:6379"          # 宿主机调试口
+    volumes:
+      - devops-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - devops-net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: devops-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: devops
+      RABBITMQ_DEFAULT_PASS: devops
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "25672:5672"          # AMQP 调试口（避开 5672）
+      - "25673:15672"         # 管理台（http://localhost:25673，devops/devops）
+    volumes:
+      - devops-rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - devops-net
+
+networks:
+  devops-net:
+    name: devops-net
+    driver: bridge
+
+volumes:
+  devops-pgdata:
+  devops-redisdata:
+  devops-rabbitmqdata:

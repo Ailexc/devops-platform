@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>能力包 Demo v8.1 - 接口点击展开/授权管理/上架下架/申请v5风格（方案A明亮风）</title>
+<style>
+:root {
+  --brand: #2f6fed; --brand-strong: #1e5ad7; --brand-soft: #eaf1fe; --brand-softer: #f4f8ff;
+  --bg: #f5f7fa; --bg-card: #ffffff; --bg-hover: #f0f4fb; --bg-inset: #f8fafc;
+  --text: #1a2233; --text-secondary: #5b6472; --text-tertiary: #8b94a3;
+  --border: #e3e8ef; --border-strong: #c9d2df;
+  --success: #16a34a; --success-bg: #e9f9ef; --warning: #d97706; --warning-bg: #fef4e6;
+  --danger: #dc2626; --danger-bg: #fdecec; --info: #0891b2; --info-bg: #e6f7fb;
+  --purple: #7c3aed; --purple-bg: #f1eaff;
+  --radius: 10px; --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(26,34,51,.05), 0 1px 3px rgba(26,34,51,.06);
+  --shadow-md: 0 4px 12px rgba(26,34,51,.07), 0 2px 4px rgba(26,34,51,.04);
+  --shadow-lg: 0 12px 32px rgba(26,34,51,.12);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC', sans-serif;
+  --font-mono: 'SF Mono','JetBrains Mono','Cascadia Code',Menlo,monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+.container { max-width: 1000px; margin: 0 auto; padding: 24px 20px 60px; }
+.header { margin-bottom: 20px; }
+.header h1 { font-size: 23px; font-weight: 800; letter-spacing: -.01em; }
+.header .subtitle { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
+.header .chip { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-strong); font-size: 12px; font-weight: 600; }
+.tabs { display: flex; gap: 6px; margin-bottom: 22px; flex-wrap: wrap; }
+.tab { padding: 8px 18px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; box-shadow: var(--shadow-sm); }
+.tab:hover { border-color: var(--brand); color: var(--brand-strong); }
+.tab.active { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 4px 12px rgba(47,111,237,.28); }
+.hidden { display: none !important; }
+.fade-in { animation: fadeIn .25s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+.card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.card-title .sec { font-size: 12px; color: var(--text-tertiary); font-weight: 500; }
+.card-desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 14px; }
+.info-box { padding: 11px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; }
+.info-box.blue { background: var(--brand-softer); border: 1px solid #d6e4ff; color: var(--brand-strong); }
+.info-box.purple { background: var(--purple-bg); border: 1px solid #e5d9ff; color: #6d28d9; }
+.info-box.green { background: var(--success-bg); border: 1px solid #c8f0d8; color: #15803d; }
+.info-box.orange { background: var(--warning-bg); border: 1px solid #fde8c8; color: #b45309; }
+.info-box.red { background: var(--danger-bg); border: 1px solid #fbcaca; color: #b91c1c; }
+.info-box.cyan { background: var(--info-bg); border: 1px solid #c8ecf6; color: #0e7490; }
+.btn { padding: 9px 18px; font-size: 13px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-strong); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--bg-hover); color: var(--text); }
+.btn-group { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.badge.blue { background: var(--brand-soft); color: var(--brand-strong); }
+.badge.green { background: var(--success-bg); color: var(--success); }
+.badge.orange { background: var(--warning-bg); color: var(--warning); }
+.badge.red { background: var(--danger-bg); color: var(--danger); }
+.badge.purple { background: var(--purple-bg); color: #6d28d9; }
+.badge.cyan { background: var(--info-bg); color: #0e7490; }
+.badge.gray { background: var(--bg-inset); color: var(--text-tertiary); border: 1px solid var(--border); }
+.tag { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 10px; border-radius: 999px; font-size: 11px; font-weight: 500; background: var(--bg-inset); color: var(--text-secondary); border: 1px solid var(--border); }
+.mono { font-family: var(--font-mono); font-size: 12px; }
+.codeblock { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-family: var(--font-mono); font-size: 12px; line-height: 1.65; color: #334155; overflow-x: auto; white-space: pre; }
+.codeblock .cmt { color: #94a3b8; font-style: italic; }
+.codeblock .kw { color: #7c3aed; font-weight: 600; }
+.codeblock .fn { color: #db2777; }
+.codeblock .str { color: #0e7490; }
+.codeblock .op { color: #2563eb; }
+.form-field { margin-bottom: 14px; }
+.form-field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.form-field .field-desc { font-size: 11px; color: var(--text-tertiary); margin-bottom: 8px; }
+.form-control { width: 100%; padding: 9px 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; transition: border-color .15s; }
+.form-control:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(47,111,237,.12); }
+.form-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b94a3' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
+.checkbox-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.checkbox-row label { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; cursor: pointer; padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; }
+.checkbox-row label.on { border-color: var(--brand); background: var(--brand-softer); color: var(--brand-strong); }
+.checkbox-row label.disabled { opacity: .45; cursor: not-allowed; }
+.checkbox-row input { accent-color: var(--brand); }
+.switch { position: relative; display: inline-block; width: 42px; height: 24px; vertical-align: middle; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider { position: absolute; cursor: pointer; inset: 0; background: #cbd5e1; border-radius: 999px; transition: .2s; }
+.switch .slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.switch input:checked + .slider { background: var(--brand); }
+.switch input:checked + .slider::before { transform: translateX(18px); }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.tbl th { text-align: left; padding: 8px 12px; color: var(--text-tertiary); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--border); }
+table.tbl td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.tbl tr:hover td { background: var(--bg-hover); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.app-card { padding: 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all .18s; box-shadow: var(--shadow-sm); }
+.app-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.app-card.selected { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(47,111,237,.18), var(--shadow-md); }
+.app-card.locked { opacity: .55; cursor: not-allowed; }
+.app-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 8px; background: var(--brand-soft); }
+.app-name { font-size: 15px; font-weight: 700; }
+.app-meta { font-size: 12px; color: var(--text-tertiary); }
+.app-foot { margin-top: 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cap-card { padding: 15px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all .18s; box-shadow: var(--shadow-sm); }
+.cap-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.cap-card.locked { opacity: .55; cursor: not-allowed; }
+.cap-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.cap-icon { width: 34px; height: 34px; border-radius: 9px; background: var(--brand-soft); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+.cap-name { font-size: 14px; font-weight: 700; }
+.cap-desc { font-size: 12px; color: var(--text-secondary); }
+.cap-tags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.cap-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.detail-head { display: flex; align-items: center; gap: 12px; padding: 18px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+.detail-head .big-icon { width: 52px; height: 52px; border-radius: 14px; background: var(--brand-soft); display: flex; align-items: center; justify-content: center; font-size: 26px; }
+.back-btn { display: inline-flex; align-items: center; gap: 4px; background: none; border: none; color: var(--brand); font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 8px 12px 0; }
+.back-btn:hover { color: var(--brand-strong); }
+/* ---- 接口树（点击展开）---- */
+.tree-group { margin-bottom: 12px; }
+.tree-group .g-title { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; }
+.ep-wrap { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--bg-card); overflow: hidden; }
+.ep { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; font-family: var(--font-mono); font-size: 12px; }
+.ep:hover { background: var(--bg-hover); }
+.ep .chev { margin-left: auto; color: var(--text-tertiary); font-size: 11px; transition: transform .15s; }
+.ep-wrap.open .ep .chev { transform: rotate(90deg); }
+.ep-wrap.open .ep { background: var(--brand-softer); }
+.ep-body { display: none; padding: 10px 12px; border-top: 1px solid var(--border); background: var(--bg-inset); font-family: var(--font); }
+.ep-wrap.open .ep-body { display: block; }
+.ep-body .eb-title { font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .4px; margin: 8px 0 4px; }
+.ep-body .eb-title:first-child { margin-top: 0; }
+.ep-body .eb-empty { color: var(--text-tertiary); font-style: italic; font-size: 11px; }
+.ep-body .eb-code { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-family: var(--font-mono); font-size: 11px; white-space: pre; overflow-x: auto; color: #334155; line-height: 1.5; }
+.method { font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+.method.get { background: var(--info-bg); color: #0e7490; }
+.method.post { background: var(--success-bg); color: #15803d; }
+.method.put { background: var(--warning-bg); color: #b45309; }
+.method.del { background: var(--danger-bg); color: #b91c1c; }
+/* ---- 数据模型 ---- */
+.model-card { width: 100%; background: var(--bg-inset); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.model-card .m-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; }
+.model-card .m-head:hover { background: var(--bg-hover); }
+.model-card .m-chev { color: var(--text-tertiary); font-size: 12px; transition: transform .15s; }
+.model-card.open .m-chev { transform: rotate(90deg); }
+.model-card .m-code { font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+.model-card .m-desc { font-size: 12px; color: var(--text-secondary); }
+.model-card .m-body { display: none; padding: 0 14px 14px; }
+.model-card.open .m-body { display: block; }
+/* ---- 预设大块 ---- */
+.preset-block { border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px; background: var(--bg-inset); }
+.preset-block .pb-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.preset-block .pb-idx { width: 24px; height: 24px; border-radius: 6px; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.sub-sec { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin: 10px 0 6px; display: flex; align-items: center; gap: 6px; }
+.sub-sec .line { flex: 1; height: 1px; background: var(--border); }
+.preset-add { border: 2px dashed var(--border-strong); border-radius: 12px; padding: 16px; text-align: center; color: var(--text-tertiary); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.preset-add:hover { border-color: var(--brand); color: var(--brand-strong); background: var(--brand-softer); }
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+.chip-item { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--brand-soft); border: 1px solid #c9dbff; border-radius: 999px; font-size: 12px; color: var(--brand-strong); }
+.chip-item .x { cursor: pointer; font-weight: 700; opacity: .6; }
+.chip-item .x:hover { opacity: 1; }
+.picker { border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--bg-card); margin-bottom: 8px; }
+.dim-row { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; background: var(--bg-card); }
+.radio-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.radio-row label { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; cursor: pointer; padding: 5px 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; }
+.radio-row label.on { border-color: var(--brand); background: var(--brand-softer); color: var(--brand-strong); }
+.radio-row input { accent-color: var(--brand); }
+.net-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.net-item { background: var(--bg-inset); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; }
+.net-item .k { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px; }
+.net-item .v { font-size: 13px; font-weight: 600; font-family: var(--font-mono); }
+.health { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.health.checking { background: var(--warning-bg); color: #b45309; }
+.health.ok { background: var(--success-bg); color: #15803d; }
+/* ---- 预设选择（市场）---- */
+.preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.preset-card { padding: 15px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all .18s; }
+.preset-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.preset-card.selected { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(47,111,237,.18), var(--shadow-md); }
+.preset-card.blocked { opacity: .6; cursor: not-allowed; }
+.preset-card.blocked:hover { border-color: var(--border); box-shadow: none; }
+.preset-icon { font-size: 20px; margin-bottom: 6px; }
+.preset-name { font-size: 14px; font-weight: 700; }
+.preset-line { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.preset-ops { font-size: 11px; color: var(--text-tertiary); margin-top: 8px; }
+.preset-ops .op-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 2px; background: var(--bg-inset); border: 1px solid var(--border); border-radius: 5px; }
+/* ---- v5 风格步骤条 ---- */
+.progress-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+.pstep { display: flex; align-items: center; gap: 8px; flex: 1; }
+.pstep .pnum { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: var(--bg-inset); border: 2px solid var(--border); color: var(--text-tertiary); flex-shrink: 0; }
+.pstep.active .pnum { background: var(--brand); border-color: var(--brand); color: #fff; }
+.pstep.completed .pnum { background: var(--success); border-color: var(--success); color: #fff; }
+.pstep .plabel { font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.pstep.active .plabel { color: var(--brand-strong); }
+.pstep.completed .plabel { color: var(--success); }
+.pdiv { flex: 0 0 18px; height: 1px; background: var(--border); }
+/* ---- 审批流 ---- */
+.flow-steps { position: relative; padding-left: 26px; }
+.flow-steps::before { content: ''; position: absolute; left: 8px; top: 6px; bottom: 6px; width: 2px; background: var(--border); }
+.flow-step { position: relative; padding: 11px 0; }
+.flow-step::before { content: ''; position: absolute; left: -22px; top: 17px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg-card); border: 2px solid var(--border); }
+.flow-step.active::before { border-color: var(--brand); background: var(--brand); }
+.flow-step.completed::before { border-color: var(--success); background: var(--success); }
+.flow-step.rejected::before { border-color: var(--danger); background: var(--danger); }
+.flow-step .step-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.flow-step .step-title { font-size: 13px; font-weight: 600; }
+.flow-step .step-badge { font-size: 10px; padding: 2px 7px; border-radius: 5px; font-weight: 600; }
+.flow-step .step-badge.current { background: var(--brand-soft); color: var(--brand-strong); }
+.flow-step .step-badge.waiting { background: var(--bg-inset); color: var(--text-tertiary); }
+.flow-step .step-badge.done { background: var(--success-bg); color: var(--success); }
+.flow-step .step-badge.no { background: var(--danger-bg); color: var(--danger); }
+.flow-step .step-desc { font-size: 12px; color: var(--text-tertiary); }
+.check-result { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 8px; margin-top: 10px; }
+.check-result.ok { background: var(--success-bg); border: 1px solid #c8f0d8; }
+.check-result.warn { background: var(--warning-bg); border: 1px solid #fde8c8; }
+.check-result .cr-icon { font-size: 20px; }
+.check-result .cr-title { font-size: 13px; font-weight: 700; }
+.check-result .cr-desc { font-size: 12px; color: var(--text-secondary); }
+.approval-action { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-inset); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+.approval-action .aa-btn { padding: 6px 14px; font-size: 12px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; }
+.approval-action .aa-ok { background: var(--success); color: #fff; }
+.approval-action .aa-no { background: var(--danger); color: #fff; }
+.approval-action .aa-done { background: var(--bg-card); color: var(--success); border: 1px solid var(--border); cursor: default; }
+/* ---- 弹窗 ---- */
+.modal-mask { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.modal { background: #fff; border-radius: 14px; box-shadow: var(--shadow-lg); width: 540px; max-width: 92vw; padding: 20px; }
+@media (max-width: 900px) { .grid-3, .preset-grid, .net-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🧭 能力包 Demo v8.1</h1>
+    <div class="subtitle">接口点击展开 · apply_scope 添加器 · 授权管理/上架/下架 · 申请 v5 风格步骤条</div>
+    <span class="chip">风格：方案 A · 云原生企业蓝</span>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-tab="0" onclick="goTab(0)">① 应用中心</button>
+    <button class="tab" data-tab="1" onclick="goTab(1)">② 能力编辑器</button>
+    <button class="tab" data-tab="2" onclick="goTab(2)">③ 权限市场</button>
+  </div>
+
+  <div id="tab0" class="tab-panel fade-in">
+    <div id="acList">
+      <div class="info-box blue">🏠 <b>应用中心</b>：应用详情 → 能力包卡片带操作（查看/编辑/授权管理/上架/下架）。</div>
+      <div class="card"><div class="card-title">应用列表</div><div class="grid-3" id="acAppGrid"></div></div>
+    </div>
+    <div id="acDetail" class="hidden"></div>
+    <div id="acSub" class="hidden"></div>
+  </div>
+
+  <div id="tab1" class="tab-panel hidden">
+    <div id="edList">
+      <div class="info-box purple">📝 <b>能力编辑器</b>：基本信息（含可见性）+ 权限组合预设大块；右下角保存。</div>
+      <div class="card"><div class="card-title">选择要编辑的能力</div><div class="grid-3" id="edCapGrid"></div></div>
+    </div>
+    <div id="edDetail" class="hidden"></div>
+  </div>
+
+  <div id="tab2" class="tab-panel hidden">
+    <div id="mkList">
+      <div class="info-box orange">🛒 <b>权限市场</b>：点应用 → 详情页 → 申请（v5 风格步骤条）。</div>
+      <div class="card"><div class="card-title">切换体验视角</div>
+        <div class="btn-group" style="margin-top:6px;">
+          <button class="btn btn-primary btn-sm" id="userHuang" onclick="switchUser('huang')">👤 小黄 · 运维中心集群组</button>
+          <button class="btn btn-secondary btn-sm" onclick="switchUser('lan')">👤 小蓝 · 运维中心 DBA 组</button>
+        </div></div>
+      <div class="card"><div class="card-title">应用列表</div><div class="grid-3" id="mkAppGrid"></div></div>
+    </div>
+    <div id="mkDetail" class="hidden"></div>
+    <div id="mkApply" class="hidden"></div>
+  </div>
+</div>
+
+<script>
+/* ==================== 数据 ==================== */
+const ORG_TREE = [ "总公司 → 研发中心 → 研发一部", "总公司 → 研发中心 → 研发二部", "总公司 → 运维中心 → 集群组", "总公司 → 运维中心 → DBA组" ];
+const PEOPLE = [ {name:"alice",display:"爱丽丝",org:"效能部门"},{name:"carol",display:"卡罗尔",org:"效能部门"},{name:"dave",display:"戴夫",org:"运维中心"},{name:"erin",display:"艾琳",org:"效能部门"},{name:"frank",display:"弗兰克",org:"运维中心"},{name:"huang",display:"小黄",org:"运维中心集群组"},{name:"lan",display:"小蓝",org:"运维中心DBA组"} ];
+const USERS = { huang:{ name:"huang", display:"小黄", org:"总公司 → 运维中心 → 集群组" }, lan:{ name:"lan", display:"小蓝", org:"总公司 → 运维中心 → DBA组" } };
+const GRANTEE_LABEL = { user:"用户", org:"组织", group:"自建组", app:"程序" };
+const INSTANCES = {
+  host:[ {id:1,name:"web-01",ip:"10.0.1.101",env:"prod"},{id:2,name:"web-02",ip:"10.0.1.102",env:"prod"},{id:3,name:"web-03",ip:"10.0.1.103",env:"staging"} ],
+  network:[ {id:1,name:"vpc-prod",cidr:"10.0.0.0/16"},{id:2,name:"vpc-staging",cidr:"10.1.0.0/16"} ],
+  database:[ {id:1,name:"db-cmdb",dept:"效能部门"},{id:2,name:"db-order",dept:"业务"} ],
+  ticket:[ {id:1,name:"INC-1001",status:"open"},{id:2,name:"INC-1002",status:"processing"} ],
+  public_resource:[ {id:1,name:"ecs-ops-01",account:"acc-ops-001"},{id:2,name:"rds-staging",account:"acc-rd-002"} ],
+};
+const GRANTS = {
+  1:{ user:[{name:"alice",display:"爱丽丝",presets:["只读查看"],req:"REQ-0001",time:"2026-07-28"},{name:"bob",display:"鲍勃",presets:["只读查看"],req:"REQ-0003",time:"2026-07-30"}],
+      org:[{name:"总公司 → 运维中心 → 集群组",presets:["只读查看"],req:"REQ-0005",time:"2026-08-01"}],
+      group:[{name:"主机运维小组",presets:["只读查看"],req:"REQ-0007",time:"2026-08-02"}],
+      app:[{name:"ops-tool",display:"运维小工具",presets:["完整管理"],req:"GR-011",time:"2026-08-03"}] },
+  2:{ user:[{name:"lan",display:"小蓝",presets:["DBA 管理"],req:"GR-012",time:"2026-08-04"},{name:"huang",display:"小黄",presets:["数据库查看"],req:"REQ-0012",time:"2026-08-04"}],
+      org:[{name:"总公司 → 运维中心 → DBA组",presets:["DBA 管理"],req:"GR-013",time:"2026-08-04"}],
+      group:[],
+      app:[{name:"ops-tool",display:"运维小工具",presets:["DBA 管理"],req:"GR-014",time:"2026-08-05"}] },
+  4:{ user:[],org:[],group:[],app:[] },
+  5:{ user:[{name:"huang",display:"小黄",presets:["资源查看"],req:"REQ-0015",time:"2026-08-05"}],org:[],group:[],app:[] },
+};
+
+const APPS = {
+  cmdb: { code:"cmdb", name:"配置管理数据库", icon:"🖥️", dept:"效能部门 · 平台组", mode:"gateway", owner:"alice", ownerDept:"效能部门", version:"2.4.1", tags:["核心","CMDB"], sync:"10 分钟前同步 · 12 接口 · 3 数据模型",
+    tree:[
+      { g:"主机管理", ops:[
+        { m:"GET", p:"/api/v1/hosts", action:"cmdb:host:list", desc:"分页获取主机列表，支持按部门/环境/标签过滤", req:"", resp:'{"items":[{"id":1024,"name":"web-01","ip":"10.0.1.101","env":"prod"}],"total":128}' },
+        { m:"POST", p:"/api/v1/hosts", action:"cmdb:host:create", desc:"创建一台主机（自动分配 IP 与安全组）", req:'{"name":"web-09","org_id":"dept-dev-1","env":"prod"}', resp:'{"id":1025,"name":"web-09","ip":"10.0.1.109","status":"provisioning"}' },
+        { m:"PUT", p:"/api/v1/hosts/:id", action:"cmdb:host:update", desc:"更新主机属性（名称/组织/环境）", req:'{"env":"staging"}', resp:'{"id":1024,"env":"staging","updated_at":"2026-08-05T10:00:00Z"}' },
+        { m:"DELETE", p:"/api/v1/hosts/:id", action:"cmdb:host:delete", desc:"删除主机（先回收实例与网络资源）", req:"", resp:'{"deleted":1024}' } ]},
+      { g:"网络管理", ops:[
+        { m:"GET", p:"/api/v1/networks", action:"cmdb:network:list", desc:"获取网络列表", req:"", resp:'{"items":[{"id":1,"cidr":"10.0.0.0/16"}]}' },
+        { m:"POST", p:"/api/v1/networks", action:"cmdb:network:create", desc:"创建网络", req:'{"cidr":"10.1.0.0/16","region":"cn-east-1"}', resp:'{"id":2,"cidr":"10.1.0.0/16"}' } ]},
+      { g:"磁盘管理", ops:[ { m:"GET", p:"/api/v1/disks", action:"cmdb:disk:list", desc:"获取磁盘列表", req:"", resp:'{"items":[{"id":1,"size":200}]}' } ]},
+    ],
+    models:[
+      { code:"host", title:"主机", desc:"计算实例资源，含网络与存储关系（OpenAPI schema）",
+        fields:[ { name:"id", type:"integer", required:true, desc:"主机唯一ID", example:"1024" }, { name:"name", type:"string", required:true, desc:"主机名（全局唯一）", example:"web-01" }, { name:"ip", type:"string", required:true, desc:"内网 IP", example:"10.0.1.101" }, { name:"org_id", type:"string", required:false, desc:"所属组织", example:"dept-dev-1" }, { name:"owner_id", type:"string", required:false, desc:"负责人", example:"alice" }, { name:"env", type:"enum", required:false, desc:"环境", example:"prod", values:["prod","staging","dev"] }, { name:"tags", type:"array<string>", required:false, desc:"标签", example:'["web","prod"]' } ]},
+      { code:"network", title:"网络", desc:"子网与网段定义", fields:[ { name:"id", type:"integer", required:true, desc:"网络ID", example:"1" }, { name:"cidr", type:"string", required:true, desc:"网段", example:"10.0.0.0/16" }, { name:"region", type:"enum", required:false, desc:"地域", example:"cn-east-1", values:["cn-east-1","cn-north-1"] } ]},
+      { code:"database", title:"数据库实例", desc:"数据库实例资源", fields:[ { name:"db_name", type:"string", required:true, desc:"库名", example:"db-cmdb" }, { name:"owner_dept", type:"string", required:false, desc:"所属部门", example:"效能部门" }, { name:"backup_policy", type:"string", required:false, desc:"备份策略", example:"daily" } ]},
+    ],
+    net:{ cloud:"自建机房", account:"-", region:"cn-east-1", vpc:"vpc-cmdb", subnet:"subnet-cmdb-1", sg:"sg-cmdb-prod", container:"EKS cluster-cmdb", health:"https://cmdb.internal/healthz" },
+    caps:[1,2,3] },
+  itsm: { code:"itsm", name:"IT 服务管理", icon:"📋", dept:"效能部门 · 服务组", mode:"sdk", owner:"carol", ownerDept:"效能部门", version:"1.8.0", tags:["工单"], sync:"32 分钟前同步 · 4 接口 · 1 数据模型",
+    tree:[ { g:"工单管理", ops:[ { m:"GET", p:"/api/v1/tickets", action:"itsm:ticket:list", desc:"获取工单列表（含本人待办）", req:"", resp:'{"items":[{"id":1001,"assignee":"bob","status":"open"}]}' }, { m:"GET", p:"/api/v1/tickets/:id", action:"itsm:ticket:read", desc:"获取工单详情", req:"", resp:'{"id":1001,"title":"磁盘扩容","assignee":"bob"}' }, { m:"POST", p:"/api/v1/tickets", action:"itsm:ticket:create", desc:"创建工单", req:'{"title":"磁盘扩容","priority":"high"}', resp:'{"id":1002,"status":"open"}' }, { m:"PUT", p:"/api/v1/tickets/:id", action:"itsm:ticket:update", desc:"更新工单状态", req:'{"status":"processing"}', resp:'{"id":1002,"status":"processing"}' } ]}],
+    models:[ { code:"ticket", title:"工单", desc:"工单数据，自带 assignee 分配人逻辑", fields:[ { name:"id", type:"integer", required:true, desc:"工单ID", example:"1001" }, { name:"title", type:"string", required:true, desc:"标题", example:"磁盘扩容" }, { name:"assignee_id", type:"string", required:true, desc:"分配人", example:"bob" }, { name:"status", type:"enum", required:false, desc:"状态", example:"open", values:["open","processing","done"] } ]}],
+    net:{ cloud:"阿里云", account:"acn-itsm", region:"cn-hangzhou", vpc:"vpc-itsm", subnet:"subnet-itsm-app", sg:"sg-itsm-app", container:"ACK cluster-itsm", health:"https://itsm.internal/healthz" },
+    caps:[4] },
+  cloudportal: { code:"cloudportal", name:"云管平台", icon:"☁️", dept:"效能部门 · 资源组", mode:"gateway", owner:"erin", ownerDept:"效能部门", version:"3.0.1", tags:["云"], sync:"5 分钟前同步 · 4 接口 · 1 数据模型",
+    tree:[ { g:"资源管理", ops:[ { m:"GET", p:"/api/v1/resources", action:"cloud:resource:list", desc:"获取公共资源列表", req:"", resp:'{"items":[{"id":1,"account":"acc-ops-001"}]}' }, { m:"POST", p:"/api/v1/resources", action:"cloud:resource:create", desc:"创建资源", req:'{"account":"acc-ops-001","type":"ecs"}', resp:'{"id":2}' }, { m:"DELETE", p:"/api/v1/resources/:id", action:"cloud:resource:delete", desc:"释放资源", req:"", resp:'{"released":2}' } ]}],
+    models:[ { code:"public_resource", title:"公共资源", desc:"公共云资源", fields:[ { name:"account_id", type:"string", required:true, desc:"云账号", example:"acc-ops-001" }, { name:"tag_dept", type:"string", required:false, desc:"部门标签", example:"运维部" }, { name:"region", type:"enum", required:false, desc:"地域", example:"ap-guangzhou", values:["ap-guangzhou","ap-shanghai"] } ]}],
+    net:{ cloud:"腾讯云", account:"act-ops", region:"ap-guangzhou", vpc:"vpc-cloud", subnet:"subnet-cloud-1", sg:"sg-cloud-prod", container:"TKE cluster-cloud", health:"https://cloudportal.internal/healthz" },
+    caps:[5] },
+  "ops-tool": { code:"ops-tool", name:"运维小工具", icon:"🛠️", dept:"运维部门 · 集群组", mode:"sdk", owner:"huang", ownerDept:"运维部门", version:"0.3.0", tags:["工具"], sync:"8 分钟前同步 · 2 接口 · 1 数据模型",
+    tree:[ { g:"巡检任务", ops:[ { m:"GET", p:"/api/v1/checks", action:"ops:check:list", desc:"获取巡检任务列表", req:"", resp:'{"items":[{"id":1,"target":"web-01"}]}' }, { m:"POST", p:"/api/v1/checks", action:"ops:check:create", desc:"创建巡检任务", req:'{"target":"web-01","type":"ping"}', resp:'{"id":2,"status":"scheduled"}' } ]}],
+    models:[ { code:"check", title:"巡检任务", desc:"巡检任务", fields:[ { name:"target", type:"string", required:true, desc:"目标", example:"web-01" }, { name:"status", type:"enum", required:false, desc:"状态", example:"scheduled", values:["scheduled","running","done"] } ]}],
+    net:{ cloud:"自建机房", account:"-", region:"cn-east-1", vpc:"vpc-ops-tool", subnet:"subnet-ops-tool-1", sg:"sg-ops-tool", container:"K8s cluster-ops-tool", health:"https://ops-tool.internal/healthz" },
+    caps:[] },
+};
+
+const CAPS = [
+  { id:1, app:"cmdb", name:"主机管理", icon:"🖥️", status:"published", version:3, tags:["主机","生命周期"], description:"主机资源生命周期管理", visibility:{ type:"public", org_paths:[] },
+    presets:[
+      { id:"readonly", name:"只读查看", desc:"查看主机列表与详情（排查用）", interfaces:["cmdb:host:list","cmdb:host:read"], grantee_types:["user","org","group","app"], apply_scope:{ orgs:[], people:[], groups_free:true }, data_control:true, data_models:["host"], data_scopes:{ host:{ mode:"all", instances:[], condition:"" } } },
+      { id:"operator", name:"运维操作", desc:"查看+创建+更新（程序对接）", interfaces:["cmdb:host:list","cmdb:host:create","cmdb:host:update"], grantee_types:["app"], apply_scope:{ orgs:[], people:[], groups_free:true }, data_control:false, data_models:[], data_scopes:{} },
+      { id:"full", name:"完整管理", desc:"全部操作", interfaces:["cmdb:host:list","cmdb:host:create","cmdb:host:update","cmdb:host:delete"], grantee_types:["app"], apply_scope:{ orgs:[], people:[], groups_free:true }, data_control:false, data_models:[], data_scopes:{} } ] },
+  { id:2, app:"cmdb", name:"数据库管理", icon:"🗄️", status:"published", version:2, tags:["数据库"], description:"数据库实例管理（DBA 组可管理；查看对全员开放）", visibility:{ type:"public", org_paths:[] },
+    presets:[
+      { id:"dbview", name:"数据库查看", desc:"查看数据库信息（全员可申请）", interfaces:["cmdb:db:list","cmdb:db:read"], grantee_types:["user","org","group","app"], apply_scope:{ orgs:[], people:[], groups_free:true }, data_control:true, data_models:["database"], data_scopes:{ database:{ mode:"all", instances:[], condition:"" } } },
+      { id:"dba", name:"DBA 管理", desc:"数据库变更操作（仅 DBA 组）", interfaces:["cmdb:db:list","cmdb:db:backup","cmdb:db:delete"], grantee_types:["user","org","group","app"], apply_scope:{ orgs:["总公司 → 运维中心 → DBA组"], people:[], groups_free:false }, data_control:true, data_models:["database"], data_scopes:{ database:{ mode:"condition", instances:[], condition:"db_name=db-cmdb" } } } ] },
+  { id:3, app:"cmdb", name:"财务数据", icon:"💰", status:"draft", version:1, tags:["财务"], description:"财务敏感数据（隐身，仅白名单/直链）", visibility:{ type:"hidden", org_paths:[] },
+    presets:[ { id:"fin", name:"财务查看", desc:"财务数据查看", interfaces:["cmdb:fin:list"], grantee_types:["user"], apply_scope:{ orgs:["总公司 → 研发中心 → 研发一部"], people:[], groups_free:false }, data_control:true, data_models:["host"], data_scopes:{ host:{ mode:"all", instances:[], condition:"" } } } ] },
+  { id:4, app:"itsm", name:"工单接口", icon:"📋", status:"published", version:4, tags:["工单"], description:"ITSM 工单接口（数据隔离由 ITSM 自身 assignee 逻辑保证）", visibility:{ type:"public", org_paths:[] },
+    presets:[
+      { id:"view", name:"工单查看", desc:"查看工单（含本人待办）", interfaces:["itsm:ticket:list","itsm:ticket:read"], grantee_types:["user","org","group","app"], apply_scope:{ orgs:[], people:[], groups_free:true }, data_control:false, data_models:[], data_scopes:{} },
+      { id:"handle", name:"工单处理", desc:"创建/更新工单（程序对接）", interfaces:["itsm:ticket:create","itsm:ticket:update"], grantee_types:["app"], apply_scope:{ orgs:[], people:[], groups_free:true }, data_control:false, data_models:[], data_scopes:{} } ] },
+  { id:5, app:"cloudportal", name:"公共资源池", icon:"☁️", status:"published", version:1, tags:["云"], description:"公共云资源（仅运维中心可见）", visibility:{ type:"org_visible", org_paths:["总公司 → 运维中心 → 集群组","总公司 → 运维中心 → DBA组"] },
+    presets:[
+      { id:"viewer", name:"资源查看", desc:"查看公共资源", interfaces:["cloud:resource:list"], grantee_types:["user","org","group","app"], apply_scope:{ orgs:[], people:[], groups_free:true }, data_control:true, data_models:["public_resource"], data_scopes:{ public_resource:{ mode:"all", instances:[], condition:"" } } },
+      { id:"manager", name:"资源管理", desc:"完整的资源管理权限", interfaces:["cloud:resource:list","cloud:resource:create","cloud:resource:delete"], grantee_types:["user","org","group","app"], apply_scope:{ orgs:[], people:[], groups_free:true }, data_control:true, data_models:["public_resource"], data_scopes:{ public_resource:{ mode:"condition", instances:[], condition:"account_id=acc-ops-001" } } } ] },
+];
+function capOf(id){ return CAPS.find(c=>c.id===id); }
+
+/* ==================== 状态 ==================== */
+let currentUser="huang", editCapId=1, editorView="form";
+let scopePicker=null;              // {pi, kind:'org'|'people'}
+let openModel=null;
+let acMode="list", acCode=null, acSub=null;   // acSub: {view:'cap'|'authz', id, offline:bool}
+let edMode="list";
+let mkMode="list", mkApp=null;
+let apply={ cap:null, preset:null, granteeType:null, granteeDetail:null, scope:{}, netTicket:false, step:1, submitted:false, approval:[] };
+
+/* ==================== 工具 ==================== */
+function goTab(i){ document.querySelectorAll(".tab").forEach((t,idx)=>t.classList.toggle("active",idx===i)); for(let k=0;k<3;k++) document.getElementById("tab"+k).classList.toggle("hidden",k!==i); if(i===0)renderAC(); if(i===1)renderEd(); if(i===2)renderMK(); }
+function hl(code){ return code.replace(/(\/\/.*)|("(?:[^"\\]|\\.)*")|(\b(?:if|elif|else|return|define|relations|type|tuple|p,|public|org_visible|hidden|true|false|all|instance|condition)\b)|(^|\s)([a-zA-Z_][\w.\-\/]*)(\s*:)(?=\s|$)/gm,(m,cmt,str,kw,p1,prop,colon)=>{ if(cmt)return '<span class="cmt">'+cmt+'</span>'; if(str)return '<span class="str">'+str+'</span>'; if(kw)return '<span class="kw">'+kw+'</span>'; if(prop!==undefined)return p1+'<span class="op">'+prop+'</span>'+colon; return m; }); }
+function statusBadge(c){ const m={published:['已发布','green'],draft:['草稿','gray']}[c.status]; return `<span class="badge ${m[1]}">${m[0]}</span>`; }
+function visBadge(c){ return c.visibility.type==='hidden'?`<span class="badge red">隐身</span>`:c.visibility.type==='public'?`<span class="badge blue">全员可见</span>`:`<span class="badge orange">组织可见</span>`; }
+function granteeBadge(p){ const gt=p.grantee_types.map(g=>GRANTEE_LABEL[g]); return `<span class="badge ${p.grantee_types.length===1&&p.grantee_types[0]==='app'?'purple':'blue'}">主体: ${gt.join('·')}</span>`; }
+function scopeBadge(p){ const s=p.apply_scope; if(!s.orgs.length&&!s.people.length) return `<span class="badge green">范围: 全员</span>`; const parts=[]; if(s.orgs.length)parts.push("仅 "+s.orgs[0].split(' → ').pop()); if(s.people.length)parts.push(s.people.length+" 人"); return `<span class="badge orange">范围: ${parts.join(' · ')}</span>`; }
+function netHTML(a){ return `<div class="card"><div class="card-title">🌐 网络信息<span class="sec">注册应用时填写 · 供申请方自行评估</span></div><div class="net-grid">${[["云",a.net.cloud],["账号",a.net.account],["区域",a.net.region],["VPC",a.net.vpc],["子网",a.net.subnet],["安全组",a.net.sg],["容器",a.net.container],["接入模式",a.mode]].map(([k,v])=>`<div class="net-item"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div><div class="card-desc" style="margin-top:10px;">通信测试接口（无鉴权，仅返回状态）：<span class="mono">${a.net.health}</span> <button class="btn btn-ghost btn-sm" onclick="healthCheck('${a.code}', this)">▶ 探测</button><span id="health_${a.code}" class="health"></span></div></div>`; }
+function healthCheck(code,btn){ const el=document.getElementById("health_"+code); if(!el)return; el.className="health checking"; el.textContent="⏳ 探测中..."; btn.disabled=true; setTimeout(()=>{ el.className="health ok"; el.textContent="✅ HTTP 200 OK"; btn.disabled=false; },900); }
+function openModal(html){ const m=document.createElement("div"); m.className="modal-mask"; m.id="modal"; m.innerHTML=`<div class="modal">${html}</div>`; m.addEventListener("click",e=>{ if(e.target===m) closeModal(); }); document.body.appendChild(m); }
+function closeModal(){ const m=document.getElementById("modal"); if(m)m.remove(); }
+
+/* ==================== 接口树 / 数据模型 ==================== */
+function treeHTML(a){ return `<div class="card"><div class="card-title">🔗 接口树<span class="sec">OpenAPI 同步 · ${a.sync} · 点击接口展开描述/请求/响应示例</span></div>${a.tree.map(g=>`<div class="tree-group"><div class="g-title">${g.g}</div>${g.ops.map(o=>`<div class="ep-wrap"><div class="ep" onclick="this.parentElement.classList.toggle('open')"><span class="method ${o.m.toLowerCase()==='delete'?'del':o.m.toLowerCase()}">${o.m}</span>${o.p}<span class="chev">▶</span></div><div class="ep-body">${o.desc?`<div class="eb-title">📝 接口描述</div><div>${o.desc}</div>`:''}${o.req?`<div class="eb-title">⬆️ 请求示例</div><div class="eb-code">${o.req}</div>`:'<div class="eb-title">⬆️ 请求示例</div><div class="eb-empty">（无）</div>'}${o.resp?`<div class="eb-title">⬇️ 响应示例</div><div class="eb-code">${o.resp}</div>`:'<div class="eb-title">⬇️ 响应示例</div><div class="eb-empty">（无）</div>'}</div></div>`).join('')}</div>`).join('')}</div>`; }
+function modelHTML(a){ return `<div class="card"><div class="card-title">🗂️ 数据模型<span class="sec">OpenAPI schema · 点击展开字段</span></div>${a.models.map(m=>`<div class="model-card ${openModel===m.code?'open':''}"><div class="m-head" onclick="openModel=openModel==='${m.code}'?null:'${m.code}';renderAllAC()"><span class="m-chev">▶</span><span class="m-code">${m.code}</span><span class="m-desc">${m.desc} · ${m.fields.length} 个字段</span></div><div class="m-body"><table class="tbl"><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th><th>示例</th></tr></thead><tbody>${m.fields.map(f=>`<tr><td><span class="mono" style="font-weight:600;">${f.name}</span></td><td><span class="tag">${f.type}</span></td><td>${f.required?'<span class="badge red">必填</span>':'<span class="badge gray">可选</span>'}</td><td>${f.desc}</td><td><span class="mono" style="color:var(--text-tertiary);">${f.example}${f.values?` · [${f.values.join('/')}]`:''}</span></td></tr>`).join('')}</tbody></table></div></div>`).join('')}</div>`; }
+
+/* ==================== Tab 0: 应用中心 ==================== */
+function renderAC(){
+  if(acSub){ renderSub(); return; }
+  if(acMode==="list"){ document.getElementById("acList").classList.remove("hidden"); document.getElementById("acDetail").classList.add("hidden"); document.getElementById("acSub").classList.add("hidden"); document.getElementById("acAppGrid").innerHTML=Object.values(APPS).map(a=>`<div class="app-card" onclick="acMode='detail';acCode='${a.code}';renderAC()"><div class="app-icon">${a.icon}</div><div class="app-name">${a.name}</div><div class="app-meta">${a.dept} · <span class="mono">${a.code}</span></div><div class="app-foot"><span class="badge ${a.mode==='gateway'?'blue':'purple'}">${a.mode==='gateway'?'🌐 网关':'📦 SDK'}</span><span class="badge gray">${a.caps.length} 能力</span></div></div>`).join(''); }
+  else renderDetailAC();
+}
+function renderAllAC(){ if(acSub) renderSub(); else renderDetailAC(); }
+function renderDetailAC(){
+  const a=APPS[acCode];
+  document.getElementById("acList").classList.add("hidden"); document.getElementById("acDetail").classList.remove("hidden"); document.getElementById("acSub").classList.add("hidden");
+  document.getElementById("acDetail").innerHTML=`
+  <button class="back-btn" onclick="acMode='list';renderAC()">← 返回应用列表</button>
+  <div class="detail-head"><div class="big-icon">${a.icon}</div><div style="flex:1;"><div class="app-name" style="font-size:17px;">${a.name}</div><div class="app-meta">${a.dept} · 负责人 <b>${a.owner}</b> · v${a.version} · 标签 ${a.tags.map(t=>`<span class="tag">${t}</span>`).join(' ')}</div></div><div><span class="badge ${a.mode==='gateway'?'blue':'purple'}">${a.mode==='gateway'?'🌐 网关托管':'📦 SDK 接入'}</span></div></div>
+  ${treeHTML(a)}${modelHTML(a)}${netHTML(a)}
+  <div class="card"><div class="card-title">📦 能力包<span class="sec">${a.caps.length} 个</span><button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="alert('新建能力：进入能力编辑器，向导方式创建')">+ 新建能力</button></div>
+  ${a.caps.map(id=>capOf(id)).map(c=>capCardActionsHTML(c)).join('') || '<div class="info-box blue" style="margin-bottom:0;">暂无能力包</div>'}
+  </div>`;
+}
+function capCardActionsHTML(c){
+  return `<div class="cap-card" style="margin-bottom:10px;">
+    <div class="cap-head"><div class="cap-icon">${c.icon}</div><div style="flex:1;"><div class="cap-name">${c.name}</div><div class="cap-desc">${c.description}</div></div>${statusBadge(c)}</div>
+    <div class="cap-tags">${visBadge(c)} <span class="badge gray">${c.presets.length} 预设</span> <span class="badge ${c.presets.some(p=>p.data_control)?'cyan':'gray'}">${c.presets.some(p=>p.data_control)?'含数据级预设':'接口级'}</span></div>
+    <div class="cap-actions">
+      <button class="btn btn-ghost btn-sm" onclick="acSub={view:'cap',id:${c.id},offline:false};renderAC()">👁️ 查看</button>
+      <button class="btn btn-ghost btn-sm" onclick="openCapEditor(${c.id})">✏️ 编辑</button>
+      <button class="btn btn-ghost btn-sm" onclick="acSub={view:'authz',id:${c.id},offline:false};renderAC()">🔑 授权管理</button>
+      ${c.status==='draft'?`<button class="btn btn-primary btn-sm" onclick="publishCap(${c.id})">🚀 上架</button>`:`<button class="btn btn-ghost btn-sm" onclick="acSub={view:'authz',id:${c.id},offline:true};renderAC()">📉 下架</button>`}
+    </div>
+  </div>`;
+}
+function renderSub(){
+  const s=acSub;
+  document.getElementById("acList").classList.add("hidden"); document.getElementById("acDetail").classList.add("hidden"); document.getElementById("acSub").classList.remove("hidden");
+  document.getElementById("acSub").innerHTML = s.view==='cap' ? capViewHTML(s.id) : capAuthzHTML(s.id, s.offline);
+}
+/* ---- 能力查看（只读详情）---- */
+function capViewHTML(id){
+  const c=capOf(id), a=APPS[c.app];
+  return `<button class="back-btn" onclick="acSub=null;renderAC()">← 返回 ${a.name} 详情</button>
+  <div class="detail-head"><div class="big-icon">${c.icon}</div><div style="flex:1;"><div class="app-name" style="font-size:17px;">${c.name} <span class="badge gray">查看模式</span></div><div class="app-meta">${a.name} · ${c.description}</div></div>${statusBadge(c)} ${visBadge(c)}</div>
+  <div class="card"><div class="card-title">基本信息</div>
+    <div class="grid-2"><div class="form-field"><label>版本</label><div class="mono" style="padding:6px 0;">v${c.version}</div></div><div class="form-field"><label>标签</label><div style="padding:6px 0;">${c.tags.map(t=>`<span class="tag">${t}</span>`).join(' ')}</div></div></div>
+    <div class="form-field" style="margin-bottom:0;"><label>可见性</label><div style="padding:6px 0;">${visBadge(c)}</div></div>
+  </div>
+  <div class="card"><div class="card-title">权限组合预设（${c.presets.length}）</div>
+  ${c.presets.map((p,i)=>`<div class="preset-block"><div class="pb-head"><span class="pb-idx">${i+1}</span><span class="pb-name">${p.name}</span>${granteeBadge(p)} ${scopeBadge(p)}</div>
+    <div class="preset-ops">${p.interfaces.map(x=>`<span class="op-item">${x}</span>`).join('')}</div>
+    ${p.data_control?`<div class="info-box cyan" style="margin-top:8px;margin-bottom:0;">数据级：${p.data_models.join(', ')} → ${Object.entries(p.data_scopes||{}).map(([m,ds])=>`${m}: ${ds.mode==='all'?'全部':ds.mode==='instance'?'实例'+ds.instances.length+'个':ds.condition}`).join(' · ')}</div>`:`<div class="info-box green" style="margin-top:8px;margin-bottom:0;">接口级（无数据级控制）</div>`}
+  </div>`).join('')}
+  </div>`;
+}
+/* ---- 授权管理 ---- */
+function capAuthzHTML(id, offline){
+  const c=capOf(id), a=APPS[c.app];
+  const dims=[["user","👤 用户","用户"],["org","🏢 组织","组织"],["group","👥 自建组","自建组"],["app","🔌 程序","程序"]];
+  let h=`<button class="back-btn" onclick="acSub=null;renderAC()">← 返回 ${a.name} 详情</button>
+  <div class="detail-head"><div class="big-icon">${c.icon}</div><div style="flex:1;"><div class="app-name" style="font-size:17px;">${c.name} <span class="badge ${offline?'orange':'blue'}">${offline?'下架模式':'授权管理'}</span></div><div class="app-meta">${a.name} · ${c.description}</div></div>${statusBadge(c)}</div>`;
+  if(offline) h+=`<div class="info-box orange">📉 <b>下架前置</b>：真实环境会发起<b>下架工单</b>，要求<b>所有使用方审批通过</b>后才能下架。下方可选择要下架的预设或整个能力包。</div>`;
+  h+=`<div class="card"><div class="card-title">🔑 被授权主体（四维）<span class="sec">${offline?'选择要下架的授权':'展示使用情况'}</span></div>
+  ${dims.map(([key,icon,label])=>{ const list=GRANTS[id]?.[key]||[]; return `<div class="sub-sec">${icon} ${label} <span class="badge gray">${list.length}</span><span class="line"></span></div>
+    ${list.length?`<table class="tbl"><thead><tr><th>${offline?'选择':'主体'}</th><th>预设</th><th>申请单</th><th>授权时间</th></tr></thead><tbody>${list.map(g=>`<tr><td>${offline?`<label class="${false?'on':''}" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" onchange="toggleOfflineItem(this,'${key}','${g.name}')"> ${g.display||g.name}</label>`:`<b>${g.display||g.name}</b><div class="mono" style="color:var(--text-tertiary);font-size:11px;">${g.name}</div>`}</td><td>${g.presets.map(p=>`<span class="tag">${p}</span>`).join(' ')}</td><td><a class="mono" style="color:var(--brand);cursor:pointer;" onclick="alert('跳转申请单 ${g.req}')">${g.req}</a></td><td><span class="mono" style="color:var(--text-tertiary);">${g.time}</span></td></tr>`).join('')}</tbody></table>`:`<div class="info-box blue" style="margin-bottom:0;">暂无 ${label} 维度授权</div>`}`; }).join('')}
+  </div>`;
+  if(offline) h+=`<div class="btn-group"><button class="btn btn-danger" onclick="offlineModal(${id})">📉 发起下架审批（需所有使用方通过）</button></div>`;
+  return h;
+}
+function toggleOfflineItem(el,key,name){ el.closest('tr').style.opacity = el.checked?0.4:1; }
+function offlineModal(id){ const c=capOf(id); openModal(`<div class="card-title">📉 下架审批 · ${c.name}</div><div class="card-desc">真实环境将发起下架工单：要求 <b>${(GRANTS[id]?.user.length||0)+(GRANTS[id]?.org.length||0)+(GRANTS[id]?.group.length||0)+(GRANTS[id]?.app.length||0)}</b> 个使用方全部审批通过后，能力包才能下架（授权将被撤销，OpenFGA 关系清理）。</div><div class="info-box orange">🎫 将生成下架工单 WO-20260805-099，进入外部审批流（模拟）。</div><div class="btn-group"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-danger" onclick="closeModal();alert('已发起下架审批（模拟）：待使用方审批通过后下架生效')">确认发起下架审批</button></div>`); }
+function publishCap(id){ const c=capOf(id); openModal(`<div class="card-title">🚀 上架审批流 · ${c.name}</div><div class="card-desc">能力上架到市场前需审批：应用 Owner 确认 → 平台复核 → 发布。</div>
+  <div class="flow-steps"><div class="flow-step active"><div class="step-header"><div class="step-title">发起上架</div><div class="step-badge current">当前</div></div><div class="step-desc">${c.name} · v${c.version}</div></div>
+  <div class="flow-step"><div class="step-header"><div class="step-title">应用 Owner 确认</div><div class="step-badge waiting">待审批</div></div><div class="step-desc">${APPS[c.app].owner} · ${APPS[c.app].name} 负责人</div></div>
+  <div class="flow-step"><div class="step-header"><div class="step-title">平台复核</div><div class="step-badge waiting">待审批</div></div><div class="step-desc">效能平台 · 安全合规</div></div>
+  <div class="flow-step"><div class="step-header"><div class="step-title">上架市场</div></div><div class="step-desc">审批通过后能力上架，对可见范围开放申请</div></div></div>
+  <div class="btn-group"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doPublish(${id})">确认发起上架审批</button></div>`); }
+function doPublish(id){ closeModal(); const c=capOf(id); c.status="published"; alert("已发起上架审批（模拟）→ 审批通过，能力已上架市场"); renderAC(); }
+
+/* ==================== Tab 1: 能力编辑器 ==================== */
+function renderEd(){ if(edMode==="list"){ document.getElementById("edList").classList.remove("hidden"); document.getElementById("edDetail").classList.add("hidden"); document.getElementById("edCapGrid").innerHTML=CAPS.map(c=>`<div class="cap-card" onclick="editCapId=${c.id};edMode='detail';renderEd()"><div class="cap-head"><div class="cap-icon">${c.icon}</div><div style="flex:1;"><div class="cap-name">${c.name}</div><div class="cap-desc">${APPS[c.app].name}</div></div>${statusBadge(c)}</div><div class="cap-tags">${visBadge(c)} <span class="badge gray">${c.presets.length} 预设</span></div></div>`).join(''); } else { edDetailHTML(); } }
+function edDetailHTML(){
+  document.getElementById("edList").classList.add("hidden"); document.getElementById("edDetail").classList.remove("hidden");
+  const cap=capOf(editCapId), app=APPS[cap.app];
+  let h=`<button class="back-btn" onclick="edMode='list';renderEd()">← 返回能力列表</button>
+  <div class="detail-head"><div class="big-icon">${cap.icon}</div><div style="flex:1;"><div class="app-name" style="font-size:17px;">${cap.name}</div><div class="app-meta">${app.name} · ${app.mode==='gateway'?'🌐网关':'📦SDK'} · owner ${app.owner}</div></div>${statusBadge(cap)}</div>`;
+  h+=`<div class="card"><div class="card-title">① 基本信息</div>
+    <div class="grid-2">
+      <div class="form-field"><label>能力名称</label><input class="form-control" value="${cap.name}" oninput="capEdit('name',this.value)"></div>
+      <div class="form-field"><label>版本</label><input class="form-control" value="v${cap.version}" readonly></div>
+      <div class="form-field"><label>所属应用</label><div class="mono" style="color:var(--text-secondary);padding:8px 0;">${app.name} · ${app.code}</div></div>
+      <div class="form-field"><label>标签</label><div class="checkbox-row">${["主机","数据库","工单","云","财务","只读"].map(t=>`<label class="${cap.tags.includes(t)?'on':''}"><input type="checkbox" ${cap.tags.includes(t)?'checked':''} onchange="capEdit('tag','${t}',this.checked)"> ${t}</label>`).join('')}</div></div>
+    </div>
+    <div class="form-field"><label>能力描述</label><textarea class="form-control" rows="2" oninput="capEdit('desc',this.value)">${cap.description}</textarea></div>
+    <div class="form-field" style="margin-bottom:0;"><label>👁️ 可见性（owner 控制）</label>
+      <select class="form-control form-select" onchange="capEdit('visType',this.value)">
+        <option value="public" ${cap.visibility.type==='public'?'selected':''}>public · 全员可见（可申请性由预设控制）</option>
+        <option value="org_visible" ${cap.visibility.type==='org_visible'?'selected':''}>org_visible · 仅指定组织可见</option>
+        <option value="hidden" ${cap.visibility.type==='hidden'?'selected':''}>hidden · 隐身（仅白名单/直链）</option>
+      </select></div>
+    ${cap.visibility.type==='org_visible'?`<div class="form-field"><label>可见组织</label><div class="checkbox-row">${ORG_TREE.map(p=>`<label class="${cap.visibility.org_paths.includes(p)?'on':''}"><input type="checkbox" ${cap.visibility.org_paths.includes(p)?'checked':''} onchange="capEdit('visOrg','${p}',this.checked)"> ${p}</label>`).join('')}</div></div>`:''}
+  </div>`;
+  h+=`<div class="card"><div class="card-title">② 权限组合预设<span class="sec">接口 + 主体 + 可申请范围 + 数据权限</span></div>
+    <div class="card-desc">底部空槽点击"添加"生成新预设块。</div>
+    ${cap.presets.map((p,pi)=>presetBlockHTML(p,pi,app)).join('')}
+    <div class="preset-add" onclick="addPreset()">+ 添加预设（在下方生成一个新的预设块）</div>
+  </div>`;
+  h+=`<div class="card"><div class="card-title">③ 声明文件</div>
+    <div class="btn-group" style="margin-top:4px;"><button class="btn btn-primary btn-sm" onclick="setView('form')">📝 表单</button><button class="btn btn-ghost btn-sm" onclick="setView('yaml')">YAML</button><button class="btn btn-ghost btn-sm" onclick="setView('json')">JSON</button></div>
+    <div id="edRaw" class="hidden" style="margin-top:12px;"><div class="codeblock" id="yamlView"></div></div>
+  </div>`;
+  h+=`<div style="text-align:right;margin-top:4px;"><button class="btn btn-primary" onclick="alert('能力声明已保存')">💾 保存</button></div>`;
+  document.getElementById("edDetail").innerHTML=h; renderRaw();
+}
+function presetBlockHTML(p,pi,app){
+  const s=p.apply_scope;
+  const showOrg=scopePicker&&scopePicker.pi===pi&&scopePicker.kind==="org";
+  const showPeople=scopePicker&&scopePicker.pi===pi&&scopePicker.kind==="people";
+  let h=`<div class="preset-block"><div class="pb-head"><span class="pb-idx">${pi+1}</span><span class="pb-name">预设 · ${p.name||'（未命名）'}</span><span class="badge gray" style="margin-left:auto;">id: ${p.id}</span><button class="btn btn-ghost btn-sm" onclick="pEdit(${pi},'del')">✕ 删除</button></div>
+    <div class="grid-2"><div class="form-field"><label>预设名称</label><input class="form-control" value="${p.name}" oninput="pEdit(${pi},'name',this.value)"></div><div class="form-field"><label>预设描述</label><input class="form-control" value="${p.desc}" oninput="pEdit(${pi},'desc',this.value)"></div></div>
+    <div class="sub-sec">🔗 绑定接口 <span class="line"></span></div>
+    ${app.tree.map(g=>`<div class="tree-group"><div class="g-title">${g.g}</div><div class="checkbox-row">${g.ops.map(o=>`<label class="${p.interfaces.includes(o.action)?'on':''}"><input type="checkbox" ${p.interfaces.includes(o.action)?'checked':''} onchange="pEdit(${pi},'iface','${o.action}',this.checked)"><span class="method ${o.m.toLowerCase()==='delete'?'del':o.m.toLowerCase()}">${o.m}</span>${o.p}</label>`).join('')}</div></div>`).join('')}
+    <div class="sub-sec">👤 权限可作用主体（grantee_types） <span class="line"></span></div>
+    <div class="checkbox-row">${[["user","👤 用户"],["org","🏢 组织"],["group","👥 自建组"],["app","🔌 程序"]].map(g=>`<label class="${p.grantee_types.includes(g[0])?'on':''}"><input type="checkbox" ${p.grantee_types.includes(g[0])?'checked':''} onchange="pEdit(${pi},'grantee','${g[0]}',this.checked)"> ${g[1]}</label>`).join('')}</div>
+    <div class="sub-sec">🎯 权限可申请范围（apply_scope） <span class="line"></span></div>
+    <div class="form-field"><label>组织级别（空=不限）</label>
+      <div class="chip-list">${s.orgs.map(o=>`<span class="chip-item">${o.split(' → ').pop()}<span class="x" onclick="pEdit(${pi},'org','${o}',false)">×</span></span>`).join('')}<button class="btn btn-ghost btn-sm" onclick="scopePicker=${showOrg?'null':`{pi:${pi},kind:'org'}`};edDetailHTML()">${showOrg?'收起':'＋ 添加组织'}</button></div>
+      ${showOrg?`<div class="picker"><div class="checkbox-row">${ORG_TREE.map(o=>`<label class="${s.orgs.includes(o)?'on':''}"><input type="checkbox" ${s.orgs.includes(o)?'checked':''} onchange="pEdit(${pi},'org','${o}',this.checked)"> ${o}</label>`).join('')}</div></div>`:''}
+    </div>
+    <div class="form-field"><label>人员级别（选择特定的人，空=不限）</label>
+      <div class="chip-list">${s.people.map(n=>{const pe=PEOPLE.find(x=>x.name===n);return `<span class="chip-item">${pe?pe.display:n}<span class="x" onclick="pEdit(${pi},'people','${n}',false)">×</span></span>`;}).join('')}<button class="btn btn-ghost btn-sm" onclick="scopePicker=${showPeople?'null':`{pi:${pi},kind:'people'}`};edDetailHTML()">${showPeople?'收起':'＋ 添加人员'}</button></div>
+      ${showPeople?`<div class="picker"><div class="checkbox-row">${PEOPLE.map(pe=>`<label class="${s.people.includes(pe.name)?'on':''}"><input type="checkbox" ${s.people.includes(pe.name)?'checked':''} onchange="pEdit(${pi},'people','${pe.name}',this.checked)"> ${pe.display}<span class="mono" style="color:var(--text-tertiary);">${pe.org}</span></label>`).join('')}</div></div>`:''}
+    </div>
+    <div class="form-field" style="margin-bottom:0;"><label>自建组级别</label><div class="checkbox-row"><label class="${s.groups_free?'on':''}"><input type="checkbox" ${s.groups_free?'checked':''} onchange="pEdit(${pi},'groupsFree',this.checked)"> 自建组不限制</label></div></div>
+    <div class="sub-sec">🗄️ 数据权限控制（每预设独立） <span class="line"></span></div>
+    <div style="display:flex;align-items:center;gap:12px;padding:4px 0 10px;"><label class="switch"><input type="checkbox" ${p.data_control?'checked':''} onchange="pEdit(${pi},'dc',this.checked)"><span class="slider"></span></label><span style="font-size:12px;color:var(--text-secondary);">${p.data_control?'开启：绑定接口 + 数据范围双重控制':'关闭：绑定接口可访问全部数据'}</span></div>`;
+  if(p.data_control){
+    h+=`<div class="form-field"><label>数据模型（多选）</label><div class="checkbox-row">${app.models.map(m=>`<label class="${p.data_models.includes(m.code)?'on':''}"><input type="checkbox" ${p.data_models.includes(m.code)?'checked':''} onchange="pEdit(${pi},'model','${m.code}',this.checked)"> ${m.code}</label>`).join('')}</div></div>`;
+    for(const mc of p.data_models){
+      const ds=p.data_scopes[mc]||{mode:"all",instances:[],condition:""};
+      h+=`<div class="dim-row"><div class="dr-head"><b class="mono">${mc}</b><span class="badge cyan">数据范围</span></div>
+        <div class="radio-row" style="margin-bottom:6px;">${[["all","全部数据"],["instance","具体实例"],["condition","条件表达式"]].map(([mode,label])=>`<label class="${ds.mode===mode?'on':''}"><input type="radio" name="ds_${pi}_${mc}" ${ds.mode===mode?'checked':''} onchange="pEdit(${pi},'dsMode','${mc}','${mode}')"> ${label}</label>`).join('')}</div>
+        ${ds.mode==='instance'?`<div class="checkbox-row">${(INSTANCES[mc]||[]).map(i=>`<label class="${ds.instances.includes(i.id)?'on':''}"><input type="checkbox" ${ds.instances.includes(i.id)?'checked':''} onchange="pEdit(${pi},'dsInst','${mc}',${i.id},this.checked)"> ${i.name}</label>`).join('')}</div>`:''}
+        ${ds.mode==='condition'?`<input class="form-control mono" value="${ds.condition}" placeholder="如 account_id=acc-ops-001" oninput="pEdit(${pi},'dsCond','${mc}',this.value)">`:''}
+      </div>`;
+    }
+  } else { h+=`<div class="info-box green" style="margin-bottom:0;">✅ 关闭后绑定接口可访问全部数据——适合自身已有数据隔离逻辑的应用。</div>`; }
+  return h+`</div>`;
+}
+function pEdit(pi,kind,...args){ const cap=capOf(editCapId),p=cap.presets[pi]; if(!p)return;
+  if(kind==="del"){ cap.presets.splice(pi,1); }
+  if(kind==="name")p.name=args[0]; if(kind==="desc")p.desc=args[0];
+  if(kind==="iface"){ const i=p.interfaces.indexOf(args[0]); args[1]&&i<0?p.interfaces.push(args[0]):(!args[1]&&i>=0?p.interfaces.splice(i,1):0); }
+  if(kind==="grantee"){ const i=p.grantee_types.indexOf(args[0]); args[1]&&i<0?p.grantee_types.push(args[0]):(!args[1]&&i>=0?p.grantee_types.splice(i,1):0); }
+  if(kind==="org"){ const i=p.apply_scope.orgs.indexOf(args[0]); args[1]&&i<0?p.apply_scope.orgs.push(args[0]):(!args[1]&&i>=0?p.apply_scope.orgs.splice(i,1):0); }
+  if(kind==="people"){ const i=p.apply_scope.people.indexOf(args[0]); args[1]&&i<0?p.apply_scope.people.push(args[0]):(!args[1]&&i>=0?p.apply_scope.people.splice(i,1):0); }
+  if(kind==="groupsFree")p.apply_scope.groups_free=args[0];
+  if(kind==="dc")p.data_control=args[0];
+  if(kind==="model"){ const i=p.data_models.indexOf(args[0]); args[1]&&i<0?p.data_models.push(args[0]):(!args[1]&&i>=0?p.data_models.splice(i,1):0); if(!p.data_scopes[args[0]])p.data_scopes[args[0]]={mode:"all",instances:[],condition:""}; }
+  if(kind==="dsMode"){ const ds=p.data_scopes[args[0]]; if(ds)ds.mode=args[1]; }
+  if(kind==="dsInst"){ const ds=p.data_scopes[args[0]]; if(ds){ const i=ds.instances.indexOf(args[1]); args[2]&&i<0?ds.instances.push(args[1]):(!args[2]&&i>=0?ds.instances.splice(i,1):0); } }
+  if(kind==="dsCond"){ const ds=p.data_scopes[args[0]]; if(ds)ds.condition=args[1]; }
+  edDetailHTML();
+}
+function addPreset(){ const cap=capOf(editCapId); cap.presets.push({id:"p"+Date.now().toString(36),name:"新预设",desc:"",interfaces:[],grantee_types:["user"],apply_scope:{orgs:[],people:[],groups_free:true},data_control:false,data_models:[],data_scopes:{}}); edDetailHTML(); }
+function capEdit(kind,...args){ const cap=capOf(editCapId);
+  if(kind==="name")cap.name=args[0]; if(kind==="desc")cap.description=args[0];
+  if(kind==="tag"){ const i=cap.tags.indexOf(args[0]); args[1]&&i<0?cap.tags.push(args[0]):(!args[1]&&i>=0?cap.tags.splice(i,1):0); }
+  if(kind==="visType")cap.visibility.type=args[0];
+  if(kind==="visOrg"){ const i=cap.visibility.org_paths.indexOf(args[0]); args[1]&&i<0?cap.visibility.org_paths.push(args[0]):(!args[1]&&i>=0?cap.visibility.org_paths.splice(i,1):0); }
+  edDetailHTML();
+}
+function setView(v){ editorView=v; renderRaw(); }
+function renderRaw(){ const el=document.getElementById("edRaw"); if(!el)return; if(editorView==="form"){ el.classList.add("hidden"); return; } el.classList.remove("hidden"); const cap=capOf(editCapId); document.getElementById("yamlView").innerHTML=hl(editorView==="yaml"?yamlOf(cap):JSON.stringify(cap,null,2)); }
+function yamlOf(cap){ const app=APPS[cap.app]; const L=[];
+  L.push("capability:"); L.push(`  name: ${cap.name}`); L.push(`  app_name: ${app.name}`); L.push(`  enforcement_mode: ${app.mode}`); L.push(`  version: ${cap.version}`); L.push(`  tags: [${cap.tags.join(", ")}]`);
+  L.push("  visibility:"); L.push(`    type: ${cap.visibility.type}`); if(cap.visibility.type==="org_visible") L.push(`    org_paths: [${cap.visibility.org_paths.map(p=>`"${p}"`).join(", ")}]`);
+  L.push(""); L.push("  presets:");
+  for(const p of cap.presets){
+    L.push(`    - id: ${p.id}`); L.push(`      name: "${p.name}"`); L.push(`      desc: "${p.desc}"`); L.push(`      interfaces: [${p.interfaces.join(", ")}]`); L.push(`      grantee_types: [${p.grantee_types.join(", ")}]`);
+    L.push("      apply_scope:"); L.push(`        orgs: [${p.apply_scope.orgs.map(o=>`"${o}"`).join(", ")}]`); L.push(`        people: [${p.apply_scope.people.join(", ")}]`); L.push(`        groups_free: ${p.apply_scope.groups_free}`);
+    L.push(`      data_control: ${p.data_control}`);
+    if(p.data_control){ L.push(`      data_models: [${p.data_models.join(", ")}]`); L.push("      data_scopes:"); for(const mc of p.data_models){ const ds=p.data_scopes[mc]||{mode:"all",instances:[],condition:""}; L.push(`        ${mc}:`); L.push(`          mode: ${ds.mode}`); if(ds.mode==="instance")L.push(`          instances: [${ds.instances.join(", ")}]`); if(ds.mode==="condition")L.push(`          condition: "${ds.condition}"`); } }
+  }
+  return L.join("\n");
+}
+
+/* ==================== Tab 2: 权限市场 ==================== */
+function switchUser(u){ currentUser=u; document.querySelectorAll("#tab2 .btn-sm").forEach(b=>b.classList.remove("btn-primary","btn-secondary")); const btn=u==="huang"?document.getElementById("userHuang"):document.querySelector('#tab2 .btn-sm[onclick*="lan"]'); btn.classList.remove("btn-secondary"); btn.classList.add("btn-primary"); mkMode="list"; mkApp=null; apply={cap:null,preset:null,granteeType:null,granteeDetail:null,scope:{},netTicket:false,step:1,submitted:false,approval:[]}; renderMK(); }
+function renderMK(){ if(mkMode==="list"){ document.getElementById("mkList").classList.remove("hidden"); document.getElementById("mkDetail").classList.add("hidden"); document.getElementById("mkApply").classList.add("hidden"); document.getElementById("mkAppGrid").innerHTML=Object.values(APPS).map(a=>`<div class="app-card" onclick="mkMode='app';mkApp='${a.code}';renderMK()"><div class="app-icon">${a.icon}</div><div class="app-name">${a.name}</div><div class="app-meta">${a.dept} · owner ${a.owner}</div><div class="app-foot"><span class="badge ${a.mode==='gateway'?'blue':'purple'}">${a.mode==='gateway'?'🌐 网关':'📦 SDK'}</span><span class="badge gray">${a.caps.length} 能力</span></div></div>`).join(''); } else if(mkMode==="app"){ mkAppHTML(); } else { mkApplyHTML(); } }
+function capVisible(c){ const u=USERS[currentUser]; if(c.visibility.type==="public")return true; if(c.visibility.type==="org_visible")return c.visibility.org_paths.includes(u.org); return false; }
+function mkAppHTML(){ const a=APPS[mkApp],u=USERS[currentUser]; const caps=a.caps.map(id=>capOf(id)).filter(c=>c.status==="published"); const visible=caps.filter(c=>capVisible(c)),hidden=caps.filter(c=>!capVisible(c));
+  document.getElementById("mkList").classList.add("hidden"); document.getElementById("mkApply").classList.add("hidden"); document.getElementById("mkDetail").classList.remove("hidden");
+  document.getElementById("mkDetail").innerHTML=`<button class="back-btn" onclick="mkMode='list';renderMK()">← 返回市场</button>
+  <div class="detail-head"><div class="big-icon">${a.icon}</div><div style="flex:1;"><div class="app-name" style="font-size:17px;">${a.name}</div><div class="app-meta">${a.dept} · 负责人 <b>${a.owner}</b> · v${a.version} · ${a.mode==='gateway'?'🌐网关':'📦SDK'}</div></div><div><span class="badge gray">视角: ${u.display}（${u.org.split(' → ').pop()}）</span></div></div>
+  ${netHTML(a)}
+  <div class="card"><div class="card-title">📦 已发布能力<span class="sec">${visible.length} 可见 / ${hidden.length} 不可见</span></div>
+  ${visible.map(c=>`<div class="cap-card" style="margin-bottom:10px;" onclick="startApply(${c.id})"><div class="cap-head"><div class="cap-icon">${c.icon}</div><div style="flex:1;"><div class="cap-name">${c.name}</div><div class="cap-desc">${c.description}</div></div><span class="badge blue">申请</span></div><div class="cap-tags">${visBadge(c)} <span class="badge gray">${c.presets.length} 预设</span> <span class="badge ${c.presets.some(p=>p.data_control)?'cyan':'gray'}">${c.presets.some(p=>p.data_control)?'含数据级预设':'接口级'}</span></div></div>`).join('')}
+  ${hidden.map(c=>`<div class="cap-card locked"><div class="cap-head"><div class="cap-icon">${c.icon}</div><div style="flex:1;"><div class="cap-name">${c.name}</div><div class="cap-desc">${c.description}</div></div><span class="badge red">🔒 不可见</span></div></div>`).join('')}
+  ${visible.length===0&&hidden.length===0?'<div class="info-box blue">暂无已发布能力</div>':''}
+  </div>`; }
+function startApply(capId){ apply={cap:capId,preset:null,granteeType:null,granteeDetail:null,scope:{},netTicket:false,step:1,submitted:false,approval:[]}; mkMode="apply"; renderMK(); }
+function presetEligible(p,u){ const s=p.apply_scope; const orgOk=!s.orgs.length||s.orgs.includes(u.org); const peopleOk=!s.people.length||s.people.includes(u.name); return orgOk&&peopleOk; }
+function scopeDesc(p){ const s=p.apply_scope; const parts=[]; if(s.orgs.length)parts.push(s.orgs.map(o=>o.split(' → ').pop()).join(',')); if(s.people.length)parts.push(s.people.length+"人"); return parts.join(' · ')||"全员"; }
+function apTryPreset(id){ const cap=capOf(apply.cap),u=USERS[currentUser]; const p=cap.presets.find(x=>x.id===id); if(p&&presetEligible(p,u))apSel("preset",id); }
+function apSel(what,val){ if(what==="preset"){ apply.preset=val; apply.granteeType=null; apply.granteeDetail=null; apply.scope={}; } if(what==="gt"){ apply.granteeType=val; apply.granteeDetail=null; } if(what==="gdetail"){ apply.granteeDetail=val; } if(what==="ticket"){ apply.netTicket=val; } if(what==="scope"){ apply.scope=val; } mkApplyHTML(); }
+function apCanNext(){ if(apply.step===1)return !!apply.preset; if(apply.step===2)return !!apply.granteeDetail; if(apply.step===3)return true; return true; }
+function apNext(){ if(apCanNext()){ apply.step++; mkApplyHTML(); } }
+function apPrev(){ if(apply.step>1){ apply.step--; mkApplyHTML(); } }
+function apDataScope(){ const cap=capOf(apply.cap),p=cap.presets.find(x=>x.id===apply.preset); if(!p.data_control) return {}; const sc={}; for(const mc of p.data_models){ sc[mc]={instances:[],condition:""}; } return sc; }
+function mkApplyHTML(){
+  const cap=capOf(apply.cap),a=APPS[cap.app],u=USERS[currentUser],p=cap.presets.find(x=>x.id===apply.preset);
+  const steps=["选择预设","选择主体","数据范围","预览审批"];
+  let h=`<button class="back-btn" onclick="mkMode='app';renderMK()">← 返回 ${a.name} 详情</button>
+  <div class="progress-bar">${steps.map((s,i)=>`<div class="pstep ${apply.step===i+1?'active':apply.step>i+1?'completed':''}"><div class="pnum">${i+1}</div><div class="plabel">${s}</div></div>${i<steps.length-1?'<div class="pdiv"></div>':''}`).join('')}</div>
+  <div class="card"><div class="card-title">「${cap.name}」${p?'/'+p.name:''} <span class="badge gray">申请人 ${u.display}（${u.org.split(' → ').pop()}）</span></div>
+  <div id="apBody">${apStepHTML()}</div>
+  <div class="btn-group"><button class="btn btn-secondary" ${apply.step===1?'style="visibility:hidden;"':''} onclick="apPrev()">← 上一步</button><button class="btn btn-primary" id="apNext" onclick="apNext()">${apply.step===4?'':'下一步 →'}</button></div></div>`;
+  document.getElementById("mkDetail").classList.add("hidden"); document.getElementById("mkApply").classList.remove("hidden"); document.getElementById("mkApply").innerHTML=h;
+  const nb=document.getElementById("apNext"); if(nb) nb.disabled=!apCanNext();
+}
+function apStepHTML(){
+  const cap=capOf(apply.cap),u=USERS[currentUser];
+  if(apply.step===1){
+    return `<div class="preset-grid">${cap.presets.map(p=>{ const ok=presetEligible(p,u);
+      return `<div class="preset-card ${apply.preset===p.id?'selected':''} ${ok?'':'blocked'}" onclick="apTryPreset('${p.id}')"><div class="preset-icon">🔖</div><div class="preset-name">${p.name}</div><div class="preset-line">${granteeBadge(p)} ${scopeBadge(p)}</div>${ok?'':'<div class="info-box red" style="margin-top:8px;margin-bottom:0;padding:8px;">🚫 该预设的可申请范围与你不符（${scopeDesc(p)}）。<br>💡 可申请同能力的「查看类」预设，或联系负责人。</div>'}<div class="preset-ops">${p.interfaces.map(i=>`<span class="op-item">${i}</span>`).join('')}</div>${p.data_control?`<div class="preset-ops" style="margin-top:4px;"><span class="badge cyan">数据级: ${p.data_models.join(',')}</span></div>`:''}</div>`; }).join('')}</div>`;
+  }
+  if(apply.step===2){
+    const p=cap.presets.find(x=>x.id===apply.preset);
+    const appOnly=p.grantee_types.length===1&&p.grantee_types[0]==="app";
+    const types=[ {v:"user",icon:"👤",name:"我自己",desc:"为自己申请",enable:p.grantee_types.includes("user")},{v:"org",icon:"🏢",name:"组织",desc:"为所在组织申请",enable:p.grantee_types.includes("org")},{v:"group",icon:"👥",name:"自建组",desc:"为自建组申请",enable:p.grantee_types.includes("group")},{v:"app",icon:"🔌",name:"下游应用",desc:"为应用（程序身份）申请",enable:p.grantee_types.includes("app")} ];
+    let h=`<div class="info-box ${appOnly?'orange':'blue'}">${appOnly?'该预设<b>仅限程序主体</b>——程序无法自己操作，由应用 owner（人）代理申请，因此只能选择「下游应用」。':'该预设允许主体：<b>'+p.grantee_types.map(g=>GRANTEE_LABEL[g]).join(' / ')+'</b>，不符合的主体不可选择。'}</div>
+    <div class="grid-3">${types.map(t=>`<div class="app-card ${apply.granteeType===t.v?'selected':''} ${t.enable?'':'locked'}" style="${t.enable?'':'pointer-events:none;'}" onclick="apSel('gt','${t.v}')"><div class="app-icon">${t.icon}</div><div class="app-name">${t.name}</div><div class="app-meta">${t.desc}</div><div class="app-foot"><span class="badge ${t.enable?'green':'gray'}">${t.enable?'可选':'不可选'}</span></div></div>`).join('')}</div>`;
+    if(apply.granteeType==="app"){ h+=`<div class="info-box purple" style="margin-top:12px;">🔀 双主体：grantee=<b>应用本身</b>（程序身份）· applicant=<b>${u.display}</b>（应用 owner 人代理）</div><div class="grid-3" style="margin-top:8px;">${Object.values(APPS).filter(x=>x.caps.length===0).map(x=>`<div class="app-card ${apply.granteeDetail===x.code?'selected':''}" onclick="apSel('gdetail','${x.code}')"><div class="app-name">${x.name}</div><div class="app-meta">${x.code} · ${x.dept}</div></div>`).join('')}</div>`; }
+    else if(apply.granteeType==="user")apply.granteeDetail="user:"+u.name;
+    else if(apply.granteeType==="org")apply.granteeDetail="org:"+u.org;
+    else if(apply.granteeType==="group")apply.granteeDetail="group:grp-ops";
+    return h;
+  }
+  if(apply.step===3){
+    const p=cap.presets.find(x=>x.id===apply.preset);
+    if(!p.data_control) return `<div class="info-box green">✅ 该预设未开启数据级控制：绑定接口可访问全部数据（由应用自身数据逻辑过滤，如 ITSM 按 assignee）。</div>`;
+    if(!Object.keys(apply.scope).length) apply.scope=apDataScope();
+    let h=`<div class="card-desc">该预设开启了数据级控制，请为每个数据模型选择数据范围（由能力发布者定义可选范围）。</div>`;
+    for(const mc of p.data_models){
+      const ds=p.data_scopes[mc]||{mode:"all"};
+      const cur=apply.scope[mc]||{instances:[],condition:""};
+      h+=`<div class="dim-row"><div class="dr-head"><b class="mono">${mc}</b><span class="badge cyan">${ds.mode==='all'?'全部数据':ds.mode==='instance'?'具体实例':'条件表达式'}</span></div>
+      ${ds.mode==='all'?`<div class="info-box cyan" style="margin-bottom:0;">该模型全部数据（无需填写）</div>`:''}
+      ${ds.mode==='instance'?`<div class="checkbox-row">${(INSTANCES[mc]||[]).map(i=>`<label class="${cur.instances.includes(i.id)?'on':''}"><input type="checkbox" ${cur.instances.includes(i.id)?'checked':''} onchange="apScopeInst('${mc}',${i.id},this.checked)"> ${i.name}</label>`).join('')}</div>`:''}
+      ${ds.mode==='condition'?`<input class="form-control mono" value="${cur.condition}" placeholder="如 ${ds.condition}" oninput="apScopeCond('${mc}',this.value)"><div class="field-desc">示例：${ds.condition||'key=value'}</div>`:''}
+      </div>`;
+    }
+    return h;
+  }
+  if(apply.step===4){
+    const p=cap.presets.find(x=>x.id===apply.preset);
+    const a=APPS[cap.app];
+    const granteeKey=apply.granteeType==="app"?"client:"+apply.granteeDetail:apply.granteeDetail;
+    let dataTxt;
+    if(!p.data_control) dataTxt="接口级（全部数据）";
+    else dataTxt=p.data_models.map(mc=>{ const ds=apply.scope[mc]||{}; const conf=p.data_scopes[mc]||{}; if(conf.mode==="all")return mc+": 全部"; if(conf.mode==="instance")return mc+": "+((INSTANCES[mc]||[]).filter(i=>ds.instances.includes(i.id)).map(i=>i.name).join(',')||"未选"); return mc+": "+ds.condition; }).join(" · ");
+    let h=`<div class="card" style="margin-bottom:12px;"><div class="card-title">📋 申请预览</div>
+      <table class="tbl"><tbody>
+      <tr><th style="width:90px;">授权主体</th><td>${apply.granteeType==="app"?`<b>${APPS[apply.granteeDetail].name}</b>（程序身份 client:${apply.granteeDetail}）`:`<b>${apply.granteeDetail}</b>`} · 申请人 ${u.display}</td></tr>
+      <tr><th>能力 / 预设</th><td>${cap.name} / ${p.name}</td></tr>
+      <tr><th>接口权限</th><td class="mono">${p.interfaces.join(" ")}</td></tr>
+      <tr><th>数据范围</th><td>${dataTxt}</td></tr>
+      <tr><th>网络开通</th><td><label class="${apply.netTicket?'on':''}" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" ${apply.netTicket?'checked':''} onclick="apSel('ticket',this.checked)"> 需要网络打通（${a.name} ${a.net.sg}）</label></td></tr>
+      </tbody></table></div>
+    ${apply.submitted?renderApproval():`<div class="info-box purple">🔀 提交后进入审批流：${applyChain().map(x=>x.role).join(' → ')}。</div><div class="btn-group"><button class="btn btn-primary" onclick="submitApply()">🚀 发起审批</button></div>`}`;
+    return h;
+  }
+  return "";
+}
+function apScopeInst(mc,id,on){ const cur=apply.scope[mc]||(apply.scope[mc]={instances:[],condition:""}); const i=cur.instances.indexOf(id); on&&i<0?cur.instances.push(id):(!on&&i>=0?cur.instances.splice(i,1):0); mkApplyHTML(); }
+function apScopeCond(mc,v){ const cur=apply.scope[mc]||(apply.scope[mc]={instances:[],condition:""}); cur.condition=v; }
+function applyChain(){ const cap=capOf(apply.cap),a=APPS[cap.app],u=USERS[currentUser]; const chain=[{name:a.owner,role:"能力提供方 Owner",desc:`${a.name} 负责人`}]; if(apply.granteeType==="app")chain.push({name:APPS[apply.granteeDetail].owner,role:"申请方应用 Owner 确认",desc:`${APPS[apply.granteeDetail].name} 负责人`}); if(applyRisk()>=3)chain.push({name:"grace",role:"安全合规复核",desc:"高风险追加"}); return chain; }
+function applyRisk(){ let r=1; if(apply.granteeType==="app")r=2; const cap=capOf(apply.cap),p=cap.presets.find(x=>x.id===apply.preset); if(p&&p.interfaces.some(i=>i.includes("delete")))r=Math.max(r,3); if(p&&p.data_control)r=Math.max(r,2); return r; }
+function submitApply(){ apply.submitted=true; apply.approval=applyChain().map(x=>({...x,action:null})); mkApplyHTML(); }
+function renderApproval(){
+  const chain=apply.approval, allDone=chain.every(x=>x.action==="ok"), rejected=chain.some(x=>x.action==="no");
+  let h=`<div class="card" style="margin-bottom:12px;"><div class="card-title">审批流（${chain.length} 人）<span class="badge ${allDone?'green':rejected?'red':'orange'}">${allDone?'已全部通过':rejected?'已驳回':'审批中'}</span></div>
+  <div class="flow-steps"><div class="flow-step ${allDone?'completed':'active'}"><div class="step-header"><div class="step-title">提交申请</div><div class="step-badge current">✓</div></div><div class="step-desc">${USERS[currentUser].display} 提交了权限申请</div></div>
+  ${chain.map(x=>{ let cls="",bd="待审批",bc="waiting"; if(x.action==="ok"){cls="completed";bd="✓ 已通过";bc="done";} if(x.action==="no"){cls="rejected";bd="✗ 已驳回";bc="no";} return `<div class="flow-step ${cls}"><div class="step-header"><div class="step-title">${x.role}</div><div class="step-badge ${bc}">${bd}</div></div><div class="step-desc">${x.desc} · ${x.name}</div></div>`; }).join('')}
+  <div class="flow-step ${allDone?'completed':''}"><div class="step-header"><div class="step-title">授权生效</div><div class="step-badge ${allDone?'done':'waiting'}">${allDone?'✓ 已生效':'等待全部通过'}</div></div></div></div></div>`;
+  if(allDone){
+    const cap=capOf(apply.cap),p=cap.presets.find(x=>x.id===apply.preset),granteeKey=apply.granteeType==="app"?"client:"+apply.granteeDetail:apply.granteeDetail;
+    const casbin=p.interfaces.map(i=>`p, ${granteeKey}, ${cap.app}, ${i}, *, allow`).join("\n");
+    h+=`<div class="check-result ok"><div class="cr-icon">🎉</div><div><div class="cr-title">授权已生效 · GR-20260805-011</div><div class="cr-desc">${granteeKey} · ${cap.name}/${p.name}</div></div></div>
+    <div class="grid-2" style="margin-top:12px;"><div class="card" style="margin-bottom:0;"><div class="card-title">Casbin 规则</div><div class="codeblock">${hl(casbin)}</div></div><div class="card" style="margin-bottom:0;"><div class="card-title">令牌 scope</div><div class="codeblock"><span class="fn">scope</span>: "${p.interfaces.join(" ")}"<br><span class="fn">aud</span>: "${cap.app}" <span class="fn">sub</span>: "${granteeKey}"</div></div></div>`;
+  } else {
+    const next=chain.find(x=>x.action===null);
+    if(next&&!rejected){ const i=chain.indexOf(next); h+=`<div class="approval-action"><div style="font-size:16px;">👤</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">${next.name}</div><div style="font-size:11px;color:var(--text-tertiary);">${next.role} · ${next.desc}</div></div><button class="aa-btn aa-ok" onclick="apApprove(${i},'ok')">✓ 通过</button><button class="aa-btn aa-no" onclick="apApprove(${i},'no')">✗ 驳回</button></div>`; }
+    else if(rejected){ h+=`<div class="info-box red">❌ 申请已被驳回，授权未生效。</div>`; }
+  }
+  return h;
+}
+function apApprove(i,action){ apply.approval[i].action=action; mkApplyHTML(); }
+
+/* ==================== 初始化 ==================== */
+renderAC(); goTab(0);
+</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+# 权限中心（IAM）全栈 Compose —— OrbStack 统一管理
+# 基础设施：postgres / redis / openfga / traefik（PEP 网关）
+# 应用服务：iam-server(PDP) / mock-cmdb / mock-identity / iam-agent / frontend(管理台)
+# 镜像：backend 由 Makefile 宿主机预编译构建 iam-backend（golang 镜像源不可用）；
+#       frontend 多阶段构建（node 构建 → nginx 反代 /api /v1 → iam-server）
+# 域名（OrbStack 自动 DNS + 反代，dev.orbstack.domains 标签）：
+#   frontend.permission-center.orb.local  管理台
+#   api.permission-center.orb.local      iam-server（管理 API + PDP）
+#   cmdb.permission-center.orb.local     Traefik 网关（mock-cmdb 受保护业务 API）
+
+# 固定 Compose 项目名：换目录/路径后卷名、容器前缀、网络名、域名均保持不变，
+# 现有数据（pgdata/redisdata 等命名卷）无缝跟随，不产生"卷分离"。
+name: permission-center
+
+services:
+  # ── 统一数据层（由根目录 infra/docker-compose.yml 提供，devops-net 网络）──
+  # PostgreSQL: devops-postgres（库 devops_iam / devops_openfga）
+  # Redis:      devops-redis（db index 3=iam）
+
+  # OpenFGA 数据级关系引擎（CNCF / Zanzibar 系）
+  # 容器内 HTTP=8080（IAM SDK 用 http://openfga:8080），宿主映射 18081
+  # ⚠️ openfga:v1.8.7 为 distroless 镜像（仅 /openfga 二进制，无 sh/curl/wget）
+  #    → 不可配 sh -c entrypoint，也不可用 curl/wget healthcheck
+  #    迁移单独执行（幂等）：docker compose -f deploy/docker-compose.yml run --rm openfga migrate
+  #    iam-server 启动时 EnsureSchema（幂等）自动完成授权模型初始化
+  openfga:
+    image: openfga/openfga:v1.8.7
+    container_name: iam-openfga
+    command: ["run"]   # 默认 entrypoint=/openfga 直接启动
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgresql://devops:devops@devops-postgres:5432/devops_openfga?sslmode=disable
+      OPENFGA_HTTP_ADDR: 0.0.0.0:8080
+      OPENFGA_GRPC_ADDR: 0.0.0.0:8081
+      OPENFGA_AUTHN_METHOD: none
+    ports:
+      - "18081:8080"   # HTTP（IAM SDK 使用），宿主机备用端口
+      - "18082:8081"   # gRPC，宿主机备用端口
+    networks:
+      - default
+      - devops-net
+
+  # Traefik 网关（PEP 执行点，forwardAuth ≈ APISIX ext-authz）
+  # 镜像来自 ghcr.io（daocloud 对 apache/apisix 403，Traefik 发布到 ghcr 且无需 etcd）
+  traefik:
+    image: ghcr.io/traefik/traefik:v3.1.2
+    container_name: iam-traefik
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    labels:
+      - "dev.orbstack.domains=cmdb.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"
+    ports:
+      - "19080:9080"   # 网关入口（受保护业务 API），宿主机备用端口
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic/dynamic.yml:ro
+
+  # ---- 应用服务（iam-backend 镜像：宿主机预编译 4 个二进制）----
+  iam-server:
+    image: iam-backend:latest
+    command: ["iam-server"]
+    labels:
+      - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"
+    environment:
+      IAM_HTTP_ADDR: ":8080"
+      PG_DSN: "postgresql://devops:devops@devops-postgres:5432/devops_iam?sslmode=disable"
+      REDIS_ADDR: "devops-redis:6379"
+      OPENFGA_ADDR: "openfga:8080"
+      CMDB_BASE_URL: "http://mock-cmdb:8090"
+      IDENTITY_BASE_URL: "http://mock-identity:8091"
+      JWT_SECRET: "${JWT_SECRET:-demo-jwt-secret-change-in-prod}"
+      PEP_SHARED_SECRET: "${PEP_SHARED_SECRET:-pep-shared-secret}"
+    ports:
+      - "18080:8080"   # 管理 API + PDP（demo.sh / 本地工具使用），宿主机备用端口
+    restart: unless-stopped
+    depends_on:
+      openfga:
+        condition: service_started   # openfga 无 healthcheck（distroless）；iam-server 内置 ensureOpenFGA 重试
+    networks:
+      - default
+      - devops-net
+
+  mock-cmdb:
+    image: iam-backend:latest
+    command: ["mock-cmdb"]
+    environment:
+      CMDB_HTTP_ADDR: ":8090"
+      REDIS_ADDR: "devops-redis:6379"
+    ports:
+      - "18090:8090"   # 宿主机备用端口，避免与其他项目冲突
+    networks:
+      - default
+      - devops-net
+
+  mock-identity:
+    image: iam-backend:latest
+    command: ["mock-identity"]
+    environment:
+      IDENTITY_HTTP_ADDR: ":8091"
+    ports:
+      - "18091:8091"   # 宿主机备用端口，避免与其他项目冲突
+
+  # 本地 PDP agent（sidecar 形态，轮询 bundle 做本地动作级决策）
+  iam-agent:
+    image: iam-backend:latest
+    command: ["iam-agent"]
+    environment:
+      IAM_SERVER_URL: "http://iam-server:8080"
+      AGENT_APP: "cmdb"
+      AGENT_HTTP_ADDR: ":9090"
+      PEP_SHARED_SECRET: "${PEP_SHARED_SECRET:-pep-shared-secret}"
+    ports:
+      - "19090:9090"   # 宿主机备用端口，避免与其他项目冲突
+    depends_on:
+      iam-server:
+        condition: service_started
+
+  # 管理控制台（nginx 同源反代 /api /v1 → iam-server，无 CORS）
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: iam-frontend:latest
+    container_name: permission-center-frontend
+    labels:
+      - "dev.orbstack.domains=frontend.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"
+    ports:
+      - "18088:80"     # 宿主访问：http://localhost:18088（或 frontend.permission-center.orb.local）
+    depends_on:
+      iam-server:
+        condition: service_started
+    networks:
+      - default
+      - devops-net
+
+networks:
+  default:
+  devops-net:    # 统一基础设施网络（根目录 infra/docker-compose.yml）
+    external: true

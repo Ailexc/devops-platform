@@ -1,0 +1,43 @@
+# ---- 环境 / 密钥 ----
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# ---- 依赖与构建产物 ----
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+.venv/
+venv/
+go-build/
+bin/
+
+# ---- 数据 / 数据库文件 ----
+*.sqlite3
+*.sqlite
+*.db
+backups/
+.db-backups/
+data/
+
+# ---- 本地调试与系统 ----
+.DS_Store
+
+# ---- Go 编译产物（本机构建，勿入仓；云端重新编译）----
+PermissionCenter/backend/iam-server
+PermissionCenter/backend/bin/
+TaskManager/go-backend/server
+EventManager/backend-go/*.out
+.idea/
+.vscode/
+*.log
+*.tmp
+
+# ---- 容器编排缓存 ----
+.dockerignore-generated/

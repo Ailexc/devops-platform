@@ -1,0 +1,2240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>部署策略详解</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; line-height: 1.6; }
+  h1 { font-size: 22px; border-bottom: 2px solid #1677ff; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1677ff; margin-top: 28px; }
+  h3 { font-size: 15px; color: #333; margin-top: 20px; }
+  .card { border: 1px solid #e2e5f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fff; }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+  th, td { border: 1px solid #e2e5f0; padding: 8px 12px; text-align: left; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:hover { background: #f6f8fa; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 12px; color: #d46b08; }
+  pre { background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 13px; overflow-x: auto; }
+  ul, ol { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .alert-info { background: #e6f4ff; border: 1px solid #91caff; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+  .alert-info h3 { margin: 0 0 6px 0; color: #1677ff; font-size: 14px; }
+  .alert-info p { margin: 0; color: #333; font-size: 13px; }
+  .alert-warning { background: #fff7e6; border: 1px solid #ffd591; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+  .alert-warning h3 { margin: 0 0 6px 0; color: #d46b08; font-size: 14px; }
+  .alert-warning p { margin: 0; color: #333; font-size: 13px; }
+  .svg-container { background: #f6f8fa; padding: 16px; border-radius: 8px; text-align: center; margin-bottom: 16px; }
+  .svg-container svg { max-width: 100%; height: auto; }
+  .svg-caption { font-size: 12px; color: #999; margin-top: 8px; display: block; }
+  .tag { display: inline-block; background: #f0f0f0; border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #666; margin-right: 4px; }
+  .tag-green { background: #f6ffed; color: #389e0d; }
+  .tag-blue { background: #e6f4ff; color: #1677ff; }
+  .tag-orange { background: #fff7e6; color: #d46b08; }
+  .tag-red { background: #fff2f0; color: #f5222d; }
+  .flex-row { display: flex; gap: 16px; margin-bottom: 16px; }
+  .flex-card { flex: 1; border-radius: 6px; padding: 12px; }
+  .flex-card.blue { background: #f0f5ff; }
+  .flex-card.green { background: #f6ffed; }
+  .flex-card.orange { background: #fff7e6; }
+  .flex-card.purple { background: #f9f0ff; }
+  .toc { background: #f6f8fa; border: 1px solid #e2e5f0; border-radius: 8px; padding: 16px 24px; margin-bottom: 24px; }
+  .toc h2 { margin-top: 0; font-size: 16px; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: #1677ff; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+</style>
+<style>
+
+/* ===== 文章自包含导航 (由 add_article_toc.py 注入) ===== */
+/* 注意: 不使用 scroll-behavior: smooth，srcdoc sandbox iframe 内动画会导致 scroll 事件不可靠 */
+[id] { scroll-margin-top: 14px; }
+.doc-layout { display: flex; gap: 28px; align-items: flex-start; }
+.doc-toc {
+  width: 236px; flex-shrink: 0; box-sizing: border-box;
+  position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+  padding: 8px 4px 24px 0; border-right: 1px solid #eef0f6;
+}
+.doc-toc.is-hidden { display: none; }
+.doc-toc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 10px 10px; font-size: 13px; font-weight: 700; color: #4a5568;
+  letter-spacing: .5px;
+}
+.doc-toc-hide {
+  cursor: pointer; border: none; background: transparent; color: #a0aec0;
+  font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.doc-toc-hide:hover { color: #1a202c; background: #f1f5f9; }
+.doc-toc-nav { display: flex; flex-direction: column; gap: 1px; }
+.doc-toc-nav a {
+  display: block; padding: 6px 10px; border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0; color: #4a5568; text-decoration: none;
+  font-size: 13px; line-height: 1.5; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; transition: all .15s;
+}
+.doc-toc-nav a:hover { color: #1677ff; background: #f0f6ff; }
+.doc-toc-nav a.active {
+  color: #1677ff; background: #e6f4ff; border-left-color: #1677ff; font-weight: 600;
+}
+.doc-toc-show {
+  display: none; position: sticky; top: 8px; z-index: 30;
+  border: 1px solid #c7d7f5; background: #fff; color: #1677ff;
+  font-size: 13px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(22,119,255,.15);
+}
+.doc-toc-show.is-visible { display: inline-block; }
+.doc-main { flex: 1; min-width: 0; }
+@media (max-width: 820px) {
+  .doc-layout { flex-direction: column; gap: 12px; }
+  .doc-toc {
+    position: static; width: 100%; max-height: 220px;
+    border-right: none; border-bottom: 1px solid #eef0f6;
+  }
+}
+</style>
+</head>
+<body>
+<div class="doc-layout">
+  <button class="doc-toc-show" id="doc-toc-show" type="button">📑 目录</button>
+  <aside class="doc-toc" id="doc-toc">
+  <div class="doc-toc-head">
+    <span class="doc-toc-title">📑 本文章节</span>
+    <button class="doc-toc-hide" id="doc-toc-hide" type="button" title="收起目录">✕</button>
+  </div>
+  <nav class="doc-toc-nav">
+    <a href="#s1">1. 策略对比总览</a>
+    <a href="#s2">2. 滚动更新 (Rolling Update)</a>
+    <a href="#s3">3. 蓝绿部署 (Blue-Green)</a>
+    <a href="#s4">4. 灰度发布 (Canary Release)</a>
+    <a href="#s5">5. 其他策略</a>
+    <a href="#s6">6. 面试高频问题</a>
+  </nav>
+</aside>
+  <main class="doc-main">
+
+
+<h1>🏗️ 部署策略详解</h1>
+
+<!-- ============================================================ -->
+<!-- s1. 策略对比总览 -->
+<!-- ============================================================ -->
+<h2 id="s1">1. 策略对比总览</h2>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:13%;">部署策略</th>
+        <th style="width:17%;">核心思想</th>
+        <th style="width:10%;">零停机</th>
+        <th style="width:12%;">资源消耗</th>
+        <th style="width:12%;">回滚速度</th>
+        <th style="width:12%;">发布速度</th>
+        <th style="width:10%;">复杂度</th>
+        <th style="width:14%;">适用场景</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>滚动更新</strong></td>
+        <td>逐个替换旧实例为新实例</td>
+        <td><span class="tag tag-green">✅ 是</span></td>
+        <td>略高（额外 maxSurge 资源）</td>
+        <td>快（一键回滚）</td>
+        <td>中等</td>
+        <td>低</td>
+        <td>无状态服务、多副本、频繁发布</td>
+      </tr>
+      <tr>
+        <td><strong>蓝绿部署</strong></td>
+        <td>维护两套环境，流量瞬间切换</td>
+        <td><span class="tag tag-green">✅ 是</span></td>
+        <td>翻倍（两套完整环境）</td>
+        <td>极快（秒级再次切换）</td>
+        <td>慢</td>
+        <td>中</td>
+        <td>重大发布、金融/医疗、快速回滚</td>
+      </tr>
+      <tr>
+        <td><strong>灰度发布</strong></td>
+        <td>小比例放量，逐步扩大验证</td>
+        <td><span class="tag tag-green">✅ 是</span></td>
+        <td>略高（少量新实例）</td>
+        <td>快（回滚灰度实例）</td>
+        <td>慢（需观察窗口）</td>
+        <td>高</td>
+        <td>高风险变更、大规模集群、真实流量验证</td>
+      </tr>
+      <tr>
+        <td><strong>重建部署</strong></td>
+        <td>先全部停止旧版本，再启动新版本</td>
+        <td><span class="tag tag-red">❌ 否</span></td>
+        <td>最低（仅一套环境）</td>
+        <td>慢（需再次重建）</td>
+        <td>慢</td>
+        <td>最低</td>
+        <td>开发/测试环境、有状态服务、内部系统</td>
+      </tr>
+      <tr>
+        <td><strong>红黑部署</strong></td>
+        <td>两套环境切换，切换后立即回收旧环境</td>
+        <td><span class="tag tag-green">✅ 是</span></td>
+        <td>接近 1×（切换瞬间需两套）</td>
+        <td>慢（需重新部署旧版本）</td>
+        <td>中等</td>
+        <td>中</td>
+        <td>资源敏感、频繁小变更、Spinnaker 用户</td>
+      </tr>
+      <tr>
+        <td><strong>影子部署</strong></td>
+        <td>流量镜像到新版本，响应丢弃</td>
+        <td><span class="tag tag-green">✅ 是</span></td>
+        <td>高（额外影子实例）</td>
+        <td>N/A（不影响生产）</td>
+        <td>慢（验证周期长）</td>
+        <td>高</td>
+        <td>高风险变更、延迟敏感、安全审计</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">📌 选型决策流程</div>
+  <div class="alert-info">
+    <h3>如何选择合适的部署策略？</h3>
+    <p>
+      <strong>1) 是否允许停机？</strong><br>
+      → 允许短暂停机 → <strong>重建部署</strong>（最简单）<br>
+      → 不允许停机 → 继续判断 ↓<br><br>
+
+      <strong>2) 资源是否充足？</strong><br>
+      → 资源紧张，但需要零停机 → <strong>滚动更新</strong>（增量替换，资源开销小）<br>
+      → 资源充足或可以临时扩容 → 继续判断 ↓<br><br>
+
+      <strong>3) 回滚速度要求如何？</strong><br>
+      → 要求秒级回滚（金融/医疗） → <strong>蓝绿部署</strong>（旧环境保留，随时切回）<br>
+      → 可以接受分钟级回滚 → 继续判断 ↓<br><br>
+
+      <strong>4) 是否需要真实流量验证？</strong><br>
+      → 需要，但不允许影响用户 → <strong>影子部署</strong>（流量镜像，零风险）<br>
+      → 需要，且允许小比例影响 → <strong>灰度发布</strong>（渐进式放量）<br><br>
+
+      <strong>5) 资源成本是否敏感？</strong><br>
+      → 是（频繁发布、云环境） → <strong>红黑部署</strong>（切换后立即回收旧环境）<br>
+      → 否 → <strong>蓝绿部署</strong>（保留旧环境用于快速回滚）
+    </p>
+  </div>
+</div>
+
+<!-- ========== 本 Demo 系统实现 ========== -->
+<h3>本 Demo 系统实现方式（概念 → Demo 实现 → 真实/EC2 三块结构）</h3>
+<div class="card">
+  <p>
+    本 Demo 系统（release_system_demo）在 OrbStack K8s 集群上真实执行以下发布策略。所有策略共用一套
+    <strong>Service Selector + track 标签</strong> 流量控制机制，无需 Ingress / Traefik 即可演示蓝绿切换与摘挂流。
+    对外可通过 <code>{app}.release-demo.svc.cluster.local</code> 域名访问（OrbStack 支持宿主机直达）。
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:20%;">策略</th>
+        <th style="width:80%;">本 Demo 实现</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>滚动更新</strong></td>
+        <td>真实：<code>kubectl apply</code> / <code>set image</code> + <code>rollout status</code>，K8s 自动滚动替换 Pod</td>
+      </tr>
+      <tr>
+        <td><strong>蓝绿部署</strong></td>
+        <td>真实：创建 <code>{app}-blue</code> Deployment（新版本，<code>track: blue</code>）→ 等就绪 → 切换 Service selector 到 <code>track: blue</code>；旧环境 <code>{app}</code>（<code>track: stable</code>）保留用于回滚</td>
+      </tr>
+      <tr>
+        <td><strong>灰度发布</strong></td>
+        <td>真实：创建 <code>{app}-canary</code> Deployment + 独立 Service 入口（<code>{app}-canary</code>）→ 就绪验证 → 手动确认全量 → 清理；权重放量为可选项（需集群内 ingress）</td>
+      </tr>
+      <tr>
+        <td><strong>流量管理</strong></td>
+        <td>真实：摘流 = patch Service selector 指向不存在的 <code>track</code> 组合（无 Endpoint）；挂流 = 恢复 <code>track: stable</code>。EC2 为 ALB Target Group deregister/register 模拟</td>
+      </tr>
+      <tr>
+        <td><strong>红黑部署（可选）</strong></td>
+        <td>真实：复用蓝绿建新环境，切换后立即回收旧环境（无回滚窗口）</td>
+      </tr>
+      <tr>
+        <td><strong>影子部署（可选）</strong></td>
+        <td>真实：创建 <code>{app}-shadow</code> + 独立入口，仅验证不切主流量</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="alert-info">
+    <p>
+      <strong>多版本模拟</strong>：Demo 应用无真实 Git 仓库/分支，多版本通过 <strong>镜像 tag + APP_VERSION</strong> 模拟——
+      Dockerfile 注入 <code>ARG APP_VERSION</code>，构建时 <code>--build-arg</code> 传入版本号，应用响应可见 <code>{"version":"x.y.z"}</code>。
+      代码仅一份，版本差异由构建参数注入，符合真实 CI/CD 语义。
+    </p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- s2. 滚动更新 -->
+<!-- ============================================================ -->
+<h2 id="s2">2. 滚动更新 (Rolling Update)</h2>
+
+<!-- ========== History ========== -->
+<h3>历史背景与名称由来</h3>
+<div class="card">
+  <p>滚动更新（Rolling Update）的概念最早来源于电信行业。在早期的电信网络中，服务中断意味着巨大的经济损失和用户体验下降。运维人员发现，如果一次性升级所有节点，风险极高——一旦新版本有问题，整个服务就会瘫痪。</p>
+  <p>于是，一种被称为 <strong>"rolling upgrade"</strong> 或 <strong>"rolling restart"</strong> 的策略被提出：<strong>逐个替换集群中的实例</strong>，而不是同时替换所有实例。这样在升级过程中，集群中始终有大部分实例在处理请求，服务不会完全中断。</p>
+  <p>这个名称中的 <strong>"Rolling"</strong> 形象地描述了更新过程像"滚轮"一样，从一个实例滚动到下一个实例，逐步推进直到所有实例都完成升级。Kubernetes 在 1.0 版本（2015 年发布）中就将 RollingUpdate 作为 Deployment 的默认更新策略，使其成为云原生时代最广泛使用的发布方式之一。</p>
+</div>
+
+<!-- ========== Core Principle ========== -->
+<h3>核心原理</h3>
+<div class="card">
+  <p>滚动更新的核心思想是 <strong>增量替换（Incremental Replacement）</strong>：</p>
+  <ul>
+    <li>用新版本的 Pod <strong>逐一替换</strong> 旧版本的 Pod</li>
+    <li>更新过程中，新旧版本的 Pod <strong>共存</strong>，新实例提供服务后才会销毁旧实例</li>
+    <li>通过控制 <strong>并发数</strong>（maxSurge / maxUnavailable）来平衡更新速度和资源消耗</li>
+    <li>整个过程对用户 <strong>透明</strong>，服务不中断（Zero-downtime Deployment）</li>
+  </ul>
+  <div class="alert-info" style="margin-top: 12px;">
+    <h3>💡 核心公式</h3>
+    <p>更新过程中，Kubernetes 确保集群中的 Pod 数量始终维持在 <strong>[replicas - maxUnavailable, replicas + maxSurge]</strong> 范围内。</p>
+  </div>
+</div>
+
+<!-- ========== SVG Architecture Diagram ========== -->
+<h3>SVG 架构图</h3>
+<div class="card">
+  <div class="svg-container">
+    <svg viewBox="0 0 800 320" style="width:100%;max-width:800px;height:auto;">
+      <text x="400" y="30" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">滚动更新过程示意（5 副本，maxSurge=1, maxUnavailable=1）</text>
+      <!-- 阶段一：初始状态 -->
+      <text x="30" y="65" font-size="12" fill="#666" text-anchor="start">初始状态</text>
+      <rect x="120" y="50" width="90" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="165" y="73" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-1</text>
+      <rect x="230" y="50" width="90" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="275" y="73" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-2</text>
+      <rect x="340" y="50" width="90" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="385" y="73" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-3</text>
+      <rect x="450" y="50" width="90" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="495" y="73" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-4</text>
+      <rect x="560" y="50" width="90" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="605" y="73" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-5</text>
+
+      <!-- 阶段二：正在替换 -->
+      <text x="30" y="125" font-size="12" fill="#666" text-anchor="start">替换中</text>
+      <rect x="120" y="110" width="90" height="36" rx="6" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="165" y="133" text-anchor="middle" font-size="12" fill="#fff">v2 Pod-1</text>
+      <rect x="230" y="110" width="90" height="36" rx="6" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="275" y="133" text-anchor="middle" font-size="12" fill="#fff">v2 Pod-2</text>
+      <rect x="340" y="110" width="90" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="385" y="133" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-3</text>
+      <rect x="450" y="110" width="90" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="495" y="133" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-4</text>
+      <rect x="560" y="110" width="90" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="605" y="133" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-5</text>
+
+      <!-- 箭头标注 maxSurge -->
+      <path d="M120 155 L120 168 Q120 178 130 178 L250 178 Q260 178 260 168 L260 155" fill="none" stroke="#fa8c16" stroke-width="1.5" stroke-dasharray="4,2" />
+      <text x="190" y="192" text-anchor="middle" font-size="11" fill="#fa8c16">maxSurge=1（额外启动 1 个新 Pod）</text>
+
+      <!-- 箭头标注 maxUnavailable -->
+      <path d="M340 155 L340 168 Q340 178 330 178 L210 178 Q200 178 200 168 L200 155" fill="none" stroke="#f5222d" stroke-width="1.5" stroke-dasharray="4,2" />
+      <text x="270" y="210" text-anchor="middle" font-size="11" fill="#f5222d">maxUnavailable=1（最多 1 个旧 Pod 下线）</text>
+
+      <!-- 阶段三：完成 -->
+      <text x="30" y="245" font-size="12" fill="#666" text-anchor="start">完成状态</text>
+      <rect x="120" y="230" width="90" height="36" rx="6" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="165" y="253" text-anchor="middle" font-size="12" fill="#fff">v2 Pod-1</text>
+      <rect x="230" y="230" width="90" height="36" rx="6" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="275" y="253" text-anchor="middle" font-size="12" fill="#fff">v2 Pod-2</text>
+      <rect x="340" y="230" width="90" height="36" rx="6" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="385" y="253" text-anchor="middle" font-size="12" fill="#fff">v2 Pod-3</text>
+      <rect x="450" y="230" width="90" height="36" rx="6" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="495" y="253" text-anchor="middle" font-size="12" fill="#fff">v2 Pod-4</text>
+      <rect x="560" y="230" width="90" height="36" rx="6" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="605" y="253" text-anchor="middle" font-size="12" fill="#fff">v2 Pod-5</text>
+
+      <!-- 连接箭头 -->
+      <path d="M400 86 L400 108" stroke="#999" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M400 200 L400 228" stroke="#999" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <defs>
+        <marker id="arrow" marker-width="8" marker-height="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#999" />
+        </marker>
+      </defs>
+    </svg>
+    <span class="svg-caption">图：滚动更新过程示意（5 副本，maxSurge=1, maxUnavailable=1）</span>
+  </div>
+</div>
+
+<!-- ========== Key Parameters ========== -->
+<h3>关键参数详解</h3>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:18%;">参数名</th>
+        <th style="width:12%;">默认值</th>
+        <th style="width:35%;">作用</th>
+        <th style="width:35%;">注意事项</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>maxSurge</code></td>
+        <td>25%</td>
+        <td>滚动更新时最多可以创建的 <strong>超出</strong> 期望副本数的 Pod 数量（可以是绝对值或百分比）</td>
+        <td>值越大更新速度越快，但会消耗更多资源（如 CPU/内存配额）。建议根据集群资源水位设置</td>
+      </tr>
+      <tr>
+        <td><code>maxUnavailable</code></td>
+        <td>25%</td>
+        <td>滚动更新过程中最多允许 <strong>不可用</strong> 的 Pod 数量（可以是绝对值或百分比）</td>
+        <td>值越大更新速度越快，但对服务容量影响越大。对延迟敏感的服务建议设为 0 或较小值</td>
+      </tr>
+      <tr>
+        <td><code>minReadySeconds</code></td>
+        <td>0</td>
+        <td>新创建的 Pod 在就绪后需要等待多少秒后才被认为可用，用于避免刚启动就接收流量导致请求失败</td>
+        <td>对启动后需要预热（Warm-up）的服务非常重要，例如 Java 应用建议设为 30-60 秒</td>
+      </tr>
+      <tr>
+        <td><code>progressDeadlineSeconds</code></td>
+        <td>600</td>
+        <td>滚动更新进度超时时间。如果在这个时间内未完成更新，Deployment 将被标记为 Progressing=False</td>
+        <td>超时后不会自动回滚，需要人工介入。建议根据副本数和启动时间合理设置</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== EC2 vs K8s Comparison ========== -->
+<h3>EC2 vs K8s 实现对比</h3>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:15%;">对比维度</th>
+        <th style="width:42%;">EC2 模式</th>
+        <th style="width:43%;">K8s 模式</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>实现方式</strong></td>
+        <td>通过 SSH 逐台连接到 EC2 实例，执行部署脚本（拉取代码、重启服务），手动或脚本控制批次</td>
+        <td>修改 Deployment 的镜像版本，K8s Controller 自动管理新旧 Pod 的创建和销毁，完全自动化</td>
+      </tr>
+      <tr>
+        <td><strong>流量切换</strong></td>
+        <td>依赖 ELB 的健康检查，旧实例下线后 ELB 自动停止转发流量；新实例启动后自动加入</td>
+        <td>通过 Service + Readiness Probe 控制，新 Pod 就绪后自动加入 Endpoint，旧 Pod 自动移除</td>
+      </tr>
+      <tr>
+        <td><strong>回滚策略</strong></td>
+        <td>重新执行部署脚本，将旧版本部署到所有实例；或使用 Auto Scaling 的 AMI 回滚</td>
+        <td><code>kubectl rollout undo</code> 一键回滚到上一个 ReplicaSet，K8s 自动反向滚动更新</td>
+      </tr>
+      <tr>
+        <td><strong>配置文件</strong></td>
+        <td>使用 Ansible/Shell 脚本管理部署流程，配置分散在各主机或 CMDB 中</td>
+        <td>Deployment YAML 声明式配置，版本化管理，配合 ConfigMap/Secret 管理配置</td>
+      </tr>
+      <tr>
+        <td><strong>监控方式</strong></td>
+        <td>CloudWatch 监控实例级别指标，结合 ELB 的请求监控</td>
+        <td><code>kubectl rollout status</code> 实时查看进度，结合 Prometheus + Grafana 监控 Pod 级别指标</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== K8s Config Example ========== -->
+<h3>K8s 配置示例</h3>
+<div class="card">
+  <p>以下是一个使用 Rolling Update 策略的 Deployment 配置示例：</p>
+  <pre>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2        # 最多超出期望副本数 2 个
+      maxUnavailable: 1  # 最多允许 1 个实例不可用
+  template:
+    spec:
+      containers:
+      - name: app
+        image: my-app:v2</pre>
+  <div class="alert-info" style="margin-top: 12px;">
+    <h3>💡 参数说明</h3>
+    <p>当 <code>maxSurge=2</code> 且 <code>maxUnavailable=1</code> 时，更新 10 个副本的过程中，K8s 会先创建 2 个新 Pod（共 12 个），然后销毁 1 个旧 Pod（共 11 个），再创建 2 个新 Pod…以此类推，直到全部替换完成。</p>
+  </div>
+</div>
+
+<!-- ========== Workflow ========== -->
+<h3>工作原理</h3>
+<div class="card">
+  <ol>
+    <li><strong>用户触发更新</strong>：修改 Deployment 的镜像版本（如 <code>kubectl set image deployment/my-app app=my-app:v2</code>）</li>
+    <li><strong>创建新 ReplicaSet</strong>：K8s 检测到 Deployment 的 Pod template 发生变化，创建一个新的 ReplicaSet（RS），期望副本数从 0 开始</li>
+    <li><strong>扩容新 RS</strong>：K8s Controller 按照 <code>maxSurge</code> 的限制，逐步增加新 RS 的副本数。同时确保集群中 Pod 总数不超过 <code>replicas + maxSurge</code></li>
+    <li><strong>缩容旧 RS</strong>：新 Pod 就绪后，K8s 按照 <code>maxUnavailable</code> 的限制，逐步减少旧 RS 的副本数。同时确保不可用 Pod 数不超过 <code>maxUnavailable</code></li>
+    <li><strong>逐步推进</strong>：重复第 3-4 步，直到所有旧版本 Pod 被新版本 Pod 替换</li>
+    <li><strong>更新完成</strong>：旧 RS 副本数归零，新 RS 副本数达到期望值，Deployment 标记为 <code>Available</code></li>
+  </ol>
+</div>
+
+<!-- ========== Applicable Scenarios ========== -->
+<h3>适用场景</h3>
+<div class="card">
+  <ul>
+    <li><span class="tag tag-green">✅</span> <strong>无状态服务</strong>：Web 应用、API 服务、微服务等无状态应用最适合滚动更新</li>
+    <li><span class="tag tag-green">✅</span> <strong>多副本服务</strong>：副本数 ≥ 3 的情况下滚动更新效果最佳，可以保证更新期间服务容量充足</li>
+    <li><span class="tag tag-green">✅</span> <strong>需要零停机发布</strong>：要求更新期间服务完全不中断的业务场景</li>
+    <li><span class="tag tag-green">✅</span> <strong>渐进式灰度发布</strong>：希望逐步将流量切换到新版本，观察新版本运行状态后再继续更新</li>
+    <li><span class="tag tag-green">✅</span> <strong>频繁迭代的场景</strong>：每天或每周有多次发布需求，需要自动化、标准化的发布流程</li>
+  </ul>
+</div>
+
+<!-- ========== Pros ========== -->
+<h3>优点</h3>
+<div class="card">
+  <ul>
+    <li><strong>零停机时间</strong>：通过逐个替换实例，确保服务在整个更新过程中始终可用</li>
+    <li><strong>自动化程度高</strong>：K8s 自动控制更新节奏，无需人工介入每台机器</li>
+    <li><strong>回滚简单</strong>：<code>kubectl rollout undo</code> 即可一键回滚到上一个版本</li>
+    <li><strong>可控性强</strong>：通过 <code>maxSurge</code> 和 <code>maxUnavailable</code> 精确控制更新速度和资源消耗</li>
+    <li><strong>版本兼容性好</strong>：新旧版本可以短暂共存，适合 API 向前兼容的场景</li>
+    <li><strong>易于监控</strong>：<code>kubectl rollout status</code> 实时跟踪更新进度，结合监控系统可及时发现异常</li>
+  </ul>
+</div>
+
+<!-- ========== Cons ========== -->
+<h3>缺点</h3>
+<div class="card">
+  <ul>
+    <li><strong>不支持不兼容变更</strong>：如果新版本与旧版本存在数据格式或 API 不兼容的问题，滚动更新期间新旧共存会导致错误</li>
+    <li><strong>更新速度较慢</strong>：对于大集群（数百个副本），逐个替换可能需要较长时间</li>
+    <li><strong>资源消耗峰值</strong>：更新期间需要额外资源来运行新旧 Pod（特别是 maxSurge 较大时）</li>
+    <li><strong>数据库迁移风险</strong>：滚动更新无法很好地处理数据库 schema 变更，需要结合其他策略（如蓝绿部署）</li>
+    <li><strong>流量不均衡</strong>：更新过程中，新旧 Pod 混合处理请求，可能导致部分请求延迟增加或处理结果不一致</li>
+  </ul>
+</div>
+
+<!-- ========== Interview Q&A (Rolling Update) ========== -->
+<h3>面试重点</h3>
+
+<div class="card">
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：滚动更新中 maxSurge 和 maxUnavailable 的作用是什么？</h3>
+    <p><strong>A：</strong></p>
+    <ul>
+      <li><strong>maxSurge</strong>：控制滚动更新时可以超出期望副本数的最大实例数。例如 <code>replicas=10, maxSurge=2</code> 时，更新过程中最多允许同时有 12 个 Pod 运行。较大的值可以加快更新速度，但会消耗更多集群资源。</li>
+      <li><strong>maxUnavailable</strong>：控制更新过程中最多允许多少个实例不可用。例如 <code>replicas=10, maxUnavailable=1</code> 时，任何时候至少有 9 个 Pod 在正常服务。对于关键业务服务，建议设 <code>maxUnavailable=0</code> 以确保服务容量不受影响。</li>
+    </ul>
+    <p>两者共同决定了滚动更新的节奏：<strong>更新速度 = min(maxSurge, maxUnavailable)</strong>，即每次只能同时处理 <code>maxSurge</code> 个新 Pod 创建和 <code>maxUnavailable</code> 个旧 Pod 销毁中的较小值。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：滚动更新过程中，新旧版本同时处理请求会有什么问题？</h3>
+    <p><strong>A：</strong>主要问题是请求可能被路由到不同版本，导致以下风险：</p>
+    <ul>
+      <li><strong>API 不兼容</strong>：如果新版本修改了 API 响应格式或字段，前端可能收到不一致的响应</li>
+      <li><strong>数据不一致</strong>：新旧版本可能对同一数据做不同的处理，导致数据状态混乱</li>
+      <li><strong>Session 丢失</strong>：如果用户请求在新旧 Pod 间切换，可能因 Session 不共享导致登录态丢失</li>
+    </ul>
+    <p><strong>解决方案</strong>：</p>
+    <ul>
+      <li>确保 API 向前兼容</li>
+      <li>使用 Session 外部存储（如 Redis）</li>
+      <li>配合 Readiness Probe 确保新实例完全就绪后才接收流量</li>
+      <li>对重大变更使用蓝绿部署或金丝雀发布</li>
+    </ul>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：滚动更新如何保证服务不中断？</h3>
+    <p><strong>A：</strong>通过以下机制协同保证：</p>
+    <ul>
+      <li><strong>Readiness Probe（就绪探针）</strong>：确保新 Pod 真正就绪后才接收流量。K8s 会定期调用 Readiness Probe，只有返回成功时才会将 Pod 加入 Service 的 Endpoint</li>
+      <li><strong>maxUnavailable 控制</strong>：限制同时下线的 Pod 数量，确保始终有足够的 Pod 处理请求</li>
+      <li><strong>优雅关闭（Graceful Shutdown）</strong>：旧 Pod 收到 SIGTERM 信号后，会等待正在处理的请求完成再退出，而不是立即强制终止</li>
+      <li><strong>Service + Endpoint 机制</strong>：新 Pod 就绪后自动加入 Endpoint 接收流量，旧 Pod 退出前自动从 Endpoint 移除，流量切换无缝</li>
+    </ul>
+  </div>
+
+  <div style="margin-bottom: 0;">
+    <h3 style="margin-top: 0;">Q：数据库变更如何在滚动更新中处理？</h3>
+    <p><strong>A：</strong>滚动更新期间新旧代码共存，数据库变更必须向前兼容。推荐方案：</p>
+    <ul>
+      <li><strong>1) 向前兼容</strong>：任何数据库变更（新增字段、修改表结构）都必须兼容旧代码的读写。例如新增字段时设置默认值，旧代码写入时不传该字段也不会报错</li>
+      <li><strong>2) 分阶段变更</strong>：第一阶段只部署代码变更（兼容旧 schema），第二阶段再执行 schema 变更（此时所有 Pod 已更新）</li>
+      <li><strong>3) 使用扩展字段</strong>：在表中预留 JSON/Map 类型的扩展字段，新功能使用扩展字段存储，避免 schema 变更</li>
+      <li><strong>4) 使用数据库迁移工具</strong>：利用 Flyway、Liquibase 等工具管理 schema 版本，确保迁移脚本可重复执行且向前兼容</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- s3. 蓝绿部署 -->
+<!-- ============================================================ -->
+<h2 id="s3">3. 蓝绿部署 (Blue-Green)</h2>
+
+<!-- ========== History ========== -->
+<h3>历史背景与名称由来</h3>
+<div class="card">
+  <p>蓝绿部署（Blue-Green Deployment）的概念最早由 <strong>Martin Fowler</strong> 和 <strong>Dan North</strong> 在 2010 年前后系统化提出。该名称来源于运维团队为生产环境维护的 <strong>两套独立且完全相同的运行环境</strong>——分别以"蓝色（Blue）"和"绿色（Green）"作为标识，两个标识本身没有特殊含义，仅用于区分当前正在运行的生产环境和待切换的新版本环境。</p>
+  <p>这种部署策略的思想根源可以追溯到电信行业和金融行业的高可用架构设计。在电信网络中，为了确保服务的不间断运行，运营商早已采用了主备切换（Active-Standby）的容灾方案；银行核心交易系统也长期使用"两套环境并行、一键切换"的策略来降低版本发布风险。蓝绿部署正是将这些行业的最佳实践抽象泛化，形成了一套适用于现代云原生应用的标准部署模式。</p>
+  <p>名称中的 <strong>"Blue"</strong> 和 <strong>"Green"</strong> 并无特殊含义，只是一个简洁的二元标识。理论上你可以用任何两个不同的标识（如 A/B、Red/Black），但"蓝绿"因其直观且易于记忆而成为行业通用的命名方式。</p>
+</div>
+
+<!-- ========== Core Principle ========== -->
+<h3>核心原理</h3>
+<div class="card">
+  <p>蓝绿部署的核心思想是 <strong>环境切换（Environment Switching）</strong>：</p>
+  <ul>
+    <li>准备 <strong>两套完全独立的生产环境</strong>（蓝色环境和绿色环境），它们架构完全相同，但运行不同版本的应用</li>
+    <li><strong>任意时刻只有一套环境承载生产流量</strong>，另一套环境处于待命状态</li>
+    <li>发布新版本时，先将新版本部署到空闲环境，进行充分的验证测试</li>
+    <li>验证通过后，通过 <strong>负载均衡器或网关</strong> 将流量 <strong>瞬间切换</strong> 到新版本环境</li>
+    <li>切换是 <strong>瞬时</strong> 的，不像滚动更新需要逐个替换实例，因此用户体验的切换成本极低</li>
+  </ul>
+  <div class="alert-info" style="margin-top: 12px;">
+    <h3>💡 核心公式</h3>
+    <p>蓝绿部署的本质是 <strong>以环境为单位的版本切换</strong>，而非以实例为单位的增量替换。切换时间为 <strong>O(1)</strong>，与实例数量无关。</p>
+  </div>
+</div>
+
+<!-- ========== SVG Architecture Diagram ========== -->
+<h3>SVG 架构图</h3>
+<div class="card">
+  <div class="svg-container">
+    <svg viewBox="0 0 700 400" style="width:100%;max-width:700px;height:auto;">
+      <text x="350" y="30" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">蓝绿部署架构示意</text>
+      <!-- 用户 -->
+      <rect x="280" y="50" width="140" height="40" rx="20" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="350" y="75" text-anchor="middle" font-size="13" fill="#1677ff">用户请求</text>
+      <path d="M350 90 L350 120" stroke="#333" stroke-width="2" />
+      <!-- 负载均衡器 -->
+      <rect x="250" y="120" width="200" height="44" rx="6" fill="#fff7e6" stroke="#fa8c16" stroke-width="2" />
+      <text x="350" y="146" text-anchor="middle" font-size="14" font-weight="bold" fill="#d46b08">负载均衡器 / 网关</text>
+      <!-- 切换开关 -->
+      <rect x="295" y="175" width="110" height="28" rx="14" fill="#f5222d" stroke="#cf1322" stroke-width="1.5" />
+      <text x="350" y="194" text-anchor="middle" font-size="12" fill="#fff" font-weight="bold">流量切换</text>
+      <!-- 连接线 -->
+      <path d="M300 203 L300 240 L160 240 L160 270" stroke="#1677ff" stroke-width="2" fill="none" />
+      <path d="M400 203 L400 240 L540 240 L540 270" stroke="#52c41a" stroke-width="2" fill="none" />
+      <!-- 蓝色环境 -->
+      <rect x="60" y="270" width="200" height="100" rx="8" fill="#e6f4ff" stroke="#1677ff" stroke-width="2" />
+      <text x="160" y="295" text-anchor="middle" font-size="14" font-weight="bold" fill="#1677ff">蓝色环境 (Blue)</text>
+      <text x="160" y="315" text-anchor="middle" font-size="12" fill="#1677ff">v1 版本（当前生产）</text>
+      <rect x="80" y="325" width="160" height="28" rx="4" fill="#1677ff" opacity="0.15" />
+      <text x="160" y="344" text-anchor="middle" font-size="11" fill="#1677ff">承载 100% 生产流量</text>
+      <!-- 绿色环境 -->
+      <rect x="440" y="270" width="200" height="100" rx="8" fill="#f6ffed" stroke="#52c41a" stroke-width="2" />
+      <text x="540" y="295" text-anchor="middle" font-size="14" font-weight="bold" fill="#389e0d">绿色环境 (Green)</text>
+      <text x="540" y="315" text-anchor="middle" font-size="12" fill="#389e0d">v2 版本（新版本）</text>
+      <rect x="460" y="325" width="160" height="28" rx="4" fill="#52c41a" opacity="0.15" />
+      <text x="540" y="344" text-anchor="middle" font-size="11" fill="#389e0d">验证中，待切换</text>
+      <text x="160" y="395" text-anchor="middle" font-size="11" fill="#999">◀ 切换前：流量 → 蓝色环境</text>
+      <text x="540" y="395" text-anchor="middle" font-size="11" fill="#999">切换后：流量 → 绿色环境 ▶</text>
+    </svg>
+    <span class="svg-caption">图：蓝绿部署架构示意</span>
+  </div>
+</div>
+
+<!-- ========== Key Parameters ========== -->
+<h3>关键参数详解</h3>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:18%;">参数名</th>
+        <th style="width:12%;">推荐值</th>
+        <th style="width:35%;">作用</th>
+        <th style="width:35%;">注意事项</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>切换时间</strong></td>
+        <td>&lt; 1s</td>
+        <td>负载均衡器将流量从旧环境切换到新环境所需的时间。通常在 DNS 更新、ELB Target Group 切换或 K8s Service Selector 更新场景下，切换可在毫秒到秒级完成</td>
+        <td>需要确保切换是原子操作，避免出现部分流量到旧环境、部分到新环境的中间状态。建议使用基础设施即代码（IaC）自动执行切换</td>
+      </tr>
+      <tr>
+        <td><strong>环境保持时间</strong></td>
+        <td>10-30 min</td>
+        <td>流量切换到新环境后，旧环境继续保持运行的时间窗口。在这段时间内，旧环境不接收生产流量，但保持可用，以便在发现问题时快速回滚</td>
+        <td>保持时间过长会浪费资源，过短则无法充分观察新环境运行状况。建议结合监控告警的响应时间来确定，一般至少 10 分钟</td>
+      </tr>
+      <tr>
+        <td><strong>预热时间</strong></td>
+        <td>1-5 min</td>
+        <td>新版本环境启动后，在正式切换流量之前，先进行预热（Warm-up）的时间。预热可以让 JIT 编译、连接池初始化、缓存预热等操作在空载或低载状态下完成</td>
+        <td>对 Java、.NET 等需要 JIT 编译的语言尤为重要。建议在预热期间通过内部端点或专有工具发送模拟请求，而不是直接暴露给生产用户</td>
+      </tr>
+      <tr>
+        <td><strong>数据库兼容窗口</strong></td>
+        <td>取决于 Schema 变更</td>
+        <td>数据库 schema 变更后，新环境和旧环境都能正常读写数据库的时间窗口。在此期间，数据库必须同时兼容新旧两个版本的代码</td>
+        <td>这是蓝绿部署的最大挑战之一。需要对数据库变更做严格的向前兼容设计：新增字段必须设置默认值、不允许立即删除旧字段、使用平滑迁移策略</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== EC2 vs K8s Comparison ========== -->
+<h3>EC2 vs K8s 实现对比</h3>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:15%;">对比维度</th>
+        <th style="width:42%;">EC2 模式</th>
+        <th style="width:43%;">K8s 模式</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>实现方式</strong></td>
+        <td>维护两个 ASG（自动伸缩组），通过 ELB 的 Target Group 切换实现流量切换</td>
+        <td>维护两个 Service（或两个 Deployment），通过修改 Service 的 Selector 或 Label 切换流量</td>
+      </tr>
+      <tr>
+        <td><strong>流量切换</strong></td>
+        <td>修改 ELB 的 Listener Rules，将流量从旧 Target Group 切换到新 Target Group</td>
+        <td>更新 Service 的 Label Selector 指向新版本 Deployment 的 Pod，切换瞬间完成</td>
+      </tr>
+      <tr>
+        <td><strong>回滚策略</strong></td>
+        <td>将 ELB 流量切回旧 Target Group，旧 ASG 保持运行无需重新部署</td>
+        <td>恢复 Service 的 Selector 指向旧版本 Deployment，回滚在秒级完成</td>
+      </tr>
+      <tr>
+        <td><strong>配置文件</strong></td>
+        <td>两套 ASG Launch Configuration，维护两个环境的配置模板</td>
+        <td>两个 Deployment YAML，通过 Namespace 或 Label 区分环境，配置管理更简洁</td>
+      </tr>
+      <tr>
+        <td><strong>监控方式</strong></td>
+        <td>分别监控两个 ASG 的实例健康状态，对比两套环境的指标</td>
+        <td>同时监控两个版本的 Pod 指标，通过 Service 流量切换前后的指标对比验证</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== Workflow ========== -->
+<h3>工作原理</h3>
+<div class="card">
+  <ol>
+    <li><strong>初始状态</strong>：蓝色环境承载 100% 的生产流量，运行着当前稳定版本（v1）。绿色环境处于空闲状态，运行着与蓝色环境相同或稍旧的版本，但未接入生产流量</li>
+    <li><strong>准备阶段</strong>：将新版本（v2）部署到绿色环境。部署完成后，通过自动化测试、冒烟测试、端到端测试对绿色环境进行充分验证，确保新版本的功能和性能符合预期</li>
+    <li><strong>验证阶段</strong>：在绿色环境上执行更深入的验证，包括但不限于：健康检查、接口测试、性能基准测试、数据一致性校验。如有条件，可将部分内部用户或测试流量导入绿色环境进行预发布验证</li>
+    <li><strong>切换阶段</strong>：验证通过后，通过负载均衡器或网关将生产流量从蓝色环境瞬间切换到绿色环境。切换完成后，绿色环境承载 100% 生产流量，蓝色环境进入空闲待命状态</li>
+    <li><strong>保持阶段</strong>：蓝色环境继续保持运行一段时间（通常 10-30 分钟），不接收生产流量但随时准备回滚。期间密切监控绿色环境的运行状态，包括错误率、延迟、资源使用等关键指标</li>
+    <li><strong>清理阶段</strong>：确认绿色环境运行稳定后，将蓝色环境回收或降级（释放资源、关闭 ASG/Deployment）。回收后，绿色环境成为新的"蓝色环境"，为下一次发布做好准备</li>
+  </ol>
+</div>
+
+<!-- ========== Applicable Scenarios ========== -->
+<h3>适用场景</h3>
+<div class="card">
+  <ul>
+    <li><span class="tag tag-green">✅</span> <strong>重大版本发布</strong>：涉及大规模功能变更、UI 重构、底层框架升级等需要充分验证的发布场景</li>
+    <li><span class="tag tag-green">✅</span> <strong>数据库兼容性良好的无状态服务</strong>：服务本身无状态且数据库 schema 变更是向前兼容的，蓝绿部署最为适用</li>
+    <li><span class="tag tag-green">✅</span> <strong>对发布风险极度敏感的业务</strong>：金融交易、医疗健康、电商核心链路等，停机或故障会造成严重损失的业务</li>
+    <li><span class="tag tag-green">✅</span> <strong>需要快速回滚能力</strong>：蓝绿部署的回滚本质上是"再次切换"，比滚动更新的回滚速度快得多，适合对回滚速度有极高要求的业务</li>
+    <li><span class="tag tag-green">✅</span> <strong>合规性审计要求高</strong>：两套环境可以分别记录日志和审计轨迹，切换时间点清晰可追溯，满足严格的合规性要求</li>
+  </ul>
+</div>
+
+<!-- ========== Pros ========== -->
+<h3>优点</h3>
+<div class="card">
+  <ul>
+    <li><strong>零停机发布</strong>：切换在瞬间完成，用户无感知，服务不中断</li>
+    <li><strong>回滚极快</strong>：回滚就是一次反向切换，无需重新部署，秒级完成</li>
+    <li><strong>验证充分</strong>：新版本在生产级环境中验证通过后才接入流量，大幅降低上线风险</li>
+    <li><strong>新旧隔离</strong>：两套环境完全独立，新版本的问题不会影响正在运行的旧版本</li>
+    <li><strong>切换可逆</strong>：只要旧环境保持运行，可以随时切回旧版本，不存在"开弓没有回头箭"的问题</li>
+    <li><strong>运维简单直观</strong>：发布流程清晰——部署→验证→切换，运维人员容易理解和操作</li>
+  </ul>
+</div>
+
+<!-- ========== Cons ========== -->
+<h3>缺点</h3>
+<div class="card">
+  <ul>
+    <li><strong>资源消耗翻倍</strong>：需要维护两套完全相同的生产环境，硬件和运维成本大幅增加，对于大规模集群成本尤为显著</li>
+    <li><strong>数据库兼容性难题</strong>：新旧环境共享同一数据库（或数据库集群），Schema 变更必须向前兼容，复杂的数据库迁移难以通过蓝绿部署解决</li>
+    <li><strong>环境一致性维护成本高</strong>：两套环境需要保持严格一致的配置、依赖版本和基础设施状态，配置漂移（Configuration Drift）是常见问题</li>
+    <li><strong>不适用于所有架构</strong>：对有状态服务（如数据库、缓存集群）或需要长时间连接的服务（如 WebSocket）支持不完善</li>
+    <li><strong>环境切换的原子性挑战</strong>：在分布式系统环境下，确保所有流量瞬间切换到新环境并非易事，DNS 缓存、长连接等问题可能导致切换不彻底</li>
+    <li><strong>频繁发布成本高</strong>：对于每天多次发布的团队，维护两套环境的成本和操作复杂度可能超过滚动更新或金丝雀发布</li>
+  </ul>
+</div>
+
+<!-- ========== Interview Q&A (Blue-Green) ========== -->
+<h3>面试重点</h3>
+
+<div class="card">
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：蓝绿部署中，数据库变更如何处理？</h3>
+    <p><strong>A：</strong>这是蓝绿部署最核心的难点。由于新旧两套环境共享同一个数据库（或数据库集群），数据库 Schema 变更必须保证新旧版本代码都能正常读写。常用方案：</p>
+    <ul>
+      <li><strong>1) 数据库向前兼容</strong>：所有数据库变更（新增字段、修改表结构）都必须兼容旧代码。例如新增字段时设置默认值或允许 NULL，确保旧版本写入时不会报错</li>
+      <li><strong>2) 读写分离</strong>：将 Schema 变更与数据迁移分离。先执行 Schema 变更（此时新旧代码均可正常读写），再执行数据迁移脚本，最后切换流量</li>
+      <li><strong>3) 多版本 Schema</strong>：保留旧字段和旧索引直到确认不再需要，新版本使用新字段，旧版本继续使用旧字段。通过应用层适配保证兼容</li>
+      <li><strong>4) 切换后立即清理</strong>：流量切换到新环境后，在保持窗口期内执行旧字段的清理和数据校验，确保回滚时旧环境仍可用</li>
+    </ul>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：蓝绿部署中，如果切换后发现严重问题，如何快速回滚？</h3>
+    <p><strong>A：</strong>蓝绿部署的回滚非常直接：只需将负载均衡器的流量再次切换回旧环境（蓝色环境）即可。在保持窗口期内，旧环境中的应用仍处于运行状态，因此回滚操作仅涉及一次流量切换，通常在秒级完成。回滚后需要确认旧环境正常运行，并记录新环境出现的问题用于后续修复。如果保持窗口期已过且旧环境已被回收，则需要使用备份镜像或 AMI 重新创建旧环境，回滚时间将显著增加。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：什么情况下不应该使用蓝绿部署？</h3>
+    <p><strong>A：</strong>以下情况不建议使用蓝绿部署：</p>
+    <ul>
+      <li><strong>1) 资源紧张时</strong>：蓝绿部署需要双倍资源，在资源受限的环境（如边缘计算、开发测试环境）中不经济</li>
+      <li><strong>2) 有状态服务</strong>：数据库、缓存（Redis）、消息队列等有状态服务难以维护两套同步的环境，数据一致性问题难以解决</li>
+      <li><strong>3) 数据变更频繁</strong>：如果每次发布都伴随复杂的数据库迁移，蓝绿部署的兼容性要求会大幅增加开发和测试成本</li>
+      <li><strong>4) 发布频率高</strong>：每天多次发布的场景，维护两套环境的操作复杂度和成本可能超过收益，滚动更新或金丝雀发布更适合</li>
+      <li><strong>5) 微服务架构</strong>：数十个服务同时做蓝绿部署需要维护数十套独立的环境，成本和管理复杂度极高，通常建议对核心服务单独做蓝绿部署</li>
+    </ul>
+  </div>
+
+  <div style="margin-bottom: 0;">
+    <h3 style="margin-top: 0;">Q：蓝绿部署在微服务架构中的挑战？</h3>
+    <p><strong>A：</strong>微服务架构中数十个服务同时做蓝绿部署，环境管理复杂度指数级上升。主要挑战包括：服务间的依赖关系导致版本兼容性管理困难——如果服务 A 的新版本依赖服务 B 的新 API，而服务 B 尚未切换，则可能出现调用失败；全量蓝绿部署的资源开销巨大，每个服务都需要两套运行环境；链路追踪和问题定位更加复杂，请求可能跨越新旧版本的服务边界。实践中通常采用<strong>混合策略</strong>：对核心、高风险的几个关键服务使用蓝绿部署，对其他服务使用滚动更新或金丝雀发布，并通过全链路追踪（如 Jaeger、Zipkin）和契约测试来保证跨服务兼容性。</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- s4. 灰度发布 -->
+<!-- ============================================================ -->
+<h2 id="s4">4. 灰度发布 (Canary Release)</h2>
+
+<!-- ========== History ========== -->
+<h3>历史背景与名称由来</h3>
+<div class="card">
+  <p>"金丝雀发布（Canary Release）"的名称来源于 <strong>煤矿工业的历史</strong>：在 20 世纪初，矿工们在下井时会携带 <strong>金丝雀（Canary）</strong>，因为金丝雀对一氧化碳、甲烷等有毒气体极为敏感。如果矿井中有毒气体浓度升高，金丝雀会比人类更早出现中毒症状甚至死亡，从而为矿工提供预警，争取逃生时间。</p>
+  <p>这一概念被互联网工程领域借鉴，形象地比喻为：<strong>先让一小部分"金丝雀"（少量新版本实例）去"矿井"（生产环境）中探险，如果它们安然无恙，再让更多的"矿工"（生产流量）进入</strong>。</p>
+  <p>金丝雀发布在互联网行业的规模化推广，很大程度上归功于 <strong>Netflix</strong> 等公司的实践。Netflix 在迁移到 AWS 云的过程中，开发了名为 <strong>Canary Analysis</strong> 的自动化工具链（后演变为 Spinnaker 中的金丝雀分析阶段），通过对比灰度实例和控制组的各项指标，自动判断是否继续扩大发布范围。此后，Spotify、Google、Facebook 等公司也陆续将金丝雀发布作为标准发布流程的一部分，逐渐形成了今天云原生领域的事实标准。</p>
+</div>
+
+<!-- ========== Core Principle ========== -->
+<h3>核心原理</h3>
+<div class="card">
+  <p>灰度发布的核心思想是 <strong>渐进式放量（Progressive Rollout）</strong>：</p>
+  <ul>
+    <li>将新版本（v2）部署到 <strong>少量实例</strong>（如 10% 的实例），让 <strong>一小部分用户的请求</strong> 路由到新版本</li>
+    <li>在灰度期间，<strong>持续监控</strong> 新版本实例的错误率、延迟、资源使用等关键指标，与旧版本实例（控制组）进行对比</li>
+    <li>如果指标正常，<strong>逐步扩大</strong> 新版本实例的比例（10% → 30% → 50% → 100%），每个阶段观察一段时间</li>
+    <li>如果发现异常，<strong>立即回滚</strong> 灰度实例，将受影响用户降至最低，影响范围始终可控</li>
+    <li>在完全确认新版本稳定后，完成 <strong>全量发布</strong></li>
+  </ul>
+  <div class="alert-info" style="margin-top: 12px;">
+    <h3>💡 核心公式</h3>
+    <p>灰度发布的本质是 <strong>以实例或流量百分比为单位的增量替换</strong>，通过时间窗口和监控指标来逐级验证新版本的稳定性。影响范围 = 当前灰度比例 × 总用户数。</p>
+  </div>
+</div>
+
+<!-- ========== SVG Architecture Diagram ========== -->
+<h3>SVG 架构图</h3>
+<div class="card">
+  <div class="svg-container">
+    <svg viewBox="0 0 750 340" style="width:100%;max-width:750px;height:auto;">
+      <text x="375" y="25" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">灰度发布流量演进</text>
+      <!-- 阶段一：10% -->
+      <text x="15" y="60" font-size="12" fill="#666" text-anchor="start">阶段一</text>
+      <text x="15" y="75" font-size="11" fill="#999" text-anchor="start">10% 灰度</text>
+      <rect x="100" y="48" width="40" height="34" rx="4" fill="#fa8c16" stroke="#d46b08" stroke-width="1.5" />
+      <text x="120" y="70" text-anchor="middle" font-size="11" fill="#fff">Gray</text>
+      <rect x="148" y="48" width="30" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="163" y="70" text-anchor="middle" font-size="9" fill="#1677ff">v1</text>
+      <rect x="182" y="48" width="30" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="197" y="70" text-anchor="middle" font-size="9" fill="#1677ff">v1</text>
+      <rect x="216" y="48" width="30" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="231" y="70" text-anchor="middle" font-size="9" fill="#1677ff">v1</text>
+      <rect x="250" y="48" width="30" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="265" y="70" text-anchor="middle" font-size="9" fill="#1677ff">v1</text>
+      <rect x="284" y="48" width="30" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="299" y="70" text-anchor="middle" font-size="9" fill="#1677ff">v1</text>
+      <rect x="318" y="48" width="30" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="333" y="70" text-anchor="middle" font-size="9" fill="#1677ff">v1</text>
+      <rect x="352" y="48" width="30" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="367" y="70" text-anchor="middle" font-size="9" fill="#1677ff">v1</text>
+      <rect x="386" y="48" width="30" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="401" y="70" text-anchor="middle" font-size="9" fill="#1677ff">v1</text>
+      <rect x="420" y="48" width="30" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="435" y="70" text-anchor="middle" font-size="9" fill="#1677ff">v1</text>
+      <text x="470" y="70" text-anchor="start" font-size="11" fill="#999">1 个灰度实例 + 9 个稳定实例</text>
+      <!-- 阶段二：50% -->
+      <text x="15" y="140" font-size="12" fill="#666" text-anchor="start">阶段二</text>
+      <text x="15" y="155" font-size="11" fill="#999" text-anchor="start">50% 灰度</text>
+      <rect x="100" y="128" width="36" height="34" rx="4" fill="#fa8c16" stroke="#d46b08" stroke-width="1.5" />
+      <text x="118" y="150" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="140" y="128" width="36" height="34" rx="4" fill="#fa8c16" stroke="#d46b08" stroke-width="1.5" />
+      <text x="158" y="150" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="180" y="128" width="36" height="34" rx="4" fill="#fa8c16" stroke="#d46b08" stroke-width="1.5" />
+      <text x="198" y="150" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="220" y="128" width="36" height="34" rx="4" fill="#fa8c16" stroke="#d46b08" stroke-width="1.5" />
+      <text x="238" y="150" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="260" y="128" width="36" height="34" rx="4" fill="#fa8c16" stroke="#d46b08" stroke-width="1.5" />
+      <text x="278" y="150" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="304" y="128" width="36" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="322" y="150" text-anchor="middle" font-size="10" fill="#1677ff">v1</text>
+      <rect x="344" y="128" width="36" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="362" y="150" text-anchor="middle" font-size="10" fill="#1677ff">v1</text>
+      <rect x="384" y="128" width="36" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="402" y="150" text-anchor="middle" font-size="10" fill="#1677ff">v1</text>
+      <rect x="424" y="128" width="36" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="442" y="150" text-anchor="middle" font-size="10" fill="#1677ff">v1</text>
+      <rect x="464" y="128" width="36" height="34" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="1" />
+      <text x="482" y="150" text-anchor="middle" font-size="10" fill="#1677ff">v1</text>
+      <text x="520" y="150" text-anchor="start" font-size="11" fill="#999">5 个灰度 + 5 个稳定实例</text>
+      <!-- 阶段三：100% -->
+      <text x="15" y="220" font-size="12" fill="#666" text-anchor="start">阶段三</text>
+      <text x="15" y="235" font-size="11" fill="#999" text-anchor="start">100% 全量</text>
+      <rect x="100" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="118" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="140" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="158" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="180" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="198" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="220" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="238" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="260" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="278" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="300" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="318" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="340" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="358" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="380" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="398" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="420" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="438" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <rect x="460" y="208" width="36" height="34" rx="4" fill="#52c41a" stroke="#389e0d" stroke-width="1.5" />
+      <text x="478" y="230" text-anchor="middle" font-size="10" fill="#fff">v2</text>
+      <text x="520" y="230" text-anchor="start" font-size="11" fill="#999">全部实例更新为 v2 版本</text>
+      <path d="M375 82 L375 126" stroke="#999" stroke-width="1.5" marker-end="url(#arrow2)" />
+      <path d="M375 168 L375 206" stroke="#999" stroke-width="1.5" marker-end="url(#arrow2)" />
+      <line x1="100" y1="260" x2="700" y2="260" stroke="#f5222d" stroke-width="1" stroke-dasharray="6,3" />
+      <text x="15" y="275" font-size="11" fill="#f5222d">安全红线</text>
+      <text x="100" y="275" font-size="11" fill="#f5222d">任何阶段发现异常 → 立即回滚灰度实例，影响范围可控</text>
+      <rect x="100" y="285" width="600" height="40" rx="6" fill="#fff7e6" stroke="#fa8c16" stroke-width="1" stroke-dasharray="4,2" />
+      <text x="400" y="302" text-anchor="middle" font-size="11" fill="#d46b08">监控指标：错误率 | 延迟 P50/P95/P99 | CPU/内存 | 业务转化率</text>
+      <text x="400" y="317" text-anchor="middle" font-size="11" fill="#d46b08">每个阶段观察 10-30 分钟，指标正常再继续扩大</text>
+      <defs>
+        <marker id="arrow2" marker-width="8" marker-height="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#999" />
+        </marker>
+      </defs>
+    </svg>
+    <span class="svg-caption">图：灰度发布流量演进示意</span>
+  </div>
+</div>
+
+<!-- ========== Key Parameters ========== -->
+<h3>关键参数详解</h3>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:22%;">参数名</th>
+        <th style="width:15%;">推荐值</th>
+        <th style="width:30%;">作用</th>
+        <th style="width:33%;">注意事项</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>初始灰度比例</strong></td>
+        <td>1%-10%</td>
+        <td>决定首批暴露在新版本下的用户比例。比例越低，风险越小，但收集反馈的速度也越慢</td>
+        <td>对于核心业务建议从 1% 开始；对于内部工具或低风险变更可以从 10% 开始。考虑用户总数——10 万用户的 1% 和 100 用户的 10% 绝对值差异大</td>
+      </tr>
+      <tr>
+        <td><strong>观察窗口期</strong></td>
+        <td>10-30 min</td>
+        <td>每个灰度阶段持续的时间，用于收集监控数据并判断新版本是否稳定</td>
+        <td>窗口期太短可能错过延迟飙升、内存泄漏等需要时间积累的问题；太长则发布效率低下。建议设置自动化监控，指标正常可自动进入下一阶段</td>
+      </tr>
+      <tr>
+        <td><strong>扩大步长</strong></td>
+        <td>10%-25%</td>
+        <td>每次灰度比例增加的幅度。步长越小，控制越精细，但发布总耗时越长</td>
+        <td>建议按对数阶梯设计：1% → 5% → 15% → 30% → 60% → 100%，早期步长小、后期步长大，兼顾安全性和效率</td>
+      </tr>
+      <tr>
+        <td><strong>自动回滚阈值</strong></td>
+        <td>错误率 &gt; 0.1% 或延迟 P99 &gt; 2× 基线</td>
+        <td>当监控指标超过预设阈值时，系统自动回滚灰度实例，无需人工介入</td>
+        <td>阈值设置需避免过于敏感（误报导致正常发布受阻）或过于宽松（问题扩散）。建议结合历史发布数据和业务容忍度动态调整</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== EC2 vs K8s Comparison ========== -->
+<h3>EC2 vs K8s 实现对比</h3>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:15%;">对比维度</th>
+        <th style="width:42%;">EC2 模式</th>
+        <th style="width:43%;">K8s 模式</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>实现方式</strong></td>
+        <td>手动将部分实例从 ELB 中移除，部署新版本后再加入；或使用 CodeDeploy 的部署组配置</td>
+        <td>创建两个 Deployment，通过 Service Mesh（Istio）或 Service 的权重分配精确控制流量比例</td>
+      </tr>
+      <tr>
+        <td><strong>流量切换</strong></td>
+        <td>调整 ELB 中实例的权重，或通过 DNS 权重轮询，控制粒度较粗</td>
+        <td>Istio VirtualService 的 weight 字段精确到 1%，或调整两个 Deployment 的副本数比例</td>
+      </tr>
+      <tr>
+        <td><strong>回滚策略</strong></td>
+        <td>将灰度实例从 ELB 移除，重新部署旧版本，恢复原始权重</td>
+        <td>调整灰度 Deployment 的副本数为 0，或将 VirtualService 权重全部指向旧版本，秒级回滚</td>
+      </tr>
+      <tr>
+        <td><strong>配置文件</strong></td>
+        <td>使用部署脚本控制灰度比例，配合 ELB 的权重配置管理</td>
+        <td>Istio DestinationRule + VirtualService 声明式配置，灰度规则作为代码管理</td>
+      </tr>
+      <tr>
+        <td><strong>监控方式</strong></td>
+        <td>对比灰度实例和稳定实例的 CloudWatch 指标，手工观察</td>
+        <td>Prometheus 按版本标签聚合指标，Grafana 仪表盘实时对比新旧版本的错误率和延迟</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== Strategy Comparison ========== -->
+<h3>灰度策略对比</h3>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:18%;">策略</th>
+        <th style="width:22%;">描述</th>
+        <th style="width:25%;">适用场景</th>
+        <th style="width:35%;">实现方式</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>基于比例</strong></td>
+        <td>按百分比分配流量</td>
+        <td>通用场景，无用户区分</td>
+        <td>负载均衡权重</td>
+      </tr>
+      <tr>
+        <td><strong>基于地域</strong></td>
+        <td>先在一个区域部署</td>
+        <td>多区域部署，区域间隔离</td>
+        <td>DNS/Global LB</td>
+      </tr>
+      <tr>
+        <td><strong>基于用户属性</strong></td>
+        <td>特定用户群体先体验</td>
+        <td>内测/Beta 用户</td>
+        <td>用户标识路由</td>
+      </tr>
+      <tr>
+        <td><strong>基于功能标签</strong></td>
+        <td>开启特定功能开关</td>
+        <td>功能粒度控制</td>
+        <td>Feature Flag</td>
+      </tr>
+      <tr>
+        <td><strong>基于请求特征</strong></td>
+        <td>如 User-Agent/IP</td>
+        <td>特定客户端验证</td>
+        <td>网关路由规则</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== K8s Implementation ========== -->
+<h3>K8s 实现</h3>
+
+<h4>方式一：Service + 多 Deployment（调整副本数比例）</h4>
+<div class="card">
+  <p>通过维护两个版本的 Deployment，并调整它们的副本数（replicas）比例来控制灰度范围。这是最轻量、不依赖 Service Mesh 的方式。</p>
+  <pre># stable-deployment.yaml — 稳定版（v1），假设初始 9 个副本
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-stable
+  labels:
+    app: myapp
+    version: v1
+spec:
+  replicas: 9
+  selector:
+    matchLabels:
+      app: myapp
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: myapp
+        version: v1
+    spec:
+      containers:
+      - name: myapp
+        image: myapp:v1
+        ports:
+        - containerPort: 8080</pre>
+  <pre># canary-deployment.yaml — 灰度版（v2），初始 1 个副本（10%）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-canary
+  labels:
+    app: myapp
+    version: v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: myapp
+        version: v2
+    spec:
+      containers:
+      - name: myapp
+        image: myapp:v2
+        ports:
+        - containerPort: 8080</pre>
+  <pre># service.yaml — 统一 Service，通过共同标签 app: myapp 将流量分发到两个版本
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service
+spec:
+  selector:
+    app: myapp
+  ports:
+  - port: 80
+    targetPort: 8080</pre>
+  <p><strong>灰度扩大流程</strong>：逐渐减少 stable 的副本数、增加 canary 的副本数。例如 50% 灰度时：<code>stable replicas: 5</code>，<code>canary replicas: 5</code>。全量发布时：<code>stable replicas: 0</code>，<code>canary replicas: 10</code>，然后将 canary 提升为新的 stable。</p>
+  <div class="alert-info">
+    <h3>⚠️ 注意事项</h3>
+    <p>这种方式依赖 Kubernetes Service 的随机轮询（Round-Robin），无法精确控制每个请求的路由，且无法基于用户属性做精细化灰度。适用于对流量控制精度要求不高的场景。</p>
+  </div>
+</div>
+
+<h4>方式二：Service Mesh（Istio）</h4>
+<div class="card">
+  <p>使用 Istio 的 VirtualService 和 DestinationRule 实现基于权重的精细化流量分发，可以精确到 1%。</p>
+  <pre># destination-rule.yaml — 定义两个版本子集
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: myapp-destination-rule
+spec:
+  host: myapp-service
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2</pre>
+  <pre># virtual-service.yaml — 按权重分配流量
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: myapp-virtual-service
+spec:
+  hosts:
+  - myapp-service
+  http:
+  - route:
+    - destination:
+        host: myapp-service
+        subset: v1
+      weight: 90
+    - destination:
+        host: myapp-service
+        subset: v2
+      weight: 10</pre>
+  <p><strong>灰度扩大流程</strong>：修改 VirtualService 中的 weight 比例。例如 50% 时将 <code>v1: 50, v2: 50</code>，100% 时将 <code>v1: 0, v2: 100</code>。</p>
+  <p>在发布过程中，可以同时运行两个版本的 Deployment，通过 Istio 精确控制进入每个版本的流量占比。结合 Prometheus 监控和 Kiali 可视化，可以实时观察灰度流量和系统健康状态。</p>
+</div>
+
+<h4>方式三：Ingress Controller</h4>
+<div class="card">
+  <p>部分 Ingress Controller（如 Nginx Ingress、Traefik、APISIX）支持通过注解（Annotation）或 CRD 实现金丝雀发布。</p>
+  <pre># Nginx Ingress 金丝雀注解示例
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: myapp-canary-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"                    # 启用金丝雀
+    nginx.ingress.kubernetes.io/canary-weight: "10"               # 10% 流量进入金丝雀
+    nginx.ingress.kubernetes.io/canary-by-header: "Canary"        # 按请求头路由
+    nginx.ingress.kubernetes.io/canary-by-header-value: "true"    # Header Canary: true 时路由
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: myapp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: myapp-canary-service   # 指向新版本 Service
+            port:
+              number: 80</pre>
+  <p>Nginx Ingress 的金丝雀功能支持多种匹配方式：<code>canary-weight</code>（按权重比例）、<code>canary-by-header</code>（按请求头）、<code>canary-by-cookie</code>（按 Cookie）。多种条件可以组合使用，实现更精细的金丝雀策略。</p>
+</div>
+
+<!-- ========== Applicable Scenarios ========== -->
+<h3>适用场景</h3>
+<div class="card">
+  <ul>
+    <li><span class="tag tag-green">✅</span> <strong>渐进式功能上线</strong>：将新功能逐步开放给更多用户，观察用户反馈和系统稳定性后再决定是否全量开放</li>
+    <li><span class="tag tag-green">✅</span> <strong>基础设施升级</strong>：底层依赖（JDK 版本、操作系统、中间件）升级时，先对小部分实例进行升级验证，确认兼容性</li>
+    <li><span class="tag tag-green">✅</span> <strong>性能敏感类变更</strong>：对数据库查询优化、缓存策略调整、算法变更等可能影响响应时间的修改，通过灰度对比新旧版本的性能指标</li>
+    <li><span class="tag tag-green">✅</span> <strong>大规模集群发布</strong>：集群规模较大（数百实例以上）时，灰度发布可以避免全量部署时出现的大规模失败，降低爆炸半径</li>
+    <li><span class="tag tag-green">✅</span> <strong>面向不同用户群的分阶段发布</strong>：先向内部员工发布 → 向 Beta 用户发布 → 向全员发布，每个阶段收集反馈并修复问题</li>
+    <li><span class="tag tag-green">✅</span> <strong>需要真实流量验证的场景</strong>：蓝绿部署的隔离验证无法模拟真实生产流量的复杂性和负载，灰度发布可以有效弥补这一不足</li>
+  </ul>
+</div>
+
+<!-- ========== Pros ========== -->
+<h3>优点</h3>
+<div class="card">
+  <ul>
+    <li><strong>风险可控</strong>：问题影响范围与当前灰度比例成正比，初始阶段仅影响极少量用户</li>
+    <li><strong>真实流量验证</strong>：在生产环境中用真实用户流量验证新版本，比任何测试环境都更接近实际运行状况</li>
+    <li><strong>资源消耗低</strong>：相比蓝绿部署需要双倍资源，灰度发布会渐进式地替换资源，总体资源开销增量很小</li>
+    <li><strong>回滚影响面小</strong>：发现问题时仅回滚灰度实例，不影响大多数用户的正常使用</li>
+    <li><strong>指标对比直观</strong>：可以同时观察新旧版本在相同生产负载下的指标对比，发现性能退化等问题</li>
+    <li><strong>灵活的策略组合</strong>：可以结合用户属性、地域、功能标签等维度实现精细化的灰度策略</li>
+    <li><strong>发布过程持续可控</strong>：每个阶段都可以人工确认或自动化决策是否继续，充分掌控发布节奏</li>
+  </ul>
+</div>
+
+<!-- ========== Cons ========== -->
+<h3>缺点</h3>
+<div class="card">
+  <ul>
+    <li><strong>发布周期长</strong>：每个灰度阶段都需要观察窗口，完整发布可能需要数小时甚至数天，不适合紧急修复</li>
+    <li><strong>运维复杂度高</strong>：需要维护灰度流程、监控对比、自动化回滚等配套机制，对 DevOps 能力有较高要求</li>
+    <li><strong>Session 亲和性问题</strong>：用户的多次请求可能被路由到不同版本，导致 Session 不一致或数据冲突</li>
+    <li><strong>排查问题困难</strong>：两个版本同时在线上运行，排查问题时需要区分请求来自哪个版本，增加排障复杂度</li>
+    <li><strong>指标噪音</strong>：灰度期间新旧版本的指标混合，可能导致全局监控指标的波动和异常告警</li>
+    <li><strong>数据库兼容性要求</strong>：与蓝绿部署类似，灰度期间的数据库 Schema 必须同时兼容新旧版本</li>
+    <li><strong>微服务依赖链复杂</strong>：多个服务同时灰度时，需要保证服务间的版本兼容性，避免跨版本调用失败</li>
+  </ul>
+</div>
+
+<!-- ========== Interview Q&A (Canary) ========== -->
+<h3>面试重点</h3>
+
+<div class="card">
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：灰度发布的比例如何确定？有哪些常见的灰度策略？</h3>
+    <p><strong>A：</strong>灰度比例没有固定标准，需要根据业务重要程度、用户规模和风险承受能力综合判断。一般原则：</p>
+    <ul>
+      <li><strong>1) 核心业务从低比例开始</strong>：支付、登录等核心链路建议从 1% 起步；非核心功能可从 10% 起步</li>
+      <li><strong>2) 考虑用户基数</strong>：100 万用户的 1% 是 1 万人，已经足够收集有效的反馈数据；100 用户的 1% 几乎无意义</li>
+      <li><strong>3) 对数阶梯策略</strong>：推荐按 1% → 5% → 15% → 30% → 60% → 100% 的阶梯扩大，早期步长小、后期步长大</li>
+      <li><strong>4) 常见灰度策略</strong>：基于比例（通用场景）、基于地域（多区域部署）、基于用户属性（内测/Beta 用户）、基于功能标签（Feature Flag）、基于请求特征（User-Agent/IP）</li>
+    </ul>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：灰度发布中如何监控和判断是否继续扩大范围？</h3>
+    <p><strong>A：</strong>判断是否继续扩大灰度范围需要综合以下指标：</p>
+    <ul>
+      <li><strong>1) 错误率对比</strong>：灰度实例的 HTTP 5xx 错误率不应显著高于基线（旧版本）。通常阈值设置为 0.1%-1%，视业务容忍度而定</li>
+      <li><strong>2) 延迟指标</strong>：P50/P95/P99 延迟不应超过基线的 1.5-2 倍。特别注意 P99 的变化，高延迟往往是问题的早期信号</li>
+      <li><strong>3) 资源使用</strong>：CPU、内存、GC 暂停时间等资源指标不应出现异常增长。内存泄漏等问题可能在灰度初期不明显，需要观察一段时间</li>
+      <li><strong>4) 业务指标</strong>：如转化率、下单率、登录成功率等业务级指标不受影响。这是最接近用户实际体验的衡量标准</li>
+      <li><strong>5) 日志和异常追踪</strong>：灰度实例的日志中不应出现新的错误类型或异常频率升高</li>
+    </ul>
+    <p>建议将上述指标配置为自动化监控，通过灰度分析工具（如 Spinnaker Kayenta、Flagger）自动判断是否继续扩大。只有当所有指标在观察窗口期内持续正常时，才进入下一阶段。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：灰度发布中 Session 亲和性怎么处理？</h3>
+    <p><strong>A：</strong>Session 亲和性（Sticky Session）是灰度发布中的常见问题——用户的多次请求可能被路由到不同版本的应用实例上，导致用户体验不一致或数据冲突。常用解决方案：</p>
+    <ul>
+      <li><strong>1) 基于 Cookie 的路由</strong>：网关或负载均衡器根据用户 Cookie 中的标识（如 <code>canary_group</code>）将同一用户的所有请求路由到同一版本。Nginx Ingress 的 <code>canary-by-cookie</code> 注解可以实现此功能</li>
+      <li><strong>2) 客户端 IP Hash</strong>：对客户端 IP 进行哈希运算，将特定 IP 段的用户固定路由到同一版本。这种方法不需要 Cookie，但可能受 NAT 和代理的影响</li>
+      <li><strong>3) User ID 一致性哈希</strong>：在应用层或网关层对用户 ID 进行一致性哈希，确保同一用户始终访问同一版本。这是最推荐的方式，因为用户标识天然具有一致性</li>
+      <li><strong>4) 版本兼容性设计</strong>：在设计 API 时就考虑前后版本的兼容性，即使同一用户的不同请求落到不同版本，也不会引起数据冲突或功能异常。这虽然不是直接解决亲和性问题，但可以作为兜底策略</li>
+    </ul>
+  </div>
+
+  <div style="margin-bottom: 0;">
+    <h3 style="margin-top: 0;">Q：微服务架构中，灰度发布的链路追踪和依赖管理如何做？</h3>
+    <p><strong>A：</strong>微服务架构下的灰度发布比单体应用复杂得多，核心挑战在于跨服务的版本兼容性和问题定位。推荐以下实践：</p>
+    <ul>
+      <li><strong>1) 全链路追踪（Distributed Tracing）</strong>：使用 Jaeger、Zipkin 或 OpenTelemetry 实现全链路追踪，在 Span 中注入版本标签（<code>version: v2</code>），通过追踪系统可以准确识别每个请求经过的服务版本组合，快速定位故障点</li>
+      <li><strong>2) 流量染色（Traffic Coloring）</strong>：网关在请求头中注入灰度标识（如 <code>X-Canary: true</code>），下游服务根据该标识决定路由行为。染色标识在微服务调用链中传递，确保灰度请求在整个调用链中保持一致</li>
+      <li><strong>3) 契约测试（Contract Testing）</strong>：在灰度发布前，使用消费者驱动契约测试（Pact 等工具）验证服务间 API 的向后兼容性，避免出现"服务 A 的新版本调用服务 B 的旧版本时失败"的问题</li>
+      <li><strong>4) 灰度隔离策略</strong>：将灰度请求和非灰度请求在链路上做物理或逻辑隔离。例如灰度服务调用灰度版本的下游服务，非灰度请求调用稳定版本的下游服务，避免跨版本调用。Istio 的基于请求头的路由可以很好地支持这种模式</li>
+      <li><strong>5) 仅对变更的服务灰度</strong>：在一个微服务架构中，通常只对本次变更涉及的服务做灰度，未变更的服务继续使用稳定版本。这要求团队有清晰的依赖关系图和版本管理策略</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- s5. 其他策略 -->
+<!-- ============================================================ -->
+<h2 id="s5">5. 其他策略</h2>
+
+<!-- ========== 5.1 重建部署 ========== -->
+<h3>5.1 重建部署 (Recreate Deployment)</h3>
+
+<h4>历史背景与名称由来</h4>
+<div class="card">
+  <p>重建部署是最原始、最直观的部署策略。在云计算和容器化技术普及之前，运维人员通常采用 <strong>"先停止旧服务，再启动新服务"</strong> 的方式来完成版本更新，这种方式本质上就是重建部署。</p>
+  <p>在 Kubernetes 中，重建部署被定义为 Deployment 的两种更新策略之一（另一种是滚动更新），其策略类型为 <code>Recreate</code>。当 Deployment 设置为 <code>strategy.type: Recreate</code> 时，K8s 会先终止所有旧版本的 Pod，然后创建新版本的 Pod。</p>
+  <p>名称中的 <strong>"Recreate"</strong>（重建）准确地描述了这种策略的本质——不是渐进式替换，而是先销毁再重建。这种策略的实现成本最低，但代价是存在明确的服务中断窗口。</p>
+</div>
+
+<h4>核心原理</h4>
+<div class="card">
+  <p>重建部署的核心思想是 <strong>"全量替换"</strong>：</p>
+  <ul>
+    <li>先 <strong>终止所有旧版本实例</strong>，等待旧实例完全停止</li>
+    <li>再 <strong>启动所有新版本实例</strong>，等待新实例全部就绪</li>
+    <li>新旧版本 <strong>不会共存</strong>，整个过程存在明确的服务中断窗口</li>
+    <li>实现最简单，资源消耗最低（只需一套环境的资源）</li>
+  </ul>
+  <div class="alert-info" style="margin-top: 12px;">
+    <h3>💡 核心特征</h3>
+    <p>重建部署的本质是 <strong>以停止为起点的重新开始</strong>，而非以替换为目标的增量更新。服务中断窗口 = 旧实例停止时间 + 新实例启动时间。</p>
+  </div>
+</div>
+
+<h4>SVG 架构图</h4>
+<div class="card">
+  <div class="svg-container">
+    <svg viewBox="0 0 800 380" style="width:100%;max-width:800px;height:auto;">
+      <text x="400" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">重建部署过程示意（先停旧 → 再启新）</text>
+      <!-- 阶段一 -->
+      <text x="30" y="65" font-size="12" fill="#666" text-anchor="start">阶段一：初始状态</text>
+      <rect x="150" y="50" width="130" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="215" y="73" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-1</text>
+      <rect x="310" y="50" width="130" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="375" y="73" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-2</text>
+      <rect x="470" y="50" width="130" height="36" rx="6" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="535" y="73" text-anchor="middle" font-size="12" fill="#1677ff">v1 Pod-3</text>
+      <text x="400" y="105" text-anchor="middle" font-size="11" fill="#999">3 个 v1 版本 Pod 正在运行，正常提供服务</text>
+      <!-- 阶段二 -->
+      <text x="30" y="145" font-size="12" fill="#f5222d" text-anchor="start">阶段二：停止阶段</text>
+      <rect x="150" y="130" width="130" height="36" rx="6" fill="#fff1f0" stroke="#f5222d" stroke-width="1.5" stroke-dasharray="4,2" />
+      <text x="215" y="153" text-anchor="middle" font-size="12" fill="#f5222d">v1 Pod-1（已终止）</text>
+      <rect x="310" y="130" width="130" height="36" rx="6" fill="#fff1f0" stroke="#f5222d" stroke-width="1.5" stroke-dasharray="4,2" />
+      <text x="375" y="153" text-anchor="middle" font-size="12" fill="#f5222d">v1 Pod-2（已终止）</text>
+      <rect x="470" y="130" width="130" height="36" rx="6" fill="#fff1f0" stroke="#f5222d" stroke-width="1.5" stroke-dasharray="4,2" />
+      <text x="535" y="153" text-anchor="middle" font-size="12" fill="#f5222d">v1 Pod-3（已终止）</text>
+      <rect x="150" y="175" width="450" height="28" rx="4" fill="#fff2e8" stroke="#fa8c16" stroke-width="1.5" stroke-dasharray="4,2" />
+      <text x="375" y="194" text-anchor="middle" font-size="12" fill="#d46b08" font-weight="bold">⚠️ 服务中断窗口：所有 Pod 已停止，服务暂时不可用</text>
+      <!-- 阶段三 -->
+      <text x="30" y="240" font-size="12" fill="#52c41a" text-anchor="start">阶段三：启动阶段</text>
+      <rect x="150" y="225" width="130" height="36" rx="6" fill="#f6ffed" stroke="#52c41a" stroke-width="1.5" />
+      <text x="215" y="248" text-anchor="middle" font-size="12" fill="#389e0d">v2 Pod-1</text>
+      <rect x="310" y="225" width="130" height="36" rx="6" fill="#f6ffed" stroke="#52c41a" stroke-width="1.5" />
+      <text x="375" y="248" text-anchor="middle" font-size="12" fill="#389e0d">v2 Pod-2</text>
+      <rect x="470" y="225" width="130" height="36" rx="6" fill="#f6ffed" stroke="#52c41a" stroke-width="1.5" />
+      <text x="535" y="248" text-anchor="middle" font-size="12" fill="#389e0d">v2 Pod-3</text>
+      <text x="400" y="280" text-anchor="middle" font-size="11" fill="#999">3 个 v2 版本 Pod 启动中，就绪后恢复服务</text>
+      <path d="M400 86 L400 128" stroke="#999" stroke-width="1.5" marker-end="url(#recArrow)" />
+      <path d="M400 203 L400 223" stroke="#999" stroke-width="1.5" marker-end="url(#recArrow)" />
+      <line x1="30" y1="310" x2="770" y2="310" stroke="#ccc" stroke-width="2" />
+      <text x="30" y="335" font-size="11" fill="#999">时间线</text>
+      <text x="180" y="335" font-size="11" fill="#1677ff">服务正常</text>
+      <text x="320" y="335" font-size="11" fill="#f5222d">服务中断</text>
+      <text x="520" y="335" font-size="11" fill="#52c41a">服务恢复</text>
+      <rect x="30" y="303" width="210" height="14" rx="2" fill="#1677ff" opacity="0.3" />
+      <rect x="240" y="303" width="180" height="14" rx="2" fill="#f5222d" opacity="0.3" />
+      <rect x="420" y="303" width="350" height="14" rx="2" fill="#52c41a" opacity="0.3" />
+      <defs>
+        <marker id="recArrow" marker-width="8" marker-height="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#999" />
+        </marker>
+      </defs>
+    </svg>
+    <span class="svg-caption">图：重建部署过程示意——先全部停止旧版本，再全部启动新版本，中间存在服务中断窗口</span>
+  </div>
+</div>
+
+<h4>工作流程</h4>
+<div class="card">
+  <ol>
+    <li><strong>发布触发</strong>：运维或 CI/CD 系统发起版本更新操作</li>
+    <li><strong>终止所有旧版本实例</strong>：向所有旧版本 Pod/实例发送 SIGTERM 信号，开始优雅关闭</li>
+    <li><strong>等待完全停止</strong>：等待所有旧实例完全停止，包括等待 PreStop Hook 执行、连接耗尽等</li>
+    <li><strong>服务中断</strong>：所有旧实例已停止，新实例尚未启动，服务处于不可用状态</li>
+    <li><strong>启动新版本</strong>：创建所有新版本 Pod/实例，拉取新版本镜像，执行初始化流程</li>
+    <li><strong>等待就绪</strong>：等待新实例通过 Readiness Probe 检测，确定可以接收流量</li>
+    <li><strong>服务恢复</strong>：新实例全部就绪，流量恢复，服务重新可用</li>
+    <li><strong>验证</strong>：对新版本进行健康检查和功能验证，确认发布成功</li>
+  </ol>
+</div>
+
+<h4>K8s 配置示例</h4>
+<div class="card">
+<pre>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 5
+  strategy:
+    type: Recreate          # ← 重建部署策略
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: app
+        image: my-app:2.0.0
+        ports:
+        - containerPort: 8080
+</pre>
+  <div class="alert-info" style="margin-top: 12px;">
+    <h3>💡 说明</h3>
+    <p>Kubernetes 中 <code>Recreate</code> 策略不包含任何可配置参数（不像 <code>RollingUpdate</code> 有 <code>maxSurge</code> 和 <code>maxUnavailable</code>），因为它的行为是确定的——先全部终止再全部创建。</p>
+  </div>
+</div>
+
+<h4>EC2 vs K8s 实现对比</h4>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:15%;">对比维度</th>
+        <th style="width:42%;">EC2 模式</th>
+        <th style="width:43%;">K8s 模式</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>实现方式</strong></td>
+        <td>修改 Auto Scaling Group 的 Launch Configuration，终止所有实例后 ASG 自动启动新实例</td>
+        <td>设置 Deployment 的 strategy.type 为 Recreate，K8s 自动完成先终止后创建</td>
+      </tr>
+      <tr>
+        <td><strong>流量切换</strong></td>
+        <td>需要先将所有实例从 ELB Target Group 中移除，更新完成后重新注册</td>
+        <td>K8s 自动将旧 Pod 从 Service Endpoints 中移除，新 Pod 就绪后自动加入</td>
+      </tr>
+      <tr>
+        <td><strong>回滚策略</strong></td>
+        <td>重新部署旧版本 Launch Configuration，再次经历完整的停止启动流程</td>
+        <td>使用 <code>kubectl rollout undo</code> 回滚到上一个 ReplicaSet，同样需要重建</td>
+      </tr>
+      <tr>
+        <td><strong>服务中断</strong></td>
+        <td>明确中断窗口：从最后一个旧实例停止到第一个新实例就绪</td>
+        <td>明确中断窗口：旧 ReplicaSet 缩容到 0 到新 ReplicaSet 扩容完成</td>
+      </tr>
+      <tr>
+        <td><strong>资源利用</strong></td>
+        <td>中断期间资源空闲，旧实例释放后新实例使用相同资源配额</td>
+        <td>中断期间资源空闲，Pod 释放后重建在同一 Node 上（或调度到可用 Node）</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h4>适用场景 / 优点 / 缺点</h4>
+<div class="flex-row">
+  <div class="flex-card green">
+    <strong>✅ 适用场景</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>开发环境和测试环境</li>
+      <li>有状态服务（如数据库、缓存集群）</li>
+      <li>要求旧版本不能共存的服务</li>
+      <li>资源受限环境（只能维护一套环境）</li>
+      <li>可接受短暂停机的内部系统</li>
+    </ul>
+  </div>
+  <div class="flex-card orange">
+    <strong>❌ 不适用场景</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>对外提供 7×24 小时服务的生产系统</li>
+      <li>SLA 要求零停机的业务</li>
+      <li>需要零停机发布的关键链路</li>
+      <li>用户规模大、停机影响面广的场景</li>
+    </ul>
+  </div>
+</div>
+
+<div class="flex-row">
+  <div class="flex-card green">
+    <strong>✅ 优点</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>实现最简单，无需复杂配置</li>
+      <li>资源消耗最低（只需一套环境）</li>
+      <li>新旧版本不会混淆，状态清晰</li>
+      <li>适合管理有状态应用的状态迁移</li>
+      <li>无版本共存带来的兼容性问题</li>
+    </ul>
+  </div>
+  <div class="flex-card red">
+    <strong>❌ 缺点</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>存在明确的服务中断窗口</li>
+      <li>回滚同样需要重建，速度慢</li>
+      <li>无法在生产环境实现零停机发布</li>
+      <li>大规模集群重新启动耗时较长</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ========== 5.2 红黑部署 ========== -->
+<h3>5.2 红黑部署 (Red-Black)</h3>
+
+<h4>历史背景（Netflix 起源）</h4>
+<div class="card">
+  <p>红黑部署（Red-Black Deployment）的概念由 <strong>Netflix</strong> 在其持续交付实践中提出，并通过其开源的持续交付工具 <strong>Spinnaker</strong> 实现了标准化。Netflix 的工程团队在管理大规模微服务架构时发现，传统的蓝绿部署虽然提供了良好的回滚能力，但维护两套完整环境的资源成本过高——尤其是在 Netflix 拥有数百个微服务的场景下。</p>
+  <p>红黑部署借鉴了蓝绿部署的核心思想（两套环境并行、流量切换），但做了关键的资源优化：<strong>流量切换后，旧环境立即被回收销毁</strong>，而不是像蓝绿部署那样保留一段时间以备回滚。这种设计大幅降低了资源占用，但回滚速度相应变慢——如果需要回滚，必须重新部署旧版本。</p>
+  <p>名称中的 <strong>"Red"（红色）</strong> 和 <strong>"Black"（黑色）</strong> 同样是两个无实际含义的环境标识，类似于蓝绿部署的 Blue/Green。之所以不使用同样的命名，是因为 Netflix 希望强调两种策略在旧环境保留策略上的本质区别。</p>
+</div>
+
+<h4>核心原理</h4>
+<div class="card">
+  <p>红黑部署的核心思想是 <strong>环境切换 + 立即回收</strong>：</p>
+  <ul>
+    <li>维护 <strong>两套独立环境</strong>（红色环境和黑色环境），与蓝绿部署类似</li>
+    <li>将新版本部署到空闲环境，充分验证后通过负载均衡器 <strong>切换流量</strong></li>
+    <li>与蓝绿部署的<strong>关键区别</strong>：切换完成后，<strong>旧环境立即回收销毁</strong>，不保留用于回滚</li>
+    <li>回滚需要 <strong>重新部署旧版本</strong> 到空闲环境，再切换流量</li>
+  </ul>
+  <div class="alert-warning" style="margin-top: 12px;">
+    <h3>⚠️ 与蓝绿部署的核心差异</h3>
+    <p>蓝绿部署切换后保留旧环境（保持窗口期通常 10-30 分钟），回滚只需再次切换；红黑部署切换后立即销毁旧环境，回滚需要重新部署。红黑部署通过牺牲即时回滚能力，换取了更低的资源成本。</p>
+  </div>
+</div>
+
+<h4>SVG 架构图</h4>
+<div class="card">
+  <div class="svg-container">
+    <svg viewBox="0 0 800 420" style="width:100%;max-width:800px;height:auto;">
+      <text x="400" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">红黑部署架构示意（Netflix 风格）</text>
+      <!-- 用户 -->
+      <rect x="280" y="50" width="140" height="40" rx="20" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="350" y="75" text-anchor="middle" font-size="13" fill="#1677ff">用户请求</text>
+      <path d="M350 90 L350 120" stroke="#333" stroke-width="2" />
+      <!-- 负载均衡器 -->
+      <rect x="250" y="120" width="200" height="44" rx="6" fill="#fff7e6" stroke="#fa8c16" stroke-width="2" />
+      <text x="350" y="146" text-anchor="middle" font-size="14" font-weight="bold" fill="#d46b08">负载均衡器 / 网关</text>
+      <!-- 切换开关 -->
+      <rect x="295" y="175" width="110" height="28" rx="14" fill="#f5222d" stroke="#cf1322" stroke-width="1.5" />
+      <text x="350" y="194" text-anchor="middle" font-size="12" fill="#fff" font-weight="bold">流量切换</text>
+      <path d="M300 203 L300 240 L160 240 L160 270" stroke="#f5222d" stroke-width="2" fill="none" />
+      <path d="M400 203 L400 240 L540 240 L540 270" stroke="#52c41a" stroke-width="2" fill="none" />
+      <!-- 红色环境 -->
+      <rect x="60" y="270" width="200" height="100" rx="8" fill="#fff1f0" stroke="#f5222d" stroke-width="2" />
+      <text x="160" y="295" text-anchor="middle" font-size="14" font-weight="bold" fill="#cf1322">红色环境 (Red)</text>
+      <text x="160" y="315" text-anchor="middle" font-size="12" fill="#cf1322">v1 版本（即将销毁）</text>
+      <rect x="80" y="325" width="160" height="28" rx="4" fill="#f5222d" opacity="0.15" />
+      <text x="160" y="344" text-anchor="middle" font-size="11" fill="#cf1322">切换后立即回收 ⚡</text>
+      <!-- 黑色环境 -->
+      <rect x="440" y="270" width="200" height="100" rx="8" fill="#f6ffed" stroke="#52c41a" stroke-width="2" />
+      <text x="540" y="295" text-anchor="middle" font-size="14" font-weight="bold" fill="#389e0d">黑色环境 (Black)</text>
+      <text x="540" y="315" text-anchor="middle" font-size="12" fill="#389e0d">v2 版本（当前生产）</text>
+      <rect x="460" y="325" width="160" height="28" rx="4" fill="#52c41a" opacity="0.15" />
+      <text x="540" y="344" text-anchor="middle" font-size="11" fill="#389e0d">承载 100% 生产流量</text>
+      <path d="M160 375 L160 395" stroke="#f5222d" stroke-width="2" marker-end="url(#redArr)" />
+      <text x="160" y="410" text-anchor="middle" font-size="11" fill="#f5222d">旧环境立即销毁回收</text>
+      <text x="400" y="410" text-anchor="middle" font-size="11" fill="#999">关键区别：与蓝绿不同，红黑切换后旧环境立即回收，不保留用于回滚</text>
+      <defs>
+        <marker id="redArr" marker-width="8" marker-height="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#f5222d" />
+        </marker>
+      </defs>
+    </svg>
+    <span class="svg-caption">图：红黑部署架构示意——切换后旧环境立即回收，不保留用于回滚</span>
+  </div>
+</div>
+
+<h4>关键参数</h4>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:20%;">参数名</th>
+        <th style="width:15%;">红黑部署值</th>
+        <th style="width:30%;">说明</th>
+        <th style="width:35%;">与蓝绿部署的差异</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>切换时间</strong></td>
+        <td>&lt; 1s</td>
+        <td>负载均衡器将流量从旧环境切换到新环境的时间</td>
+        <td>与蓝绿部署相同</td>
+      </tr>
+      <tr>
+        <td><strong>旧环境保留时间</strong></td>
+        <td><span class="tag tag-red">0</span></td>
+        <td>切换后旧环境立即销毁回收，不保留</td>
+        <td>蓝绿部署保留 10-30 分钟用于回滚</td>
+      </tr>
+      <tr>
+        <td><strong>预热时间</strong></td>
+        <td>1-5 min</td>
+        <td>新环境启动后、切换前的预热时间</td>
+        <td>与蓝绿部署相同</td>
+      </tr>
+      <tr>
+        <td><strong>回滚方式</strong></td>
+        <td>重新部署旧版本</td>
+        <td>需要将旧版本重新部署到空闲环境，再切换流量</td>
+        <td>蓝绿部署只需再次切换，无需重新部署</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h4>与蓝绿部署的详细对比</h4>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:20%;">对比维度</th>
+        <th style="width:40%;">红黑部署（Red-Black）</th>
+        <th style="width:40%;">蓝绿部署（Blue-Green）</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>旧环境保留</strong></td>
+        <td>切换后立即回收</td>
+        <td>保留 10-30 分钟保持窗口</td>
+      </tr>
+      <tr>
+        <td><strong>资源消耗</strong></td>
+        <td>接近 1×（只有切换瞬间需要两套环境）</td>
+        <td>2×（保持窗口期内两套环境同时运行）</td>
+      </tr>
+      <tr>
+        <td><strong>回滚速度</strong></td>
+        <td>慢，需重新部署旧版本（分钟级）</td>
+        <td>快，只需再次切换流量（秒级）</td>
+      </tr>
+      <tr>
+        <td><strong>回滚可靠性</strong></td>
+        <td>取决于重新部署的成功率</td>
+        <td>旧环境仍在运行，回滚几乎 100% 成功</td>
+      </tr>
+      <tr>
+        <td><strong>资源利用率</strong></td>
+        <td>高，不浪费闲置环境</td>
+        <td>低，保持窗口期资源闲置浪费</td>
+      </tr>
+      <tr>
+        <td><strong>对数据库压力</strong></td>
+        <td>低（旧环境立即释放数据库连接）</td>
+        <td>高（旧环境保持期仍需维持数据库连接池）</td>
+      </tr>
+      <tr>
+        <td><strong>典型使用者</strong></td>
+        <td>Netflix（Spinnaker）</td>
+        <td>传统企业、金融行业</td>
+      </tr>
+      <tr>
+        <td><strong>回滚场景应对</strong></td>
+        <td>优先尝试修复新版本而非回滚</td>
+        <td>优先回滚到旧版本</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h4>EC2 vs K8s 实现对比</h4>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:15%;">对比维度</th>
+        <th style="width:42%;">EC2 模式</th>
+        <th style="width:43%;">K8s 模式</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>实现方式</strong></td>
+        <td>两套 ASG + ELB Target Group，切换后销毁旧 ASG</td>
+        <td>两个 Deployment + Service，切换后删除旧 Deployment</td>
+      </tr>
+      <tr>
+        <td><strong>流量切换</strong></td>
+        <td>修改 ELB Listener Rules 切换 Target Group</td>
+        <td>修改 Service 的 Label Selector 指向新 Deployment</td>
+      </tr>
+      <tr>
+        <td><strong>旧环境回收</strong></td>
+        <td>合并/删除旧 ASG，释放 EC2 实例</td>
+        <td>删除旧 Deployment，Pod 被 GC 回收</td>
+      </tr>
+      <tr>
+        <td><strong>回滚操作</strong></td>
+        <td>重新部署旧版本 AMI 到空闲 Target Group</td>
+        <td>重新 apply 旧 Deployment YAML 或 helm rollback</td>
+      </tr>
+      <tr>
+        <td><strong>自动化工具</strong></td>
+        <td>Spinnaker（原生支持红黑部署）、AWS CodeDeploy</td>
+        <td>Spinnaker on K8s、Argo Rollouts（蓝绿策略）、自定义脚本</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h4>工作流程</h4>
+<div class="card">
+  <ol>
+    <li><strong>初始状态</strong>：黑色环境承载 100% 生产流量，运行 v1 版本。红色环境处于空闲或已销毁状态</li>
+    <li><strong>部署新版本</strong>：将 v2 版本部署到红色环境。Spinnaker 等工具会自动创建所有必要的资源（ASG、ELB Target Group 等）</li>
+    <li><strong>验证</strong>：对红色环境进行自动化测试和验证，包括健康检查、接口测试、性能基准</li>
+    <li><strong>切换流量</strong>：验证通过后，将负载均衡器流量从黑色环境切换到红色环境（通常在秒级完成）</li>
+    <li><strong>立即回收</strong>：切换完成后立即销毁黑色环境（释放 EC2 实例或删除 Deployment），释放资源</li>
+    <li><strong>监控</strong>：密切监控红色环境（现为生产环境）的运行状态，包括错误率、延迟、资源使用</li>
+    <li><strong>回滚（如需）</strong>：如果发现问题，将旧版本（v1）重新部署到空闲环境（此时为黑色），再次切换流量</li>
+  </ol>
+</div>
+
+<h4>适用场景 / 优点 / 缺点</h4>
+<div class="flex-row">
+  <div class="flex-card green">
+    <strong>✅ 适用场景</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>资源成本敏感但需要环境切换能力</li>
+      <li>发布频率较高、每次发布变更较小的团队</li>
+      <li>自动化发布流水线成熟（如 Spinnaker）</li>
+      <li>微服务架构中单个服务的独立发布</li>
+      <li>需要快速回收资源的云环境（节省成本）</li>
+    </ul>
+  </div>
+  <div class="flex-card orange">
+    <strong>❌ 不适用场景</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>对回滚速度要求极高的关键业务</li>
+      <li>发布后发现问题概率较高的场景</li>
+      <li>旧版本销毁后才发现问题的场景</li>
+      <li>数据库 Schema 变更需要长时间兼容的场景</li>
+    </ul>
+  </div>
+</div>
+
+<div class="flex-row">
+  <div class="flex-card green">
+    <strong>✅ 优点</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>资源利用率高，不浪费闲置环境</li>
+      <li>切换瞬间完成，无停机窗口</li>
+      <li>适合频繁发布，环境准备和回收自动化</li>
+      <li>云环境下可以显著节省计算资源费用</li>
+      <li>环境隔离性好，新版本在独立环境验证</li>
+    </ul>
+  </div>
+  <div class="flex-card red">
+    <strong>❌ 缺点</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>回滚需要重新部署，速度比蓝绿慢</li>
+      <li>回滚成功依赖于重新部署的可靠性</li>
+      <li>发布流程比滚动更新复杂</li>
+      <li>需要成熟的自动化工具支持</li>
+      <li>数据库等有状态服务的兼容性仍需解决</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ========== 5.3 影子部署 ========== -->
+<h3>5.3 影子部署 (Shadow Deployment)</h3>
+
+<h4>历史背景</h4>
+<div class="card">
+  <p>影子部署的思想最早源于 <strong>Google</strong> 和 <strong>Netflix</strong> 在大规模分布式系统中的流量镜像实践。在微服务架构兴起之前，传统负载均衡器就已经支持了流量镜像（Traffic Mirroring/Port Mirroring）功能——将网络端口的流量复制一份到监控系统，用于安全审计或故障排查。</p>
+  <p>Netflix 在其 Chaos Engineering 实践中，通过流量镜像将生产流量复制到测试服务，用于验证新版本在真实负载下的行为。Google 则在 Borg 和早期的 Kubernetes 实践中使用了类似的技术来安全地测试新版本。</p>
+  <p>随着 <strong>Service Mesh</strong>（服务网格）技术的普及，特别是 <strong>Istio</strong> 对流量镜像的标准化支持，影子部署成为了一种正式的部署策略。Istio 在 1.5 版本中引入了 <code>TrafficMirror</code> 功能，使得运维人员可以轻松地将一定比例的生产流量复制到影子服务。</p>
+  <p>名称中的 <strong>"Shadow"（影子）</strong> 形象地描述了这种策略的本质——新版本的实例像"影子"一样伴随着生产环境运行，接收流量的副本但不直接影响用户。</p>
+</div>
+
+<h4>核心原理（流量镜像）</h4>
+<div class="card">
+  <p>影子部署的核心思想是 <strong>流量镜像（Traffic Mirroring）</strong>：</p>
+  <ul>
+    <li>在网关或 Service Mesh 层面将生产流量 <strong>异步复制一份</strong> 发送到影子环境</li>
+    <li>影子环境运行新版本（v2），接收流量副本并处理，但 <strong>响应被丢弃</strong></li>
+    <li>生产环境（v1）正常运行，处理真实请求并返回响应给用户</li>
+    <li>通过对比两套环境的 <strong>行为指标</strong>（错误率、延迟、输出一致性）来评估新版本的可靠性</li>
+    <li>影子实例的 <strong>性能问题和崩溃不会影响生产环境</strong></li>
+  </ul>
+  <div class="alert-warning" style="margin-top: 12px;">
+    <h3>⚠️ 重要前提</h3>
+    <p>影子部署要求服务是 <strong>幂等</strong> 的——影子环境接收到请求副本后可能产生副作用（如写入数据库、发送消息），必须确保这些副作用不会污染生产数据或产生真实影响。</p>
+  </div>
+</div>
+
+<h4>SVG 架构图</h4>
+<div class="card">
+  <div class="svg-container">
+    <svg viewBox="0 0 800 340" style="width:100%;max-width:800px;height:auto;">
+      <text x="400" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">影子部署架构示意（流量镜像）</text>
+      <rect x="280" y="50" width="140" height="40" rx="20" fill="#e6f4ff" stroke="#1677ff" stroke-width="1.5" />
+      <text x="350" y="75" text-anchor="middle" font-size="13" fill="#1677ff">生产流量</text>
+      <path d="M350 90 L350 120" stroke="#333" stroke-width="2" />
+      <rect x="250" y="120" width="200" height="44" rx="6" fill="#fff7e6" stroke="#fa8c16" stroke-width="2" />
+      <text x="350" y="142" text-anchor="middle" font-size="13" font-weight="bold" fill="#d46b08">网关 / Service Mesh</text>
+      <text x="350" y="156" text-anchor="middle" font-size="10" fill="#d46b08">流量复制 + 路由</text>
+      <path d="M300 164 L300 200 L160 200 L160 230" stroke="#1677ff" stroke-width="2.5" fill="none" />
+      <path d="M400 164 L400 200 L540 200 L540 230" stroke="#999" stroke-width="2" fill="none" stroke-dasharray="8,4" />
+      <rect x="60" y="230" width="200" height="80" rx="8" fill="#e6f4ff" stroke="#1677ff" stroke-width="2" />
+      <text x="160" y="255" text-anchor="middle" font-size="14" font-weight="bold" fill="#1677ff">生产环境 v1</text>
+      <text x="160" y="275" text-anchor="middle" font-size="11" fill="#1677ff">处理真实请求</text>
+      <text x="160" y="295" text-anchor="middle" font-size="11" fill="#1677ff">返回响应给用户</text>
+      <rect x="440" y="230" width="200" height="80" rx="8" fill="#f5f5f5" stroke="#999" stroke-width="2" stroke-dasharray="6,3" />
+      <text x="540" y="255" text-anchor="middle" font-size="14" font-weight="bold" fill="#666">影子环境 v2</text>
+      <text x="540" y="275" text-anchor="middle" font-size="11" fill="#666">接收流量副本</text>
+      <text x="540" y="295" text-anchor="middle" font-size="11" fill="#666">响应被丢弃 ✗</text>
+      <text x="220" y="215" text-anchor="middle" font-size="11" fill="#1677ff" font-weight="bold">100% 真实流量</text>
+      <text x="490" y="215" text-anchor="middle" font-size="11" fill="#999">镜像流量（仅监控）</text>
+      <rect x="200" y="322" width="300" height="15" rx="3" fill="#f0f5ff" stroke="#1677ff" stroke-width="1" />
+      <text x="350" y="333" text-anchor="middle" font-size="10" fill="#1677ff">监控对比：错误率 | 延迟 | 资源消耗 | 输出一致性</text>
+    </svg>
+    <span class="svg-caption">图：影子部署架构示意——生产流量被异步复制到影子环境，影子环境的响应被丢弃，仅用于监控对比</span>
+  </div>
+</div>
+
+<h4>实现方式</h4>
+
+<div class="card">
+  <div class="card-title">Istio 流量镜像配置</div>
+  <pre>
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: my-app
+spec:
+  hosts:
+  - my-app
+  http:
+  - route:
+    - destination:
+        host: my-app
+        subset: v1
+      weight: 100
+    mirror:
+      host: my-app
+      subset: v2
+    mirror_percent: 100
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: my-app
+spec:
+  host: my-app
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+</pre>
+</div>
+
+<div class="card">
+  <div class="card-title">Nginx 流量镜像配置</div>
+  <pre>
+upstream production {
+    server production-svc:8080;
+}
+
+upstream shadow {
+    server shadow-svc:8080;
+}
+
+server {
+    listen 80;
+
+    location /api/ {
+        # 将请求镜像到影子环境
+        mirror /mirror;
+        proxy_pass http://production;
+    }
+
+    location = /mirror {
+        internal;
+        proxy_pass http://shadow$request_uri;
+        # 影子环境响应被自动丢弃
+    }
+}
+</pre>
+</div>
+
+<div class="card">
+  <div class="card-title">Envoy 流量镜像配置</div>
+  <pre>
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 8080 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: backend
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                route:
+                  cluster: production_cluster
+                  request_mirror_policies:
+                  - cluster: shadow_cluster
+                    runtime_fraction:
+                      default_value:
+                        numerator: 100
+                        denominator: HUNDRED
+          http_filters:
+          - name: envoy.filters.http.router
+</pre>
+</div>
+
+<h4>影子实例的副作用处理</h4>
+<div class="alert-warning">
+  <h3>⚠️ 重要警告：影子实例的副作用隔离</h3>
+  <p>影子部署最大的风险在于 <strong>影子实例可能产生真实副作用</strong>。必须仔细评估以下场景：</p>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:22%;">副作用类型</th>
+        <th style="width:40%;">风险描述</th>
+        <th style="width:38%;">解决方案</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>数据库写入</strong></td>
+        <td>影子实例处理镜像请求时可能写入生产数据库，导致数据重复或污染</td>
+        <td>使用独立的影子数据库；或通过 Feature Flag 在影子环境中跳过所有写操作</td>
+      </tr>
+      <tr>
+        <td><strong>消息队列</strong></td>
+        <td>影子实例可能向消息队列发送重复消息，导致下游消费者处理两次</td>
+        <td>影子实例使用独立的 Topic/Queue；或配置消费端去重逻辑</td>
+      </tr>
+      <tr>
+        <td><strong>外部 API 调用</strong></td>
+        <td>影子实例可能调用第三方支付、短信等外部服务，造成重复扣款或骚扰</td>
+        <td>在影子环境中 Mock 所有外部调用；或通过统一的 HTTP 拦截器阻止出站请求</td>
+      </tr>
+      <tr>
+        <td><strong>缓存写入</strong></td>
+        <td>影子实例写入 Redis/Memcached 可能导致缓存数据不一致</td>
+        <td>影子实例使用独立的缓存 Key 前缀或独立的缓存实例</td>
+      </tr>
+      <tr>
+        <td><strong>日志/审计</strong></td>
+        <td>影子实例的日志可能混入生产日志，干扰监控和审计</td>
+        <td>影子实例使用独立的日志通道或特殊的日志标记（如添加 shadow=true 标签）</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h4>EC2 vs K8s 实现对比</h4>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:15%;">对比维度</th>
+        <th style="width:42%;">EC2 模式</th>
+        <th style="width:43%;">K8s 模式</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>流量镜像</strong></td>
+        <td>使用 Nginx/HAProxy 的 mirror 功能，或将 ELB 流量复制到另一个 Target Group</td>
+        <td>使用 Istio VirtualService 的 mirror 字段，或 Envoy 的 request_mirror_policies</td>
+      </tr>
+      <tr>
+        <td><strong>影子实例管理</strong></td>
+        <td>单独维护一个 ASG 运行影子实例，通过自动缩放控制副本数</td>
+        <td>创建独立的 Deployment，通过 Label 区分影子 Pod，使用 HPA 自动缩放</td>
+      </tr>
+      <tr>
+        <td><strong>监控对比</strong></td>
+        <td>通过 CloudWatch 分别收集两个 ASG 的指标，使用自定义仪表盘对比</td>
+        <td>使用 Prometheus + Grafana 分别采集两套 Pod 的指标，通过 ServiceMonitor 区分</td>
+      </tr>
+      <tr>
+        <td><strong>成本控制</strong></td>
+        <td>影子实例数量固定，可通过按需实例或 Spot 实例降低成本</td>
+        <td>影子 Pod 可设置较低的 Resource Requests/Limits，利用 Cluster Autoscaler 控制成本</td>
+      </tr>
+      <tr>
+        <td><strong>镜像比例控制</strong></td>
+        <td>通过 Nginx mirror 百分比或 ELB 规则控制</td>
+        <td>通过 Istio mirror_percent 字段精确控制（0-100%）</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h4>适用场景 / 优点 / 缺点</h4>
+<div class="flex-row">
+  <div class="flex-card green">
+    <strong>✅ 适用场景</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>需要在实际生产流量下验证新版本的正确性和性能</li>
+      <li>高风险变更（如底层框架升级、缓存策略调整）</li>
+      <li>新版本对延迟敏感，需要对比延迟分布（P50/P99）</li>
+      <li>需要验证新版本在极端情况下的行为（如突发流量）</li>
+      <li>安全审计和合规性验证（验证请求处理的一致性）</li>
+    </ul>
+  </div>
+  <div class="flex-card orange">
+    <strong>❌ 不适用场景</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>服务有严重的副作用问题且无法隔离</li>
+      <li>基础设施不支持流量镜像能力</li>
+      <li>对资源成本高度敏感（影子实例增加资源消耗）</li>
+      <li>需要快速发布上线，影子验证周期太长的场景</li>
+    </ul>
+  </div>
+</div>
+
+<div class="flex-row">
+  <div class="flex-card green">
+    <strong>✅ 优点</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>对生产环境零风险：影子实例的故障不影响用户</li>
+      <li>在真实生产流量下验证，测试数据最真实可靠</li>
+      <li>可以对比新旧版本的性能指标，精确评估差异</li>
+      <li>适合验证新版本在高并发下的表现</li>
+      <li>可以与金丝雀发布结合使用，实现"先看再放"</li>
+    </ul>
+  </div>
+  <div class="flex-card red">
+    <strong>❌ 缺点</strong>
+    <ul style="margin-top: 8px; padding-left: 16px;">
+      <li>需要服务是幂等的，副作用隔离增加了实现复杂度</li>
+      <li>影子环境仍需消耗额外资源（CPU、内存、网络带宽）</li>
+      <li>流量镜像增加了网关/Service Mesh 的负载</li>
+      <li>影子实例的响应被丢弃，无法完整验证端到端流程</li>
+      <li>监控对比需要额外的工具和流程支持</li>
+      <li>不适合有状态服务的灰度验证（数据库写入难隔离）</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- s6. 面试高频问题 -->
+<!-- ============================================================ -->
+<h2 id="s6">6. 面试高频问题</h2>
+
+<div class="card">
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：蓝绿部署和灰度发布的区别是什么？</h3>
+    <p><strong>A：</strong>核心区别体现在以下方面：</p>
+    <ul>
+      <li><strong>1) 切换方式</strong>：蓝绿部署是"一刀切"——所有流量一次性从旧环境切换到新环境；灰度发布是"渐进式"——将流量按百分比逐步迁移到新版本，从 1% → 5% → 20% → 100%</li>
+      <li><strong>2) 资源消耗</strong>：蓝绿部署需要两套完整环境，资源消耗翻倍；灰度发布只需要额外运行少量新版本实例，资源消耗增量较小</li>
+      <li><strong>3) 风险控制</strong>：蓝绿部署的验证在隔离环境中完成，验证不通过不会影响生产流量；灰度发布用小部分生产流量做验证，可能存在影响部分用户的风险</li>
+      <li><strong>4) 验证深度</strong>：蓝绿部署可以在切换前充分验证；灰度发布可以获取真实生产流量的反馈，发现蓝绿部署无法捕获的问题（如真实负载下的性能瓶颈）</li>
+    </ul>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：红黑部署和蓝绿部署的核心区别是什么？</h3>
+    <p><strong>A：</strong>核心区别在于 <strong>旧环境的保留策略</strong>。蓝绿部署在流量切换到新环境后，旧环境会保留一段时间（通常 10-30 分钟），以便在发现问题时快速回滚；红黑部署在流量切换后立即销毁旧环境，不保留回滚能力。因此蓝绿部署回滚极快（秒级再次切换），红黑部署回滚较慢（需要重新部署旧版本）。红黑部署的优势在于资源利用率更高，成本更低。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：影子部署和金丝雀发布的本质区别是什么？</h3>
+    <p><strong>A：</strong>核心区别在于 <strong>新版本是否直接处理生产请求</strong>。金丝雀发布是将小部分真实生产流量路由到新版本，新版本直接处理请求并返回响应给用户——如果新版本有 Bug，会直接影响部分用户。影子部署则是将流量复制一份发送到新版本，新版本的响应被丢弃，用户的请求始终由旧版本处理——新版本的问题不会影响用户。金丝雀发布的验证更真实（返回响应给用户），但风险更高；影子部署零风险，但验证不够完整（无法验证端到端流程）。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：灰度发布和 A/B 测试的区别是什么？</h3>
+    <p><strong>A：</strong>二者虽然都涉及"将用户分流到不同版本"，但目标和实现方式有本质区别：</p>
+    <ul>
+      <li><strong>1) 目的不同</strong>：灰度发布的目的是<strong>降低发布风险</strong>，逐步验证新版本的稳定性，最终目标是 100% 全量发布；A/B 测试的目的是<strong>对比两个版本的业务效果</strong>，评估 UI 改版、算法优化等对用户行为的影响，最终不一定全量发布</li>
+      <li><strong>2) 持续时间</strong>：灰度发布是<strong>短期</strong>的，通常在数小时到数天内完成全过程；A/B 测试是<strong>中期</strong>的，可能需要持续数天到数周来收集足够的统计数据</li>
+      <li><strong>3) 分流方式</strong>：灰度发布通常是<strong>随机分流</strong>，按比例或按属性分桶；A/B 测试需要<strong>严格的分桶和对照</strong>，确保实验组和对照组在统计学上具有可比性</li>
+      <li><strong>4) 结果评估</strong>：灰度发布通过<strong>系统指标</strong>（错误率、延迟、资源使用）判断是否可以继续；A/B 测试通过<strong>业务指标</strong>（点击率、转化率、留存率）判断哪个版本更好</li>
+      <li><strong>5) 变更范围</strong>：灰度发布通常是<strong>代码级别</strong>的版本变更；A/B 测试可以是<strong>功能级别</strong>的差异，甚至只改变前端的按钮颜色或文案</li>
+    </ul>
+    <p>在实际工程中，<strong>灰度发布和 A/B 测试可以结合使用</strong>：灰度发布期间同步进行 A/B 测试，既验证稳定性又评估业务效果。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：如何确认影子实例的输出与生产实例一致？</h3>
+    <p><strong>A：</strong>可以通过以下方法验证：1）<strong>响应对比</strong>——在影子环境中记录响应内容，与生产环境的响应进行结构化对比（状态码、响应体、响应头），使用工具如 Diffy（Twitter 开源）自动对比；2）<strong>指标对比</strong>——使用 Prometheus 等监控系统对比两套环境的 P50/P99 延迟、错误率、请求处理量等核心指标；3）<strong>日志分析</strong>——将生产实例和影子实例的日志收集到同一个分析平台，关联相同请求 ID 的日志进行对比；4）<strong>数据校验</strong>——对于幂等的读操作，对比两套环境的数据库查询结果是否一致。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：影子部署在 Istio 中的性能影响如何？</h3>
+    <p><strong>A：</strong>Istio 的流量镜像在 Envoy Sidecar 层面完成，对原始请求的性能影响极小。具体来说：1）镜像操作是 <strong>异步</strong> 的——主请求的返回不受镜像请求处理速度的影响；2）Envoy 使用独立的 Worker 处理镜像请求，不会阻塞主请求处理流程；3）镜像请求 <strong>超时独立</strong>——影子实例响应慢不影响主请求；4）主要开销在于额外的网络带宽和 Envoy CPU 负载（需要复制和发送请求体）。实践中建议将镜像比例控制在 50% 以下，并监控 Envoy Sidecar 的 CPU 和内存使用。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：红黑部署在 Spinnaker 中是如何实现的？</h3>
+    <p><strong>A：</strong>在 Spinnaker 中，红黑部署通过 Server Group 的概念实现。Spinnaker 会维护两个 Server Group（对应红和黑两个集群），部署新版本时创建一个新的 Server Group，通过负载均衡器将流量从旧 Server Group 切换到新 Server Group，然后立即销毁旧 Server Group。Spinnaker 的管道（Pipeline）提供了完整的自动化流程，包括创建、验证、切换和销毁阶段，用户只需配置一次即可重复执行。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：红黑部署为什么不适合数据库 Schema 频繁变更的场景？</h3>
+    <p><strong>A：</strong>红黑部署切换后旧环境立即销毁，意味着一旦新版本代码上线，部署在数据库中的 Schema 变更就不可回退（因为旧版本代码已不可用）。如果 Schema 变更需要回滚，必须重新部署旧版本代码，而旧版本代码很可能不兼容新 Schema，导致数据损坏或服务异常。相比之下，蓝绿部署的保持窗口期可以等待 Schema 变更的影响完全确认后再回收旧环境。因此，数据库 Schema 频繁变更的场景更适合使用蓝绿部署或滚动更新配合向前兼容设计。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：重建部署和滚动更新在 Kubernetes 中的核心区别是什么？</h3>
+    <p><strong>A：</strong>Kubernetes 中，重建部署（<code>strategy.type: Recreate</code>）会先缩容旧 ReplicaSet 到 0，再扩容新 ReplicaSet 到期望副本数；滚动更新（<code>strategy.type: RollingUpdate</code>）则逐步缩容旧 ReplicaSet 并逐步扩容新 ReplicaSet，保证整个过程中可用 Pod 数量始终满足 <code>[replicas - maxUnavailable, replicas + maxSurge]</code> 的范围约束。核心区别在于是否存在服务中断窗口。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：什么情况下必须使用重建部署而不是滚动更新？</h3>
+    <p><strong>A：</strong>当应用有 <strong>明确的互斥约束</strong> 时必须使用重建部署。典型场景包括：数据库 Schema 变更要求新旧版本不能同时存在、应用启动时会加载独占资源（如文件锁）、依赖底层硬件特性的应用（如 GPU 驱动版本绑定）、以及使用 Volume 的 ReadWriteOnce 访问模式的 Pod。在这些场景下，如果新旧版本共存，可能导致数据损坏或资源竞争。</p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;">
+    <h3 style="margin-top: 0;">Q：重建部署如何最小化服务中断时间？</h3>
+    <p><strong>A：</strong>可以从以下几个角度优化：1）确保 PreStop Hook 快速完成优雅关闭，避免不必要的等待；2）使用轻量级基础镜像减少拉取时间；3）配置合理的 Readiness Probe，加快就绪判断；4）利用 PDB（PodDisruptionBudget）确保中断期间有足够的调度资源；5）提前拉取新版本镜像到所有 Node（例如使用 DaemonSet 预热），避免镜像拉取耗时。通过这些优化，可以将中断窗口从分钟级压缩到 10 秒以内。</p>
+  </div>
+
+  <div style="margin-bottom: 0;">
+    <h3 style="margin-top: 0;">Q：在生产实践中，你会如何组合使用这些部署策略？</h3>
+    <p><strong>A：</strong>实际生产中很少只用一种策略，通常根据服务特征和风险等级组合使用：</p>
+    <ul>
+      <li><strong>常规迭代</strong>（低风险）：使用<strong>滚动更新</strong>，简单高效，零停机</li>
+      <li><strong>核心服务重大变更</strong>（高风险）：使用<strong>蓝绿部署</strong>或<strong>灰度发布</strong>，确保可控</li>
+      <li><strong>底层框架/中间件升级</strong>（极高风险）：先用<strong>影子部署</strong>验证，确认无异常后再切换</li>
+      <li><strong>微服务架构</strong>：对核心链路服务使用蓝绿部署，对非核心服务使用滚动更新，对全链路关键变更使用灰度发布</li>
+      <li><strong>数据库变更</strong>：始终采用向前兼容设计，配合滚动更新的分阶段变更策略</li>
+    </ul>
+  </div>
+</div>
+
+<hr>
+<p style="text-align: center; color: #999; font-size: 12px;">文档版本: v1.0 · 最后更新: 2026-08-01</p>
+
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var toc = document.getElementById('doc-toc');
+  var showBtn = document.getElementById('doc-toc-show');
+  var hideBtn = document.getElementById('doc-toc-hide');
+  var links = Array.prototype.slice.call(
+    document.querySelectorAll('.doc-toc-nav a[href^="#"]')
+  );
+  var items = links.map(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    return el ? { id: id, el: el, a: a } : null;
+  }).filter(Boolean);
+  if (!items.length) { return; }
+
+  function highlight() {
+    var pos = window.scrollY + 120;
+    var active = null;
+    for (var i = 0; i < items.length; i++) {
+      var top = items[i].el.getBoundingClientRect().top + window.scrollY;
+      if (top <= pos) { active = items[i].id; }
+    }
+    var activeEl = active ? items.filter(function (x) { return x.id === active; })[0].a : null;
+    items.forEach(function (x) {
+      x.a.classList.toggle('active', x.a === activeEl);
+    });
+  }
+  // srcdoc sandbox iframe 内 scroll/IntersectionObserver 事件不可靠，
+  // 故用轮询驱动高亮，scroll/resize 事件仅作加速。
+  window.setInterval(highlight, 150);
+  window.addEventListener('scroll', highlight, { passive: true });
+  window.addEventListener('resize', highlight, { passive: true });
+  highlight();
+
+  // 拦截目录链接点击：srcdoc iframe 内原生锚点 <a href="#id"> 会解析到
+  // 父页面 URL 而被沙箱拦截，必须改用 scrollIntoView 实现平滑/即时跳转。
+  links.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) el.scrollIntoView(true);
+    });
+  });
+
+  if (hideBtn && toc) {
+    hideBtn.addEventListener('click', function () {
+      toc.classList.add('is-hidden');
+      if (showBtn) showBtn.classList.add('is-visible');
+    });
+  }
+  if (showBtn) {
+    showBtn.addEventListener('click', function () {
+      if (toc) toc.classList.remove('is-hidden');
+      showBtn.classList.remove('is-visible');
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>应用间鉴权</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.75; color: #1f2937; max-width: 860px; margin: 0 auto; padding: 32px 24px; background: #fff; }
+  @media (prefers-color-scheme: dark) { body { color: #d1d5db; background: #0f172a; } }
+  h1 { font-size: 26px; border-bottom: 2px solid #7c3aed; padding-bottom: 10px; }
+  h2 { font-size: 19px; color: #7c3aed; margin-top: 30px; border-left: 4px solid #7c3aed; padding-left: 10px; }
+  h3 { font-size: 15px; }
+  code { background: #f5f3ff; color: #6d28d9; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  pre { background: #1e293b; color: #e2e8f0; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; }
+  th { background: #f5f3ff; }
+  @media (prefers-color-scheme: dark) { th { background: #1e293b; } th, td { border-color: #374151; } }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-right: 6px; }
+  .tag.purple { background: #ede9fe; color: #6d28d9; }
+  .tag.blue { background: #dbeafe; color: #1d4ed8; }
+  .callout { background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  @media (prefers-color-scheme: dark) { .callout { background: #2e1065; border-color: #4c1d95; } }
+  .box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+  @media (prefers-color-scheme: dark) { .box { background: #111827; border-color: #1f2937; } }
+</style>
+</head>
+<body>
+<h1>🔐 应用间鉴权</h1>
+<p><span class="tag purple">架构设计</span><span class="tag blue">复盘总结</span></p>
+<p class="callout">本文复盘系统「应用之间如何安全调用」的方案：认证（你是谁）与鉴权（你能不能）分离、网关 PEP 接入、凭证与授权分离。</p>
+
+<h2>1. 核心模型：认证 vs 鉴权</h2>
+<div class="box"><b>认证 AuthN</b>：调用方用凭证（client_id / secret）向 IAM 换取短期访问令牌（JWT）。回答「你是谁」。</div>
+<div class="box"><b>鉴权 AuthZ</b>：网关 / 应用内 SDK 验令牌（你是谁）后，再问 PDP「这个身份对这个动作/这条数据能不能」。回答「你能不能」。</div>
+<div class="box"><b>一句话</b>：凭证负责身份（一次签发），授权负责范围（多次追加）；认证在前、鉴权在后。</div>
+
+<h2>2. 市面常见做法</h2>
+<table>
+<tr><th>方式</th><th>身份载体</th><th>签发方</th><th>校验</th><th>适用</th></tr>
+<tr><td>静态 Token / API Key</td><td>固定字符串</td><td>平台</td><td>查签发记录</td><td>轻量 / 内网</td></tr>
+<tr><td><b>OAuth2 Client Credentials</b></td><td>短 TTL JWT</td><td>授权服务器</td><td>验签 + aud/scope/exp</td><td><b>M2M 标准</b></td></tr>
+<tr><td>mTLS / SPIFFE</td><td>客户端证书</td><td>CA / 网格</td><td>TLS 握手验书</td><td>高安全 / 网格</td></tr>
+<tr><td>OIDC 委托令牌</td><td>ID/访问令牌</td><td>企业 IdP</td><td>验签 + 用户会话</td><td>涉及「人」</td></tr>
+</table>
+<p>本系统采用 <b>OAuth2 Client Credentials</b>（M2M 事实标准）+ 网关 PEP 执行。</p>
+
+<h2>3. 系统方案：网关 PEP</h2>
+<pre>
+调用方 consumer
+   │ ① client_id + secret → /v1/oauth/token 换 access_token
+   ▼
+请求（Authorization: Bearer token）
+   ▼
+Traefik 网关（PEP）
+   │ ② forwardAuth 回调 → /v1/gateway/check（注入 X-PEP-Token）
+   ▼
+iam-server（PDP）
+   │ ③ 校验 PEP 共享密钥（防绕过网关直连）
+   │ ④ 解析身份 → Casbin 动作级 + OpenFGA 数据级
+   ▼
+决策：200 转发 / 403 拦截（deny-by-default）
+</pre>
+
+<h2>4. 防绕过设计</h2>
+<div class="box"><b>共享密钥信任链</b>：PEP 组（<code>/v1/authz</code>、<code>/v1/gateway</code>）要求 <code>X-PEP-Token</code> 等于配置的共享密钥。只有网关（PEP）持有该密钥，外部无法绕过网关直接调用 PDP。</div>
+<div class="box"><b>凭证与授权分离</b>：应用申请（接入单）签发的凭证（Client Credentials）只解决「能不能连」；「能用哪些能力」由能力包授权（接口 + 数据范围）决定。先打通访问，再申请细粒度权限。</div>
+
+<h2>5. 端到端工作流</h2>
+<pre>
+1. 应用 Owner 注册应用 → 登记鉴权方式（Client Credentials）+ 网络信息
+2. 声明能力 → 配置预设 → 上架市场（审批）
+3. 调用方（程序身份）申请接入 → 审批通过 → 签发 client_id/secret
+4. 调用方申请能力包（选主体+数据范围）→ 审批通过 → 策略自动创建
+5. 网关放行：token 有效 + 动作级通过 + 数据级匹配 → 200
+</pre>
+
+<h2>6. 面试叙事要点</h2>
+<ul>
+<li><b>为什么用 OAuth2 CC 而不是 API Key</b>：令牌无状态（验签即可）、短 TTL 可吊销、支持 scope 最小权限。</li>
+<li><b>认证与鉴权分离的价值</b>：一次认证，多次鉴权；凭证只管身份，授权管范围。</li>
+<li><b>网关 PEP vs SDK 接入</b>：网关零侵入（对目标应用透明）；SDK 更灵活但每应用集成成本高。</li>
+<li><b>deny-by-default</b>：默认拒绝，显式放行；任何引擎不可用时 fail-closed。</li>
+</ul>
+
+<h2>7. 小结</h2>
+<p>应用间鉴权的本质是「出示身份凭据 + 让对方按策略决策」。本系统以 OAuth2 CC 换令牌、以网关 PEP 做执行点、以 PDP 双引擎做决策，并用共享密钥防止绕过，构成了完整且可讲解的安全链路。</p>
+</body>
+</html>

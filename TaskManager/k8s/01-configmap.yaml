@@ -1,0 +1,43 @@
+# ──────────────────────────────────────────────────────────────────
+# ConfigMap: 存放非敏感的配置项（环境变量 + Nginx 配置）
+# 敏感信息（密码、密钥）放在 Secret 中
+# ──────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cmdb-config
+  namespace: cmdb
+data:
+  # ── Django 后端配置 ──
+  DEBUG: "0"
+  ALLOWED_HOSTS: "*"
+  DJANGO_SETTINGS_MODULE: "config.settings"
+  CELERY_BROKER_URL: "redis://redis-service:6379/0"
+  REDIS_URL: "redis://redis-service:6379/0"
+
+  # ── Celery Worker 队列配置 ──
+  CELERY_WORKER_QUEUES: "aws,connector,inspection,default"
+
+  # ── Nginx 前端配置（直接内嵌） ──
+  nginx.conf: |
+    server {
+        listen 80;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location /api/ {
+            proxy_pass http://backend-service:8000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        location /static/ {
+            proxy_pass http://backend-service:8000;
+        }
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }

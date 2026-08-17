@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>本地模拟发布 — 环境配置与应用手册</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 20px; background: #f5f7fa; }
+  .container { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 24px; border-bottom: 3px solid #1677ff; padding-bottom: 10px; margin-bottom: 24px; }
+  h2 { font-size: 18px; color: #1677ff; margin-top: 32px; border-left: 4px solid #1677ff; padding-left: 12px; }
+  h3 { font-size: 15px; color: #333; margin-top: 20px; }
+  .alert { border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+  .alert-info { background: #e6f4ff; border: 1px solid #91caff; }
+  .alert-warn { background: #fff7e6; border: 1px solid #ffd591; }
+  .alert-ok { background: #f6ffed; border: 1px solid #b7eb8f; }
+  .alert strong { color: inherit; }
+  .card { border: 1px solid #e2e5f0; border-radius: 8px; padding: 20px; margin-bottom: 16px; background: #fff; }
+  .card-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+  th, td { border: 1px solid #e2e5f0; padding: 8px 12px; text-align: left; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:hover td { background: #f9fbff; }
+  code { background: #f1f5f9; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-family: 'SF Mono', Consolas, monospace; color: #e11d48; }
+  pre { background: #1e293b; color: #e2e8f0; border-radius: 6px; padding: 14px 18px; font-size: 12px; font-family: 'SF Mono', Consolas, monospace; overflow-x: auto; line-height: 1.5; margin-bottom: 16px; }
+  pre .comment { color: #64748b; }
+  pre .cmd { color: #38bdf8; }
+  pre .ok { color: #4ade80; }
+  pre .warn { color: #fbbf24; }
+  pre .hl { color: #a78bfa; font-weight: 600; }
+  .tag { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; margin-right: 4px; }
+  .tag-go { background: #dbeafe; color: #2563eb; }
+  .tag-node { background: #dcfce7; color: #16a34a; }
+  .tag-python { background: #fef3c7; color: #d97706; }
+  .tag-k8s { background: #f0fdf4; color: #15803d; }
+  .tag-sim { background: #faf5ff; color: #7c3aed; }
+  .flex-row { display: flex; gap: 16px; margin-bottom: 16px; }
+  .flex-card { flex: 1; border: 1px solid #e2e5f0; border-radius: 8px; padding: 16px; background: #fff; }
+  .flex-card h4 { margin: 0 0 8px; font-size: 14px; }
+  .file-tree { background: #1e293b; color: #e2e8f0; border-radius: 6px; padding: 14px 18px; font-size: 12px; font-family: 'SF Mono', Consolas, monospace; line-height: 1.6; margin-bottom: 16px; }
+  .file-tree .dir { color: #38bdf8; }
+  .file-tree .file { color: #a78bfa; }
+  .file-tree .ok { color: #4ade80; }
+  .file-tree .dim { color: #64748b; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 4px; font-size: 13px; }
+  .toc { background: #fff; border: 1px solid #e2e5f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; }
+  .toc a { color: #1677ff; text-decoration: none; font-size: 13px; }
+  .toc a:hover { text-decoration: underline; }
+  .toc li { margin-bottom: 6px; }
+  .arch-box { background: #1e293b; color: #e2e8f0; border-radius: 6px; padding: 18px 22px; font-size: 12px; font-family: 'SF Mono', Consolas, monospace; line-height: 1.5; margin-bottom: 16px; white-space: pre; }
+  .arch-box .hl { color: #a78bfa; font-weight: 600; }
+  .arch-box .grn { color: #4ade80; }
+  .arch-box .yel { color: #fbbf24; }
+  .arch-box .blue { color: #38bdf8; }
+</style>
+<style>
+
+/* ===== 文章自包含导航 (由 add_article_toc.py 注入) ===== */
+/* 注意: 不使用 scroll-behavior: smooth，srcdoc sandbox iframe 内动画会导致 scroll 事件不可靠 */
+[id] { scroll-margin-top: 14px; }
+.doc-layout { display: flex; gap: 28px; align-items: flex-start; }
+.doc-toc {
+  width: 236px; flex-shrink: 0; box-sizing: border-box;
+  position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+  padding: 8px 4px 24px 0; border-right: 1px solid #eef0f6;
+}
+.doc-toc.is-hidden { display: none; }
+.doc-toc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 10px 10px; font-size: 13px; font-weight: 700; color: #4a5568;
+  letter-spacing: .5px;
+}
+.doc-toc-hide {
+  cursor: pointer; border: none; background: transparent; color: #a0aec0;
+  font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.doc-toc-hide:hover { color: #1a202c; background: #f1f5f9; }
+.doc-toc-nav { display: flex; flex-direction: column; gap: 1px; }
+.doc-toc-nav a {
+  display: block; padding: 6px 10px; border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0; color: #4a5568; text-decoration: none;
+  font-size: 13px; line-height: 1.5; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; transition: all .15s;
+}
+.doc-toc-nav a:hover { color: #1677ff; background: #f0f6ff; }
+.doc-toc-nav a.active {
+  color: #1677ff; background: #e6f4ff; border-left-color: #1677ff; font-weight: 600;
+}
+.doc-toc-show {
+  display: none; position: sticky; top: 8px; z-index: 30;
+  border: 1px solid #c7d7f5; background: #fff; color: #1677ff;
+  font-size: 13px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(22,119,255,.15);
+}
+.doc-toc-show.is-visible { display: inline-block; }
+.doc-main { flex: 1; min-width: 0; }
+@media (max-width: 820px) {
+  .doc-layout { flex-direction: column; gap: 12px; }
+  .doc-toc {
+    position: static; width: 100%; max-height: 220px;
+    border-right: none; border-bottom: 1px solid #eef0f6;
+  }
+}
+</style>
+</head>
+<body>
+<div class="doc-layout">
+  <button class="doc-toc-show" id="doc-toc-show" type="button">📑 目录</button>
+  <aside class="doc-toc" id="doc-toc">
+  <div class="doc-toc-head">
+    <span class="doc-toc-title">📑 本文章节</span>
+    <button class="doc-toc-hide" id="doc-toc-hide" type="button" title="收起目录">✕</button>
+  </div>
+  <nav class="doc-toc-nav">
+    <a href="#s1">1. 架构总览</a>
+    <a href="#s2">2. 必要应用（demo-apps）</a>
+    <a href="#s3">3. 环境配置（OrbStack K8s）</a>
+    <a href="#s4">4. K8s 命名空间与配置</a>
+    <a href="#s5">5. 应用环境配置（AppEnvConfig）</a>
+    <a href="#s6">6. 审批策略配置</a>
+    <a href="#s7">7. 用户角色与权限</a>
+    <a href="#s8">8. 本地环境检查清单</a>
+    <a href="#s9">9. 常见问题与排障</a>
+    <a href="#s10">10. Dockerfile 编写指南</a>
+    <a href="#s11">11. deployment.yaml 编写指南</a>
+    <a href="#s12">12. CI/CD 完整流程</a>
+  </nav>
+</aside>
+  <main class="doc-main">
+
+<div class="container">
+
+<h1>📦 本地模拟发布 — 环境配置与应用手册</h1>
+
+<!-- ==================== 1. 架构总览 ==================== -->
+<h2 id="s1">1. 架构总览</h2>
+
+<div class="alert alert-info">
+  <strong>💡 核心思路：</strong>本系统将 AWS Spug 的两层安全架构（backend + Lambda）映射为本地三服务架构（backend + executor + K8s），通过模拟模式在无真实集群时也能完整跑通发布流程。
+</div>
+
+<div class="arch-box"><span class="hl">┌──────────────────────────────────────────────────────────────────┐</span>
+<span class="hl">│</span>                <span class="yel">Web UI (React + Ant Design :5173)</span>                  <span class="hl">│</span>
+<span class="hl">│</span>  发布管理 → 应用列表 → 新建发布 → CI/CD 双面板日志              <span class="hl">│</span>
+<span class="hl">└─────────────────────────────┬────────────────────────────────────┘</span>
+                              │ JWT Auth
+<span class="hl">┌─────────────────────────────▼────────────────────────────────────┐</span>
+<span class="hl">│</span>              <span class="yel">API Server (Django + DRF :8000)</span>                     <span class="hl">│</span>
+<span class="hl">│</span>  发布引擎 · 审批引擎 · 权限引擎 · 审计日志                       <span class="hl">│</span>
+<span class="hl">│</span>  ↓ 签名请求（EdDSA 方案B：签名 + 请求内容绑定）                 <span class="hl">│</span>
+<span class="hl">└─────────────────────────────┬────────────────────────────────────┘</span>
+                              │
+<span class="hl">┌─────────────────────────────▼────────────────────────────────────┐</span>
+<span class="hl">│</span>            <span class="yel">release-executor (FastAPI :8765)</span>                     <span class="hl">│</span>
+<span class="hl">│</span>  op=build  → 真实 docker build（用户 Dockerfile + 层缓存）     <span class="hl">│</span>
+<span class="hl">│</span>  op=deploy → kubectl apply（首次）/ set image（后续）            <span class="hl">│</span>
+<span class="hl">│</span>  op=pods   → kubectl rollout status 跟踪滚动更新                <span class="hl">│</span>
+<span class="hl">│</span>  ↓ 连接本地 K8s（OrbStack / kind）                               <span class="hl">│</span>
+<span class="hl">└─────────────────────────────┬────────────────────────────────────┘</span>
+                              │ kubeconfig
+<span class="hl">┌─────────────────────────────▼────────────────────────────────────┐</span>
+<span class="hl">│</span>               <span class="yel">OrbStack K8s 集群 (context: orbstack)</span>             <span class="hl">│</span>
+<span class="hl">│</span>  Deployment / StatefulSet → Pod → 运行                           <span class="hl">│</span>
+<span class="hl">└──────────────────────────────────────────────────────────────────┘</span></div>
+
+<h3>三服务端口</h3>
+<table>
+  <tr><th>服务</th><th>端口</th><th>说明</th></tr>
+  <tr><td>前端</td><td>5173</td><td>Vite 开发服务器</td></tr>
+  <tr><td>后端</td><td>8000</td><td>Django API Server</td></tr>
+  <tr><td>执行端</td><td>8765</td><td>release-executor (FastAPI)</td></tr>
+</table>
+
+<!-- ==================== 2. 必要应用 ==================== -->
+<h2 id="s2">2. 必要应用（demo-apps）</h2>
+
+<p>系统注册了三个语言不同的演示应用，用于展示发布系统对多语言技术栈的支持能力。</p>
+
+<div class="flex-row">
+  <div class="flex-card">
+    <h4><span class="tag tag-python">Python</span> python-app (Python API 服务)</h4>
+    <ul>
+      <li>框架：FastAPI</li>
+      <li>源码：`demo-apps/python-app/`</li>
+      <li>Dockerfile：两层镜像（python:3.11-slim + uvicorn）</li>
+      <li>端口：8080</li>
+      <li>健康检查：`/health`</li>
+    </ul>
+  </div>
+  <div class="flex-card">
+    <h4><span class="tag tag-go">Go</span> go-app (Go 微服务)</h4>
+    <ul>
+      <li>框架：标准库 net/http</li>
+      <li>源码：`demo-apps/go-app/`</li>
+      <li>Dockerfile：多阶段构建（golang:1.23-alpine → alpine:3.20）</li>
+      <li>端口：8080</li>
+      <li>健康检查：`/health`</li>
+    </ul>
+  </div>
+  <div class="flex-card">
+    <h4><span class="tag tag-node">Node</span> node-app (Node.js 前端服务)</h4>
+    <ul>
+      <li>框架：Express</li>
+      <li>源码：`demo-apps/node-app/`</li>
+      <li>Dockerfile：node:20-alpine</li>
+      <li>端口：8080</li>
+      <li>健康检查：`/health`</li>
+    </ul>
+  </div>
+</div>
+
+<h3>demo-apps 目录结构</h3>
+<div class="file-tree"><span class="dir">demo-apps/</span>
+├── <span class="dir">config/</span>                          <span class="dim"># 模拟 GitLab K8s 配置仓库</span>
+│   ├── <span class="dir">python-app/</span>
+│   │   ├── <span class="dir">dev/</span>  <span class="ok">✓</span> <span class="file">deployment.yaml</span>    <span class="dim"># 开发环境 K8s 配置</span>
+│   │   ├── <span class="dir">test/</span> <span class="ok">✓</span> <span class="file">deployment.yaml</span>    <span class="dim"># 测试环境</span>
+│   │   └── <span class="dir">prod/</span> <span class="ok">✓</span> <span class="file">deployment.yaml</span>    <span class="dim"># 生产环境</span>
+│   ├── <span class="dir">go-app/</span>
+│   │   ├── <span class="dir">dev/</span>  <span class="ok">✓</span> <span class="file">deployment.yaml</span>
+│   │   └── <span class="dir">prod/</span> <span class="ok">✓</span> <span class="file">deployment.yaml</span>
+│   └── <span class="dir">node-app/</span>
+│       └── <span class="dir">dev/</span>  <span class="ok">✓</span> <span class="file">deployment.yaml</span>
+├── <span class="dir">python-app/</span>                      <span class="dim"># 应用源码</span>
+│   ├── <span class="file">Dockerfile</span>                    <span class="dim"># 双镜像构建</span>
+│   ├── <span class="file">main.py</span>
+│   └── <span class="file">requirements.txt</span>
+├── <span class="dir">go-app/</span>
+│   ├── <span class="file">Dockerfile</span>
+│   ├── <span class="file">go.mod</span>
+│   └── <span class="file">main.go</span>
+└── <span class="dir">node-app/</span>
+    ├── <span class="file">Dockerfile</span>
+    ├── <span class="file">package.json</span>
+    └── <span class="file">server.js</span></div>
+
+<h3>executor 如何使用这些文件</h3>
+<table>
+  <tr><th>阶段</th><th>executor 操作</th><th>读取的文件</th></tr>
+  <tr><td>CI 构建</td><td>读取 `demo-apps/{app}/Dockerfile`，执行真实 `docker build`</td><td>Dockerfile + 源码</td></tr>
+  <tr><td>CD 首次部署</td><td>读取 `demo-apps/config/{app}/{env}/deployment.yaml`，执行 kubectl apply</td><td>YAML</td></tr>
+  <tr><td>CD 后续部署</td><td>检测已有 Deployment，执行 kubectl set image</td><td>不读文件</td></tr>
+</table>
+
+<!-- ==================== 3. 环境配置 ==================== -->
+<h2 id="s3">3. 环境配置（OrbStack K8s）</h2>
+
+<div class="alert alert-ok">
+  <strong>✅ 本地环境：OrbStack K8s</strong><br>
+  当前使用 OrbStack 内置的 K8s 集群（context: orbstack），kubectl 已自动配置。
+</div>
+
+<h3>当前集群状态</h3>
+<table>
+  <tr><th>项目</th><th>值</th><th>说明</th></tr>
+  <tr><td>K8s Context</td><td>`orbstack`</td><td>OrbStack 内置集群</td></tr>
+  <tr><td>Control Plane</td><td>`https://127.0.0.1:26443`</td><td>本地访问</td></tr>
+  <tr><td>OrbStack</td><td>Running</td><td>Docker + K8s 均可用</td></tr>
+  <tr><td>Docker</td><td>v29.4.0</td><td>可 build 应用镜像</td></tr>
+  <tr><td>kubectl</td><td>v1.32.3</td><td>Homebrew 安装</td></tr>
+</table>
+
+<h3>当前集群已有命名空间</h3>
+<table>
+  <tr><th>命名空间</th><th>状态</th><th>说明</th></tr>
+  <tr><td>default</td><td>Active</td><td>默认命名空间</td></tr>
+  <tr><td>kube-system</td><td>Active</td><td>系统组件（CoreDNS 等）</td></tr>
+  <tr><td>kube-public</td><td>Active</td><td>公共信息</td></tr>
+  <tr><td>kube-node-lease</td><td>Active</td><td>节点租约</td></tr>
+</table>
+
+<div class="alert alert-warn">
+  <strong>⚠️ 注意：</strong>系统当前没有 `release-demo`、`dev`、`test1`、`pre`、`prod` 等命名空间。executor 的 deployment.yaml 引用了这些命名空间，首次部署时会自动创建，或需手动创建。
+</div>
+
+<h3>executor K8s 连接模式</h3>
+<p>executor 有两种运行模式：</p>
+<table>
+  <tr><th>模式</th><th>触发条件</th><th>行为</th></tr>
+  <tr><td><strong>真实模式</strong></td><td>`config.load_kubeconfig()` 成功</td><td>真实执行 kubectl 命令</td></tr>
+  <tr><td><strong>模拟模式</strong></td><td>kubernetes 库不可用或连接失败</td><td>记录日志，不实际执行</td></tr>
+</table>
+<p>当前 executor 显示 <code>"simulate": true</code>，需要排查 kubernetes Python 库的 kubeconfig 加载问题。</p>
+
+<!-- ==================== 4. K8s 命名空间 ==================== -->
+<h2 id="s4">4. K8s 命名空间与配置</h2>
+
+<h3>系统中定义的环境与对应命名空间</h3>
+<table>
+  <tr><th>环境</th><th>Code</th><th>集群</th><th>命名空间</th><th>副本数</th><th>审批</th></tr>
+  <tr><td>开发环境</td><td>dev</td><td>kind-dev</td><td>dev</td><td>2</td><td>无需审批</td></tr>
+  <tr><td>测试环境1</td><td>test1</td><td>kind-test1</td><td>test1</td><td>1</td><td>应用负责人审批</td></tr>
+  <tr><td>预发环境</td><td>pre</td><td>kind-pre</td><td>pre</td><td>2</td><td>应用负责人 + 组负责人</td></tr>
+  <tr><td>生产环境</td><td>prod</td><td>kind-prod</td><td>prod</td><td>3</td><td>应用负责人 + 业务线负责人</td></tr>
+</table>
+
+<div class="alert alert-info">
+  <strong>💡 配置说明：</strong>以上集群（kind-dev、kind-test1 等）是系统种子数据中的虚拟名称。在本地环境中，所有环境都连接到同一个 OrbStack 集群（`orbstack` context），通过命名空间区分环境。
+</div>
+
+<h3>首次部署前需创建的命名空间</h3>
+<pre><span class="comment"># 创建所有需要的命名空间</span>
+<span class="cmd">kubectl</span> create namespace dev
+<span class="cmd">kubectl</span> create namespace test1
+<span class="cmd">kubectl</span> create namespace pre
+<span class="cmd">kubectl</span> create namespace prod
+
+<span class="comment"># 验证</span>
+<span class="cmd">kubectl</span> get namespaces</pre>
+
+<!-- ==================== 5. 应用环境配置 ==================== -->
+<h2 id="s5">5. 应用环境配置（AppEnvConfig）</h2>
+
+<p>每个应用在每个环境下都有独立的部署配置：</p>
+
+<table>
+  <tr><th>应用</th><th>环境</th><th>副本数</th><th>端口</th><th>健康检查</th><th>CPU</th><th>内存</th></tr>
+  <tr><td>python-app</td><td>dev</td><td>2</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>python-app</td><td>test1</td><td>1</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>python-app</td><td>pre</td><td>1</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>python-app</td><td>prod</td><td>3</td><td>8080</td><td>/health</td><td>1000m</td><td>1Gi</td></tr>
+  <tr><td>go-app</td><td>dev</td><td>2</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>go-app</td><td>test1</td><td>1</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>go-app</td><td>pre</td><td>2</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>go-app</td><td>prod</td><td>3</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>node-app</td><td>dev</td><td>2</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>node-app</td><td>test1</td><td>1</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>node-app</td><td>pre</td><td>2</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+  <tr><td>node-app</td><td>prod</td><td>3</td><td>8080</td><td>/health</td><td>500m</td><td>512Mi</td></tr>
+</table>
+
+<h3>YAML 配置文件格式（模拟 GitLab）</h3>
+<p>executor 读取 `demo-apps/config/{app}/{env}/deployment.yaml`，解析后执行 kubectl apply 或 set image：</p>
+<pre><span class="comment"># demo-apps/config/python-app/dev/deployment.yaml</span>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-app
+  namespace: <span class="hl">release-demo</span>
+  labels:
+    app: python-app
+    language: python
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: python-app
+  template:
+    metadata:
+      labels:
+        app: python-app
+    spec:
+      containers:
+      - name: python-app
+        image: <span class="hl">python-app:latest</span>
+        imagePullPolicy: IfNotPresent   <span class="comment"># ← 本地镜像，不从仓库拉取</span>
+        ports:
+        - containerPort: 8080
+        env:
+        - name: APP_VERSION
+          value: "1.0.0"
+        - name: ENV
+          value: "dev"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-app
+  namespace: release-demo
+spec:
+  selector:
+    app: python-app
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP</pre>
+
+<!-- ==================== 6. 审批策略 ==================== -->
+<h2 id="s6">6. 审批策略配置</h2>
+
+<table>
+  <tr><th>环境</th><th>审批模式</th><th>审批人来源</th><th>步骤</th><th>说明</th></tr>
+  <tr><td>dev</td><td><span class="tag" style="background:#f6ffed;color:#389e0d">无需审批</span></td><td>—</td><td>0</td><td>直接发布，跳过审批</td></tr>
+  <tr><td>test1</td><td><span class="tag" style="background:#e6f4ff;color:#1677ff">单人审批</span></td><td>应用负责人</td><td>1</td><td>应用 owner 审批即可</td></tr>
+  <tr><td>pre</td><td><span class="tag" style="background:#fff7e6;color:#d46b08">多级审批</span></td><td>app_owner → group_leader</td><td>2</td><td>先应用负责人，再组负责人</td></tr>
+  <tr><td>prod</td><td><span class="tag" style="background:#fff1f0;color:#cf1322">多级审批</span></td><td>app_owner → bl_leader</td><td>2</td><td>先应用负责人，再业务线负责人</td></tr>
+</table>
+
+<h3>审批人动态解析</h3>
+<p>系统不绑定固定审批人，而是根据策略中的 `approver_source` 动态查找：</p>
+<pre><span class="cmd">_resolve_approver(release, source)</span>
+  ├── <span class="hl">app_owner</span>    → release.application.owner  <span class="comment">（如：李四）</span>
+  ├── <span class="hl">group_leader</span> → release.application.owner_group.leader
+  └── <span class="hl">bl_leader</span>    → release.application.business_line.leader</pre>
+
+<h3>发布单状态流转</h3>
+<pre>
+创建(draft) → 发起审批(submitting) → 审批通过(passed) → 点击发布 → CI→CD → 完成(completed)
+                │                        ↓ 驳回
+                └── rejected → 可重新发起
+</pre>
+
+<!-- ==================== 7. 用户角色 ==================== -->
+<h2 id="s7">7. 用户角色与权限</h2>
+
+<h3>测试用用户</h3>
+<table>
+  <tr><th>用户名</th><th>姓名</th><th>角色</th><th>可操作</th></tr>
+  <tr><td>zhangsan</td><td>张三</td><td>开发者（支付研发组成员）</td><td>创建发布单、发起审批</td></tr>
+  <tr><td>lisi</td><td>李四</td><td>应用负责人（组长）</td><td>审批 go-app/node-app/python-app 的发布</td></tr>
+  <tr><td>wangwu</td><td>王五</td><td>应用负责人</td><td>审批 user-service 等</td></tr>
+</table>
+
+<h3>应用负责人配置</h3>
+<table>
+  <tr><th>应用</th><th>负责人</th><th>含义</th></tr>
+  <tr><td>payment-api</td><td>李四 (lisi)</td><td>payment-api 的 test 环境审批人</td></tr>
+  <tr><td>go-app</td><td>李四 (lisi)</td><td>go-app 的 test 环境审批人</td></tr>
+  <tr><td>node-app</td><td>李四 (lisi)</td><td>node-app 的 test 环境审批人</td></tr>
+  <tr><td>python-app</td><td>李四 (lisi)</td><td>python-app 的 test 环境审批人</td></tr>
+  <tr><td>user-service</td><td>王五 (wangwu)</td><td>user-service 的审批人</td></tr>
+</table>
+
+<div class="alert alert-info">
+  <strong>💡 测试建议流程：</strong><br>
+  1. 用张三登录 → 进入 go-app → 新建发布（dev 环境）→ 无需审批 → 直接发布<br>
+  2. 用张三登录 → 进入 go-app → 新建发布（test 环境）→ 发起审批<br>
+  3. 用李四登录 → 审批中心 → 发布审批 → 通过<br>
+  4. 用张三登录 → go-app → 点击「发布」→ CI→CD 执行
+</div>
+
+<!-- ==================== 8. 环境检查 ==================== -->
+<h2 id="s8">8. 本地环境检查清单</h2>
+
+<table>
+  <tr><th>#</th><th>检查项</th><th>命令</th><th>期望结果</th><th>当前状态</th></tr>
+  <tr><td>1</td><td>OrbStack 运行</td><td>`orbctl status`</td><td>Running</td><td>✅</td></tr>
+  <tr><td>2</td><td>Docker 可用</td><td>`docker info | head -3`</td><td>显示 Docker 版本</td><td>✅</td></tr>
+  <tr><td>3</td><td>kubectl 可用</td><td>`kubectl version --client --short`</td><td>显示版本号</td><td>✅</td></tr>
+  <tr><td>4</td><td>K8s 集群连接</td><td>`kubectl cluster-info`</td><td>显示 control plane 地址</td><td>✅</td></tr>
+  <tr><td>5</td><td>命名空间 dev</td><td>`kubectl get ns dev`</td><td>Active</td><td>❌ 未创建</td></tr>
+  <tr><td>6</td><td>命名空间 test1</td><td>`kubectl get ns test1`</td><td>Active</td><td>❌ 未创建</td></tr>
+  <tr><td>7</td><td>命名空间 pre</td><td>`kubectl get ns pre`</td><td>Active</td><td>❌ 未创建</td></tr>
+  <tr><td>8</td><td>命名空间 prod</td><td>`kubectl get ns prod`</td><td>Active</td><td>❌ 未创建</td></tr>
+  <tr><td>9</td><td>executor 运行</td><td>`curl localhost:8765/api/v1/cluster/health`</td><td>`simulate: false`</td><td>⚠️ 当前 simulate=true</td></tr>
+  <tr><td>10</td><td>demo 应用镜像</td><td>`docker images | grep release-demo`</td><td>有镜像</td><td>⚠️ 暂无</td></tr>
+</table>
+
+<!-- ==================== 9. 常见问题 ==================== -->
+<h2 id="s9">9. 常见问题与排障</h2>
+
+<h3>Q: executor 显示 simulate=true 怎么办？</h3>
+<p>executor 的 k8s_client.py 通过 `config.load_kubeconfig()` 连接 K8s。如果失败会进入模拟模式。排查步骤：</p>
+<pre><span class="comment"># 1. 检查 kubeconfig 是否指向 OrbStack</span>
+<span class="cmd">kubectl</span> config current-context
+<span class="comment"># 应输出: orbstack</span>
+
+<span class="comment"># 2. 检查 executor 的 kubernetes 库能否加载 kubeconfig</span>
+<span class="cmd">cd</span> executor && source ../.venv/bin/activate
+python -c "from kubernetes import config; config.load_kubeconfig(); print('OK')"
+
+<span class="comment"># 3. 如果失败，检查 kubernetes 库版本</span>
+pip show kubernetes</pre>
+
+<h3>Q: executor 报错 "命名空间不存在" 怎么办？</h3>
+<p>首次部署时，executor 的 deployment.yaml 中 `namespace` 字段需要对应的命名空间存在。</p>
+<pre><span class="comment"># 方法一：手动创建</span>
+<span class="cmd">kubectl</span> create namespace release-demo
+
+<span class="comment"># 方法二：修改 deployment.yaml 中的 namespace 字段</span>
+<span class="comment"># 把 namespace: release-demo 改为 namespace: default</span></pre>
+
+<h3>Q: 首次部署和后续部署有什么区别？</h3>
+<table>
+  <tr><th></th><th>首次部署</th><th>后续部署</th></tr>
+  <tr><td>判断依据</td><td>`is_first_deploy=true`</td><td>`is_first_deploy=false`</td></tr>
+  <tr><td>判断逻辑</td><td>DeployHistory 中无成功记录</td><td>已有成功部署记录</td></tr>
+  <tr><td>kubectl 命令</td><td>`kubectl apply -f deployment.yaml`</td><td>`kubectl set image deployment/{name} ...`</td></tr>
+  <tr><td>日志表现</td><td>「创建 Deployment」「创建 Service」</td><td>「检测到现有 Deployment」「滚动更新中...」</td></tr>
+</table>
+
+<h3>Q: CI 阶段是真实构建吗？</h3>
+<p>是的。CI 阶段（op=build）由 executor 执行真实的 `docker build`：</p>
+<ul>
+  <li>读取 `demo-apps/{app}/Dockerfile`，执行 `docker build -t {app}:{version} .`</li>
+  <li>利用 Docker 层缓存加速（基础镜像和依赖安装层只下载一次）</li>
+  <li>构建完成后自动打 `latest` 标签</li>
+</ul>
+<p>CD 阶段（op=deploy）同样执行真实 `kubectl apply` / `kubectl set image` + `kubectl rollout status`。</p>
+
+<h3>Q: deployment.yaml 中的 image 应该写什么？</h3>
+<p>本地开发环境下，镜像直接使用 `docker build` 产出的本地镜像名：</p>
+<pre><span class="comment"># 本地构建的镜像（docker build -t python-app:1.0.0 .）</span>
+image: <span class="hl">python-app:latest</span>
+imagePullPolicy: IfNotPresent  <span class="comment"># 关键：不从远程仓库拉取，使用本地镜像</span></pre>
+<p>CI 构建流程会自动产出 `{app}:{version}` 标签的镜像，同时打 `latest` 标签供 deployment.yaml 引用。</p>
+
+<h3>Q: 为什么 dev 环境不需要审批而 test 需要？</h3>
+<p>这是由审批策略表 `ReleaseApprovalStrategy` 控制的。dev 环境配置为 `mode=none`（无需审批），test1 配置为 `mode=single + app_owner`（应用负责人审批）。创建发布单时系统自动根据环境匹配策略判断 `need_approval`。</p>
+
+<!-- ==================== 10. Dockerfile 编写指南 ==================== -->
+<h2 id="s10">10. Dockerfile 编写指南</h2>
+
+<div class="alert alert-info">
+  <strong>💡 设计原则：</strong>CI 系统不修改用户的 Dockerfile。应用代码仓库自带 Dockerfile，executor 直接执行 <code>docker build</code>。<code>builder_image</code> / <code>base_image</code> 字段仅作为元数据记录，供展示和合规校验使用。
+</div>
+
+<h3>Python 应用 Dockerfile</h3>
+<pre><span class="comment"># demo-apps/python-app/Dockerfile</span>
+<span class="cmd">FROM</span> python:3.11-slim
+<span class="cmd">WORKDIR</span> /app
+<span class="cmd">COPY</span> requirements.txt .
+<span class="cmd">RUN</span> pip install --no-cache-dir -r requirements.txt
+<span class="cmd">COPY</span> main.py .
+<span class="cmd">EXPOSE</span> 8080
+<span class="cmd">CMD</span> ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]</pre>
+
+<h3>Go 应用 Dockerfile（多阶段构建）</h3>
+<pre><span class="comment"># demo-apps/go-app/Dockerfile</span>
+<span class="comment"># 阶段 1：编译</span>
+<span class="cmd">FROM</span> golang:1.23-alpine <span class="hl">AS builder</span>
+<span class="cmd">WORKDIR</span> /app
+<span class="cmd">COPY</span> go.mod main.go ./
+<span class="cmd">RUN</span> CGO_ENABLED=0 GOOS=linux go build -o /app/server .
+
+<span class="comment"># 阶段 2：运行（极简镜像）</span>
+<span class="cmd">FROM</span> alpine:3.20
+<span class="cmd">WORKDIR</span> /app
+<span class="cmd">COPY</span> --from=builder /app/server .
+<span class="cmd">EXPOSE</span> 8080
+<span class="cmd">CMD</span> ["./server"]</pre>
+
+<h3>Node.js 应用 Dockerfile</h3>
+<pre><span class="comment"># demo-apps/node-app/Dockerfile</span>
+<span class="cmd">FROM</span> node:20-alpine
+<span class="cmd">WORKDIR</span> /app
+<span class="cmd">COPY</span> package.json .
+<span class="cmd">RUN</span> npm install --production
+<span class="cmd">COPY</span> server.js .
+<span class="cmd">EXPOSE</span> 8080
+<span class="cmd">CMD</span> ["node", "server.js"]</pre>
+
+<h3>Dockerfile 关键注意事项</h3>
+<table>
+  <tr><th>要点</th><th>说明</th></tr>
+  <tr><td><code>EXPOSE</code> 端口</td><td>必须与 deployment.yaml 中的 <code>containerPort</code> 一致（本系统统一为 8080）</td></tr>
+  <tr><td>健康检查端点</td><td>建议提供 <code>/health</code> 端点，K8s readinessProbe 会调用它</td></tr>
+  <tr><td>镜像拉取策略</td><td>本地环境使用 <code>imagePullPolicy: IfNotPresent</code>，避免从远程仓库拉取</td></tr>
+  <tr><td>Docker 缓存优化</td><td>先 COPY 依赖文件（如 requirements.txt），再 COPY 源码，最大化利用层缓存</td></tr>
+  <tr><td>多阶段构建</td><td>Go 等编译型语言推荐多阶段构建，最终镜像不含编译工具链，体积更小</td></tr>
+</table>
+
+<!-- ==================== 11. deployment.yaml 编写指南 ==================== -->
+<h2 id="s11">11. deployment.yaml 编写指南</h2>
+
+<h3>完整模板（Deployment + Service）</h3>
+<pre><span class="comment"># 文件路径: demo-apps/config/{app}/dev/deployment.yaml</span>
+<span class="comment"># 首次部署: kubectl apply -f deployment.yaml（同时创建 Deployment + Service）</span>
+<span class="comment"># 后续部署: kubectl set image deployment/{app} {app}={app}:{version}</span>
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: <span class="hl">{app-name}</span>
+  namespace: release-demo
+  labels:
+    app: <span class="hl">{app-name}</span>
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: <span class="hl">{app-name}</span>
+  template:
+    metadata:
+      labels:
+        app: <span class="hl">{app-name}</span>
+    spec:
+      containers:
+      - name: <span class="hl">{app-name}</span>
+        image: <span class="hl">{app-name}:latest</span>          <span class="comment"># CI 构建产出的本地镜像</span>
+        imagePullPolicy: IfNotPresent     <span class="comment"># 本地环境必须设置</span>
+        ports:
+        - containerPort: 8080
+        env:
+        - name: APP_VERSION
+          value: "1.0.0"
+        - name: ENV
+          value: "dev"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: <span class="hl">{app-name}</span>
+  namespace: release-demo
+spec:
+  selector:
+    app: <span class="hl">{app-name}</span>
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP</pre>
+
+<h3>deployment.yaml 关键字段说明</h3>
+<table>
+  <tr><th>字段</th><th>说明</th><th>必须</th></tr>
+  <tr><td><code>metadata.namespace</code></td><td>目标命名空间，需预先存在（如 <code>release-demo</code>、<code>dev</code>、<code>test1</code> 等）</td><td>✅</td></tr>
+  <tr><td><code>spec.replicas</code></td><td>Pod 副本数，根据环境调整（dev=2, prod=3+）</td><td>✅</td></tr>
+  <tr><td><code>image</code></td><td>CI 构建产出的镜像名，格式为 <code>{app}:{version}</code>，同时有 <code>{app}:latest</code> 标签</td><td>✅</td></tr>
+  <tr><td><code>imagePullPolicy</code></td><td>本地环境设为 <code>IfNotPresent</code>，避免拉取远程镜像</td><td>✅ 本地</td></tr>
+  <tr><td><code>readinessProbe</code></td><td>就绪探针，K8s 据此判断 Pod 是否可接收流量</td><td>推荐</td></tr>
+  <tr><td><code>livenessProbe</code></td><td>存活探针，失败时 K8s 会重启 Pod</td><td>推荐</td></tr>
+  <tr><td>Service (同文件)</td><td>ClusterIP 类型，暴露 80→8080 端口映射，供其他 Pod 或 port-forward 访问</td><td>✅</td></tr>
+</table>
+
+<div class="alert alert-warn">
+  <strong>⚠️ 注意事项：</strong>
+  <ul style="margin:8px 0 0;padding-left:20px">
+    <li>不要使用 <code>serviceAccountName</code>，除非已创建对应的 ServiceAccount</li>
+    <li>每个环境（dev/test/prod）应有独立的 deployment.yaml，副本数和资源限制可以不同</li>
+    <li><code>kubectl apply -f deployment.yaml</code> 会同时创建 Deployment 和 Service</li>
+    <li>如果部署失败，检查 <code>kubectl describe pod -n {namespace}</code> 查看 Pod 事件</li>
+  </ul>
+</div>
+
+<!-- ==================== 12. CI/CD 流程示意 ==================== -->
+<h2 id="s12">12. CI/CD 完整流程</h2>
+
+<div class="arch-box"><span class="hl">用户点击「发布」</span>
+    │
+    ▼
+<span class="blue">┌─ CI 阶段 ─────────────────────────────────────────────┐</span>
+│  executor 收到 op=build                                │
+│  1. git clone（检查 demo-apps/{app}/ 源码目录）          │
+│  2. docker build -t {app}:{version} . （真实构建）       │
+│  3. docker tag {app}:{version} {app}:latest             │
+│  4. 输出构建日志（逐行回传到前端 CI 面板）               │
+<span class="blue">└───────────────────────────────────────────────────────┘</span>
+    │ CI 成功
+    ▼
+<span class="grn">┌─ CD 阶段 ─────────────────────────────────────────────┐</span>
+│  executor 收到 op=deploy                               │
+│  1. 解析 deployment.yaml（namespace, replicas, image）  │
+│  2. 首次: kubectl apply -f deployment.yaml              │
+│     后续: kubectl set image deployment/{app} {app}=...  │
+│  3. kubectl rollout status（跟踪新 ReplicaSet）         │
+│  4. 输出部署日志（逐行回传到前端 CD 面板）               │
+<span class="grn">└───────────────────────────────────────────────────────┘</span>
+    │ CD 成功
+    ▼
+<span class="ok">发布完成 → 状态更新为「已完成」</span></div>
+
+<hr style="border:none;border-top:1px solid #e2e5f0;margin:32px 0 16px">
+<p style="font-size:12px;color:#999;text-align:center">文档版本: v1.1 · 最后更新: 2026-08-01 · 适用范围: release-system-demo 本地环境</p>
+
+</div>
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var toc = document.getElementById('doc-toc');
+  var showBtn = document.getElementById('doc-toc-show');
+  var hideBtn = document.getElementById('doc-toc-hide');
+  var links = Array.prototype.slice.call(
+    document.querySelectorAll('.doc-toc-nav a[href^="#"]')
+  );
+  var items = links.map(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    return el ? { id: id, el: el, a: a } : null;
+  }).filter(Boolean);
+  if (!items.length) { return; }
+
+  function highlight() {
+    var pos = window.scrollY + 120;
+    var active = null;
+    for (var i = 0; i < items.length; i++) {
+      var top = items[i].el.getBoundingClientRect().top + window.scrollY;
+      if (top <= pos) { active = items[i].id; }
+    }
+    var activeEl = active ? items.filter(function (x) { return x.id === active; })[0].a : null;
+    items.forEach(function (x) {
+      x.a.classList.toggle('active', x.a === activeEl);
+    });
+  }
+  // srcdoc sandbox iframe 内 scroll/IntersectionObserver 事件不可靠，
+  // 故用轮询驱动高亮，scroll/resize 事件仅作加速。
+  window.setInterval(highlight, 150);
+  window.addEventListener('scroll', highlight, { passive: true });
+  window.addEventListener('resize', highlight, { passive: true });
+  highlight();
+
+  // 拦截目录链接点击：srcdoc iframe 内原生锚点 <a href="#id"> 会解析到
+  // 父页面 URL 而被沙箱拦截，必须改用 scrollIntoView 实现平滑/即时跳转。
+  links.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) el.scrollIntoView(true);
+    });
+  });
+
+  if (hideBtn && toc) {
+    hideBtn.addEventListener('click', function () {
+      toc.classList.add('is-hidden');
+      if (showBtn) showBtn.classList.add('is-visible');
+    });
+  }
+  if (showBtn) {
+    showBtn.addEventListener('click', function () {
+      if (toc) toc.classList.remove('is-hidden');
+      showBtn.classList.remove('is-visible');
+    });
+  }
+})();
+</script>
+</body>
+</html>

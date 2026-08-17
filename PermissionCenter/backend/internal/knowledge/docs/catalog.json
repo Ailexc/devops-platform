@@ -1,0 +1,42 @@
+[
+  {
+    "id": "01-architecture",
+    "title": "系统架构总览",
+    "category": "架构设计",
+    "summary": "PEP/PDP/PAP/PIP 四平面划分、组件拓扑与全链路数据流",
+    "order": 1,
+    "file": "01-architecture.html"
+  },
+  {
+    "id": "02-authz-chain",
+    "title": "鉴权链路与双引擎",
+    "category": "核心技术",
+    "summary": "动作级 Casbin + 数据级 OpenFGA，决策缓存与策略快照",
+    "order": 2,
+    "file": "02-authz-chain.html"
+  },
+  {
+    "id": "03-capability-contract",
+    "title": "能力包与接口契约",
+    "category": "业务设计",
+    "summary": "声明式权限模型、预设×数据范围、OpenAPI 接口契约",
+    "order": 3,
+    "file": "03-capability-contract.html"
+  },
+  {
+    "id": "04-observability",
+    "title": "系统观测设计",
+    "category": "工程实践",
+    "summary": "决策缓存工作台 / 指标面板 / 数据面图谱 / Owner 巡检",
+    "order": 4,
+    "file": "04-observability.html"
+  },
+  {
+    "id": "05-app-authz",
+    "title": "应用间鉴权",
+    "category": "架构设计",
+    "summary": "网关 PEP 方案、共享密钥信任链与防绕过",
+    "order": 5,
+    "file": "05-app-authz.html"
+  }
+]

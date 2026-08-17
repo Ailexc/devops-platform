@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发布方式概览</title>
+<style>
+/* ====== Reset & Base ====== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+
+/* ====== @font-face ====== */
+@font-face {
+  font-family: 'Heading';
+  src: url("data:font/ttf;base64,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`)
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Heading';
+  src: url("data:font/ttf;base64,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TaZN/E5eTrpPEE9mT7hQElCAUOZRclH8UoZTEFO6U+BUBlQsVFJUelSgVMZU7FUSVThVXlWEVapV0lX6ViJWSlZyVppXGFc+V2ZXjle2V95YBlguWFZYflimWM5Y9lkeWUZZbFl0WZxZxFnqWhBaNlpcWoJaqFrOWvRa/GsEawxrFGsWayBrKGswazhrQGtIa1BrWGtga2hrcGt4a4BrkGuYbABsIGxAbIBswGzgbQBtIG1AbYBtwG3gbgBvQG+Ab8BwAHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEBwQHBAcEB3gH/gICAlICUgKCAooC2gLqAxIDEgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDkgOSA5IDpAOwA9ID4gPyBAIEEgQiBDIEQgRSBGIEcgSCBJIEogSyBMIFAgWCBgIGAgeCB4IIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCCAIIAggCBA=`)
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Body';
+  src: url("data:font/ttf;base64,AAEAAAAQAQAABAAAR0RFRjS5LBUAAAJYAAABWEdQT1OzKitoAACWcAAAc0xHU1VCEGgVCwAAGtAAAAwaT1MvMmEFHXoAAAH4AAAAYFNUQVRfDUM5AAABmAAAAF5jbWFw54swLQAAB5wAAAQmZ2FzcAAAABAAAAEUAAAACGdseWYBwpIKAAA2+AAAX3hoZWFkJldk4AAAAWAAAAA2aGhlYQumB34AAAE8AAAAJGhtdHgsRGX/AAAS/AAAB9Rsb2NhHJQz+gAAA7AAAAPsbWF4cAIHAJ4AAAEcAAAAIG5hbWXfrx0qAAALxAAABzZwb3N01plpNQAAJuwAABAJcHJlcGgGjIUAAAEMAAAAB7gB/4WwBI0AAAEAAf//AA8AAQAAAfUAVQAHAEcABgABAAAAAAAAAAAAAAAAAAQAAQABAAADyv8GAAAINv+//kwIGgABAAAAAAAAAAAAAAAAAAAB9QABAAAAAQAAKtAIdF8PPPUAAwPoAAAAAN8K/H4AAAAA4Fwkzf+//tgIGgPaAAAABgACAAAAAAAAAAEAAQAIAAMAAAAUAAMAAAAsAAJ3ZHRoAQwAAHdnaHQBDQABaXRhbAEVAAIAJgAWAAYAAwACAAIBFgAAAAAAAQAAAAMAAQACAQ4BkAAAArwAAAABAAAAAgEUAGQAAAAAAAQCOQGQAAUAAAKKAlgAAABLAooCWAAAAV4AJgEtAAAAAAAAAAAAAAAAoAAAbwAAAGoAAAAAAAAAAE5PTkUAwAAgIhIDyv8GAAAD2gFeAAAAkwAAAAAB/gLQAAAAIAADAAEAAgCAAAAADgAAASwAFgAJAGQAZABcAFQARgA8ADQALAAsAAEACQE2ATcBOAE5AToBOwE8AVcBogABAAQAAQGpAAEABAABATMAAgAyAAYAAQJqAAIACgAGAAEFeQABAr0AAQAEAAEBLgABAAQAAQEqAAIACgAGAAECaQABATUAAgAcAAEACwABAA4AHwABACEALwABADEANwABADkAPQABAD8ARwABAEwAVAABAFYAYgABAGQAaAABAGoAigABAIwAjwABAJIAoAABAKMAqAABAKoAtAABALYAzgABANAA1AABANYA3AABAN4A3gABAOMA6wABAO0A+QABAPsA/wABAQEBNQABATYBPAACAVcBVwACAaIBogACAa0BrgABAdIB1gADAdgB5QADAAEAAgAAACIAAAAMAAIAAwHSAdYAAAHYAd4ABQHiAeQADAABAAMB3wHgAeUAAAAUADIAPgBKAFYAYgBuAHoAhgCSAJ4AqgDSATsBPgFKAVYBYgFuAZUBwwHPAdcB9wIDAg8CGwInAjMCPwJLAlcCcQKrArcCwwLPAukDCwMXAyMDLwM7A0cDUwNfA2sDdgOSA7ADvAPOA9oD5gPyBBIEMARJBFUEYQRtBHkEpwTbBOcE8wT/BQsFFwUjBV8FawWqBcwF8gYxBlsGZwZzBn8GvAbIBtQG3wbrBygHOQdFB1EHbwd7B4cHkwefB6sHtwfDB88H2wfxCBEIHQgpCDUIQQhlCH0IiQiVCKEIrQjGCNII3gjqCPYJAgkOCRoJJgkyCT4JSglWCWIJbgl6CYYJkgmeCaoJtgnCCeMJ7wocCigKNApACl8KmQqlCrEKvQrdCxkLJQsxCz0LSQuKC5ULoAurC7YLwQvMC9cL4wvuC/kMYgyVDMYM0gzdDOgM9A0mDWwNeA2yDeYN8g39DggOEw4fDioONQ5BDmMOpQ6wDrwOyA7rDxUPIA8sDzcPQg9ND1gPYw92D4EPjw+aD7YP0A/cD+gP9BAAEAsQJRBhEIYQkhCdEKkQtBDqERkRJREwETsRRhFREVwRkxGeEgESNBJnEpoSuhLFEtAS2xMWEyETLBM3E0MThxOrE7cTwxPqE/YUARQMFBcUIhQtFDgURBRPFGIUgRSNFJkUpRSxFNEU6hT1FQAVCxUWFS8VOhU+ ForwardSlash 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Body';
+  src: url("data:font/ttf;base64,AAEAAAAQAQAABAAAR0RFRjq5KpwAAAJUAAABZkdQT1NQTPpZAACWeAAAc3xHU1VCEGgVCwAAGsgAAAwaT1MvMmIxHW8AAAH0AAAAYFNUQVRfDEGlAAABmAAAAFpjbWFw54swLQAAB6gAAAQmZ2FzcAAAABAAAAEUAAAACGdseWageL9iAAA28AAAX4ZoZWFkJoxkqgAAAWAAAAA2aGhlYQvaB2UAAAE8AAAAJGhtdHhUrEXwAAAS9AAAB9Rsb2NhHvQ2WwAAA7wAAAPsbWF4cAIHAJ4AAAEcAAAAIG5hbWXfDxoNAAAL0AAAByRwb3N01plpNQAAJuQAABAJcHJlcGgGjIUAAAEMAAAAB7gB/4WwBI0AAAEAAf//AA8AAQAAAfUAVQAHAEcABgABAAAAAAAAAAAAAAAAAAQAAQABAAADyv8GAAAIZP+z/gUIWgABAAAAAAAAAAAAAAAAAAAB9QABAAAAAQAAT6ZYDF8PPPUAAwPoAAAAAN8K/H4AAAAA4Fwkzf+z/qIIWgPaAAEABgACAAAAAAAAAAEAAQAIAAMAAAAUAAMAAAAsAAJ3ZHRoAQwAAHdnaHQBDQABaXRhbAEVAAIAIgAWAAYAAwACAAIBFgAAAAAAAQAAAAEAAQAAARECvAAAAAEAAAACARQAZAAAAAAABAJOArwABQAAAooCWAAAAEsCigJYAAABXgAmAS0AAAAAAAAAAAAAAACgAABvAAAAagAAAAAAAAAATk9ORQCgACAiEgPK/wYAAAPaAV4AAACTAAAAAAH+AtAAAAAgAAMAAQACAI4AAAAOAAABOgAWAAkAcgBkAFwAVABGADwANAAsACwAAQAJATYBNwE4ATkBOgE7ATwBVwGiAAEABAABAakAAQAEAAEBQgACABwABgABAn8AAgAKAAYAAQWYAAECzAABAAQAAQFAAAEABAABATYAAgAKAAYAAQKGAAEBQwACAAoABgABAoMAAQFBAAIAHAABAAsAAQAOAB8AAQAhAC8AAQAxADcAAQA5AD0AAQA/AEcAAQBMAFQAAQBWAGIAAQBkAGgAAQBqAIoAAQCMAI8AAQCSAKAAAQCjAKgAAQCqALQAAQC2AM4AAQDQANQAAQDWANwAAQDeAN4AAQDjAOsAAQDtAPkAAQD7AP8AAQEBATUAAQE2ATwAAgFXAVcAAgGiAaIAAgGtAa4AAQHSAdYAAwHYAeUAAwABAAIAAAAiAAAADAACAAMB0gHWAAAB2AHeAAUB4gHkAAwAAQADAd8B4AHlAAAAAAATADAAPABIAFQAYABsAHgAhACQAJwAqADQAQkBPAFIAVQBYAFsAZQBwwHPAdcB9wIDAg8CGwInAjMCPwJLAlcCcQKrArcCwwLPAukDCwMXAyMDLwM7A0cDUwNfA2sDdgOSA7ADvAPOA9oD5gPyBBIELwRIBFQEYARsBHgEpgTaBOYE8gT+BQoFFgUiBV4FagWpBcsF8QYwBloGZgZyBn4GuwbHBtMG3wbrBygHOQdFB1EHbwd7B4cHkwefB6sHtwfDB88H2wfwCA8IGwgnCDMIPwhjCHsIhwiTCJ8IqwjECNAI3AjoCPQJAAkMCRgJJAkwCTwJSAlUCWAJbAl4CYQJkAmcCagJtAnACeIJ7goaCiYKMgo+Cl0KlwqjCq8KuwrbCxcLIwsvCzsLRwuJC5ULoAurC7YLwQvMC9cL4wvuC/kMYwyWDMcM0wzeDOkM9Q0oDW4Neg20DegN9A3/DgoOFQ4hDiwONw5DDmUOpw6yDr4Oyg7tDxcPIg8uDzkPRQ9QD1sPZg95D4QPkg+dD7kP0Q/dD+kP9RABEAwQJhBhEIYQkhCdEKkQtBDqERkRJREwETsRRhFREVwRkxGeEgESNBJnEpsSuxLGEtES3BMXEyITLRM4E0QTiBOsE7gTxBPrE/cUAhQNFBgUIxQuFDkURRRRFGQUgxSPFJsUpxSzFNMU7BT3FQIVDRUYFTEVPBU+ Eg==`)
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Mono';
+  src: url("data:font/ttf;base64,AAEAAAAARAQAABAAQR0RFRmQCZh4AAAKAAAABeEdQT1NrXW0dAAAn0AAAEM5HU1VC/fn0nAAAWOAAACysT1MvMggFLaMAAAIgAAAAYFNUQVTnmcw8AAAB2AAAAEhjbWFwOJL49gAAEpgAAAgiZ2FzcAAAABAAAAEkAAAACGdseWaBtMD+AACFjAAArApoZWFkIUP4QQAAAaAAAAA2aGhlYf+0BhAAAAFMAAAAJGhtdHhcOwTRAAAavAAADRJsb2NhnldyMAAAA/gAAAaebWF4cANuAOoAAAEsAAAAIG1ldGFns8PCAAABcAAAAC9uYW1lDBxAGgAACpgAAAf+cG9zdEAjBiMAADigAAAgPXByZXBoBoyFAAABHAAAAAe4Af+FsASNAAABAAH//wAPAAEAAANOAH8AEABpAAwAAQAAAAAAAAAAAAAAAAADAAEAAQAAA+3+2QAAAlj5Nv28Ao4D6AAAAAAAAAAAAAAAAAAAAzsAAAABAAAAAAAAACgAAAACZGxuZwAAACgAAAAEc2xuZwAAACwAAAADTGF0bkN5cgAAAQAAAAFmqNKzae5fDzz1AAMD6AAAAADjKaHrAAAAAOM+q875Nv8JAo4D9AAAAAYAAgAAAAAAAAABAAEACAACAAAAFAACAAAAJAACd2dodAEAAABpdGFsASQAAQAUAAQAAwABAAIBJQAAAAAAAQAAAAMAAAACARgBkAAAArwAAAAEAlgBkAAFAAACigJYAAAASwKKAlgAAAFeADIBPgAAAgEACQAAAAAAAKEAAv8QAa37AAAAAAAAAABWUkNMAMAAIPj/A+3+2QAAA/QBBiAAAJcAAAAAAhICxgAAACAABgABAAIADgAAAAAAAAE4AAIAMQABACEAAQAjACoAAQAsAFQAAQBWAGAAAQBiAIIAAQCEALAAAQCyALIAAQC0APAAAQDyAP4AAQEAASAAAQEiAU8AAQFSAVgAAQFaAVwAAQFfAWMAAQFlAWcAAQFpAW0AAQFvAW8AAQF1AXUAAQF3AXcAAQF6AX8AAQGCAYIAAQGEAYQAAQGGAYYAAQGJAY0AAQGQAZAAAQGSAZUAAQGYAZsAAQGdAZ8AAQGiAaYAAQGqAaoAAQGsAa0AAQGvAbAAAQGyAbIAAQG9Ab0AAQHAAcMAAQHFAcUAAQHJAckAAQHMAcwAAQHQAdAAAQHSAdcAAQJYAlgAAQLNAs0AAQLSAtIAAQLWAtYAAQMRAxEAAQMgAyQAAwMmAzkAAwM7Az4AAQNKA0oAAQABAAMAAAAwAAAAJgAAABAAAgADAyADJAAAAyYDLAAFAzgDOQAMAAEAAwMtAy4DLwACAAIDIAMkAAADJgMsAAUAAAAVAC4AOgBGAFIAXgBuAHoAhgCSAJ4AqgDLAP4BLQE5AUUBUAFcAWgBiAGUAZ8BqgHAAcwB2AHkAfQCAAIMAhgCJAIwAmYCfwK5AsUC0QLdAugC9AMAAzoDVwNiA24DgwOPA5sDqwO3A8MDzwPbA+cEBQQRBB0EOgRGBFEEYQRtBHgEgwSOBKwEwQTNBNkE5ATwBRUFRwVTBV8FbwV7BYsFlwWiBa4F7AYPBjQGbQaeBqoGtgbBBwkHFQchBywHOAdDB3QHhQeQB5wHpweyB9AH3AfoB/QIBAgQCCAILAg3CEMITwhiCIEIjQiZCKkItQjQCOYI8gj+CQ4JGgkmCTwJSAlUCWAJcAl7CYYJrQm5CcUJ0AoCCg4KGgolCjEKPQpNClkKaQp1CoEKkQqdCq0KvQrNCt0K6Qr1Cz4LSQtUC18Lagt4C4MLjguaC6ULsAwPDEIMcQx8DIcMkgydDKgM2w0SDR4NYw2VDaANqw22DcQNzw3aDeUN8A37Di4OSg6PDpoOpQ6wDrsOxg7RDx0PQQ9ND1kPZA9+D4kPlA+iD60PuA/DD9IP3Q/oEAQQEBAbEDMQPxBKEGYQchB+EIkQlBDNEPMQ/hE RkxETkFST0Q 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Mono';
+  src: url("data:font/ttf;base64,AAEAAAAARAQAABAAQR0RFRmQCZh4AAAJ8AAABeEdQT1PQL9nXAAAnwAAAEVJHU1VC/fn0nAAAWVQAACysT1MvMgk1LYkAAAIcAAAAYFNUQVTmBcxCAAAB2AAAAERjbWFwOJL49gAAEogAAAgiZ2FzcAAAABAAAAEkAAAACGdseWbujI+/AACGAAAAq+BoZWFkIUT4OwAAAaAAAAA2aGhlYf+0BgoAAAFMAAAAJGhtdHhbmOIzAAAarAAADRJsb2NhmQ1s8wAAA/QAAAaebWF4cANuAOoAAAEsAAAAIG1ldGFns8PCAAABcAAAAC9uYW1lC+c+0wAACpQAAAfycG9zdEAjBiMAADkUAAAgPXByZXBoBoyFAAABHAAAAAe4Af+FsASNAAABAAH//wAPAAEAAANOAH8AEABpAAwAAQAAAAAAAAAAAAAAAAADAAEAAQAAA+3+2QAAAlj5Nv22Ao4D6AAAAAAAAAAAAAAAAAAAAzsAAAABAAAAAAAAACgAAAACZGxuZwAAACgAAAAEc2xuZwAAACwAAAADTGF0bkN5cgAAAQAAAAFmqDxnRBZfDzz1AAMD6AAAAADjKaHrAAAAAOM+q875Nv8DAo4D9AABAAYAAgAAAAAAAAABAAEACAACAAAAFAACAAAAJAACd2dodAEAAABpdGFsASQAAQAUAAQAAwABAAIBJQAAAAAAAQAAAAEAAAAAAR4CvAAAAAQCWAK8AAUAAAKKAlgAAABLAooCWAAAAV4AMgFCAAACAQAJAAAAAAAAoQAC/xABrfsAAAAAAAAAAFZSQ0wAoAAg+P8D7f7ZAAAD9AEGIAAAlwAAAAACGALGAAAAIAAGAAEAAgAOAAAAAAAAATgAAgAxAAEAIQABACMAKgABACwAVAABAFYAYAABAGIAggABAIQAsAABALIAsgABALQA8AABAPIA/gABAQABIAABASIBTwABAVIBWAABAVoBXAABAV8BYwABAWUBZwABAWkBbQABAW8BbwABAXUBdQABAXcBdwABAXoBfwABAYIBggABAYQBhAABAYYBhgABAYkBjQABAZABkAABAZIBlQABAZgBmwABAZ0BnwABAaIBpgABAaoBqgABAawBrQABAa8BsAABAbIBsgABAb0BvQABAcABwwABAcUBxQABAckByQABAcwBzAABAdAB0AABAdIB1wABAlgCWAABAs0CzQABAtIC0gABAtYC1gABAxEDEQABAyADJAADAyYDOQADAzsDPgABA0oDSgABAAEAAwAAADAAAAAmAAAAEAACAAMDIAMkAAADJgMsAAUDOAM5AAwAAQADAy0DLgMvAAIAAgMgAyQAAAMmAywABQAAABUALgA6AEYAUgBeAG4AegCGAJIAngCqAMsA/wEuAToBRgFRAV0BaQGJAZUBoAGrAcEBzQHZAeUB9QIBAg0CGQIlAjECZwKAArsCxwLTAt8C6gL2AwIDPANZA2QDcAOFA5EDnQOtA7kDxQPRA90D6QQHBBMEHwQ7BEcEUgRiBG4EegSFBJAErwTEBNAE3ATnBPMFGAVKBVYFYgVyBX4FjgWaBaUFsQXwBhIGNwZwBqEGrQa5BsQHDAcYByQHLwc7B0YHdgeHB5IHngepB7QH0gfeB+oH9ggGCBIIIgguCDkIRQhRCGQIgwiPCJsIqwi3CNAI5QjxCP0JDQkZCSUJOwlHCVMJXwluCXkJhAmrCbcJwwnOCgEKDQoZCiQKMAo8CkwKWApoCnQKgAqQCpwKrAq8CswK3AroCvQLPQtIC1MLXgtpC3cLgguNC5kLpAuvDA4MQQxwDHsMhgyRDJwMpwzZDRENHQ1iDZQNnw2qDbUNww3ODdkN5A3vDfoOLA5IDo0OmA6jDq4OuQ7EDs8PGw8/D0sPVw9iD3wPhw+SD6EPrA+3D8IP0Q/cD+cQAxAPEBoQMRA9EEgQYxBvEHsQhhCREMoQ8BD7EQYRERE U0ZNT05P 700; font-style: normal; font-display: swap;
+}
+
+/* ====== CSS Variables ====== */
+:root {
+  --bg: #F8F9FC;
+  --bg2: rgba(255,255,255,0.85);
+  --ink: #1A1A2E;
+  --muted: #6B7280;
+  --rule: #E5E7EB;
+  --accent: #4F46E5;
+  --accent2: #7C3AED;
+  --accent-gradient: linear-gradient(135deg, #4F46E5, #7C3AED);
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --radius: 8px;
+  --radius-lg: 16px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,0.08), 0 4px 10px rgba(0,0,0,0.04);
+  --font-heading: 'Heading', 'PingFang SC', system-ui, sans-serif;
+  --font-body: 'Body', 'PingFang SC', system-ui, sans-serif;
+  --font-mono: 'Mono', 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  --max-width: 960px;
+}
+
+/* ====== Background ====== */
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(79, 70, 229, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 40%, rgba(124, 58, 237, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 40% at 50% 80%, rgba(79, 70, 229, 0.04) 0%, transparent 50%);
+  background-attachment: fixed;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ====== Layout ====== */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ====== Cover ====== */
+.cover {
+  min-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 80px 24px 60px;
+  position: relative;
+}
+.cover-badge {
+  display: inline-block;
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--accent);
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 24px;
+  border: 1px solid rgba(79, 70, 229, 0.15);
+}
+.cover h1 {
+  font-family: var(--font-heading);
+  font-size: 2.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+  max-width: 800px;
+  margin-bottom: 16px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.cover-sub {
+  font-size: 1.1rem;
+  color: var(--muted);
+  max-width: 600px;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+.cover-meta {
+  display: flex;
+  gap: 24px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.cover-meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cover-arrow {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--muted);
+  font-size: 1.5rem;
+  animation: bounce 2s infinite;
+}
+@keyframes bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(8px); }
+}
+
+/* ====== TOC ====== */
+.toc {
+  background: var(--bg2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-lg);
+  padding: 32px 40px;
+  margin: 40px auto;
+  border: 1px solid var(--rule);
+  box-shadow: var(--shadow);
+}
+.toc h2 {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  margin-bottom: 20px;
+  color: var(--ink);
+}
+.toc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 32px;
+}
+.toc-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.95rem;
+}
+.toc-num {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  font-weight: 700;
+  min-width: 28px;
+}
+.toc-item a {
+  color: var(--ink);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.toc-item a:hover { color: var(--accent); }
+
+/* ====== Sections ====== */
+section {
+  background: var(--bg2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-lg);
+  padding: 40px 44px;
+  margin: 28px 0;
+  border: 1px solid var(--rule);
+  box-shadow: var(--shadow);
+}
+
+h2 {
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid;
+  border-image: var(--accent-gradient) 1;
+  position: relative;
+}
+h2 .section-num {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+h3 {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-top: 28px;
+  margin-bottom: 12px;
+  color: var(--ink);
+}
+h3 .sub-icon {
+  display: inline-block;
+  width: 4px;
+  height: 18px;
+  background: var(--accent-gradient);
+  border-radius: 2px;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-top: 20px;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+
+p { margin-bottom: 12px; color: var(--ink); font-size: 0.95rem; }
+
+/* ====== Key Highlight ====== */
+mark.key {
+  background: none;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ====== Code ====== */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  background: rgba(79, 70, 229, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+pre {
+  background: rgba(26, 26, 46, 0.04);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  overflow-x: auto;
+  margin: 12px 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* ====== Callout Boxes ====== */
+.callout {
+  border-left: 4px solid;
+  padding: 14px 18px;
+  margin: 16px 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 0.9rem;
+}
+.callout-tip {
+  border-color: var(--accent);
+  background: rgba(79, 70, 229, 0.06);
+}
+.callout-warn {
+  border-color: var(--warning);
+  background: rgba(245, 158, 11, 0.06);
+}
+.callout-q {
+  border-color: var(--success);
+  background: rgba(16, 185, 129, 0.06);
+}
+.callout-q strong {
+  color: var(--success);
+}
+
+/* ====== Alert Boxes ====== */
+.alert-warning {
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.alert-warning h3 {
+  margin: 0 0 6px 0;
+  color: #d46b08;
+  font-size: 14px;
+}
+.alert-error {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.alert-error h3 {
+  margin: 0 0 6px 0;
+  color: #f5222d;
+  font-size: 14px;
+}
+
+/* ====== Interview Q&A ====== */
+.qa-block {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  margin: 16px 0;
+  overflow: hidden;
+}
+.qa-q {
+  padding: 14px 18px;
+  background: rgba(79, 70, 229, 0.05);
+  font-weight: 700;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.qa-q .badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+.badge-basic { background: rgba(16, 185, 129, 0.12); color: var(--success); }
+.badge-adv { background: rgba(79, 70, 229, 0.12); color: var(--accent); }
+.badge-scene { background: rgba(245, 158, 11, 0.12); color: var(--warning); }
+.badge-extend { background: rgba(124, 58, 237, 0.12); color: var(--accent2); }
+.qa-a {
+  padding: 14px 18px;
+  border-top: 1px solid var(--rule);
+  font-size: 0.9rem;
+  background: var(--bg2);
+}
+.qa-a p { margin-bottom: 6px; font-size: 0.9rem; }
+.qa-a p:last-child { margin-bottom: 0; }
+
+/* ====== Tables ====== */
+.table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 600px;
+  margin: 16px 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  min-width: 500px;
+}
+thead th {
+  background: rgba(79, 70, 229, 0.08);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--accent);
+  border-bottom: 2px solid var(--rule);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+tbody tr:hover { background: rgba(79, 70, 229, 0.03); }
+tbody tr:last-child td { border-bottom: none; }
+
+/* ====== Comparison Grid ====== */
+.comp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+.comp-card {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 20px;
+  background: var(--bg2);
+}
+.comp-card h4 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+.comp-card p { font-size: 0.88rem; margin-bottom: 6px; }
+.comp-card ul { font-size: 0.88rem; padding-left: 18px; color: var(--ink); }
+.comp-card li { margin-bottom: 4px; }
+.card-accent { border-color: var(--accent); }
+.card-accent h4 { color: var(--accent); }
+
+/* ====== Lists ====== */
+ul, ol { padding-left: 20px; margin-bottom: 12px; font-size: 0.95rem; }
+li { margin-bottom: 4px; }
+
+/* ====== Footer ====== */
+footer {
+  max-width: var(--max-width);
+  margin: 40px auto;
+  padding: 0 24px 40px;
+}
+
+/* ====== Responsive ====== */
+@media (max-width: 768px) {
+  .cover h1 { font-size: 1.8rem; }
+  .cover-sub { font-size: 0.95rem; }
+  .toc-grid { grid-template-columns: 1fr; }
+  .comp-grid { grid-template-columns: 1fr; }
+  section { padding: 24px 20px; }
+  .toc { padding: 24px 20px; }
+  .container { padding: 0 12px; }
+}
+
+/* ====== Print ====== */
+@media print {
+  body { background: white; }
+  section { break-inside: avoid; page-break-after: auto; border: 1px solid #ddd; box-shadow: none; }
+  .cover { min-height: auto; }
+  .cover-arrow { display: none; }
+}
+</style>
+<style>
+
+/* ===== 文章自包含导航 (由 add_article_toc.py 注入) ===== */
+/* 注意: 不使用 scroll-behavior: smooth，srcdoc sandbox iframe 内动画会导致 scroll 事件不可靠 */
+[id] { scroll-margin-top: 14px; }
+.doc-layout { display: flex; gap: 28px; align-items: flex-start; }
+.doc-toc {
+  width: 236px; flex-shrink: 0; box-sizing: border-box;
+  position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+  padding: 8px 4px 24px 0; border-right: 1px solid #eef0f6;
+}
+.doc-toc.is-hidden { display: none; }
+.doc-toc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 10px 10px; font-size: 13px; font-weight: 700; color: #4a5568;
+  letter-spacing: .5px;
+}
+.doc-toc-hide {
+  cursor: pointer; border: none; background: transparent; color: #a0aec0;
+  font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.doc-toc-hide:hover { color: #1a202c; background: #f1f5f9; }
+.doc-toc-nav { display: flex; flex-direction: column; gap: 1px; }
+.doc-toc-nav a {
+  display: block; padding: 6px 10px; border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0; color: #4a5568; text-decoration: none;
+  font-size: 13px; line-height: 1.5; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; transition: all .15s;
+}
+.doc-toc-nav a:hover { color: #1677ff; background: #f0f6ff; }
+.doc-toc-nav a.active {
+  color: #1677ff; background: #e6f4ff; border-left-color: #1677ff; font-weight: 600;
+}
+.doc-toc-show {
+  display: none; position: sticky; top: 8px; z-index: 30;
+  border: 1px solid #c7d7f5; background: #fff; color: #1677ff;
+  font-size: 13px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(22,119,255,.15);
+}
+.doc-toc-show.is-visible { display: inline-block; }
+.doc-main { flex: 1; min-width: 0; }
+@media (max-width: 820px) {
+  .doc-layout { flex-direction: column; gap: 12px; }
+  .doc-toc {
+    position: static; width: 100%; max-height: 220px;
+    border-right: none; border-bottom: 1px solid #eef0f6;
+  }
+}
+</style>
+</head>
+<body>
+<div class="doc-layout">
+  <button class="doc-toc-show" id="doc-toc-show" type="button">📑 目录</button>
+  <aside class="doc-toc" id="doc-toc">
+  <div class="doc-toc-head">
+    <span class="doc-toc-title">📑 本文章节</span>
+    <button class="doc-toc-hide" id="doc-toc-hide" type="button" title="收起目录">✕</button>
+  </div>
+  <nav class="doc-toc-nav">
+    <a href="#mode-regular">01 常规发布（Regular Release）</a>
+    <a href="#mode-incremental">02 增量发布（Incremental Release）</a>
+    <a href="#mode-compensation">03 补偿发布（Compensation Release）</a>
+    <a href="#mode-quick">04 快速发布（Quick Release）</a>
+    <a href="#mode-rollback">05 回滚发布（Rollback Release）</a>
+    <a href="#mode-emergency">06 紧急发布 / Hotfix（Emergency Release）</a>
+    <a href="#mode-scheduled">07 定时发布（Scheduled Release）</a>
+  </nav>
+</aside>
+  <main class="doc-main">
+
+
+<!-- ====== Cover ====== -->
+<div class="cover">
+  <div class="cover-badge">发布工程 · 核心概念</div>
+  <h1>发布方式概览</h1>
+  <p class="cover-sub">七种发布模式的核心理念、工作流程与适用场景，涵盖常规、增量、补偿、快速、回滚、紧急及定时发布，为构建健壮的发布系统提供全面参考。</p>
+  <div class="cover-meta">
+    <span>📋 7 种模式</span>
+    <span>📅 2026-07-31</span>
+  </div>
+  <div class="cover-arrow">⬇</div>
+</div>
+
+<div class="container">
+
+</div>
+
+<!-- ================================================================== -->
+<section id="mode-regular">
+  <h2><span class="section-num">01</span> 常规发布（Regular Release）</h2>
+
+  <h3><span class="sub-icon"></span>概念</h3>
+  <p>常规发布是标准的 <mark class="key">CI/CD 全流程发布模式</mark>，遵循完整的流水线：代码构建 → 镜像打包 → 制品推送 → 环境部署 → 功能验证。这是大多数团队的默认发布方式，强调流程完整性和质量保障。</p>
+
+  <h3><span class="sub-icon"></span>工作流程</h3>
+  <ol>
+    <li>代码提交触发构建</li>
+    <li>编译打包生成制品</li>
+    <li>推送制品到仓库</li>
+    <li>部署到开发环境</li>
+    <li>验证开发环境</li>
+    <li>部署到测试环境</li>
+    <li>验证测试环境</li>
+    <li>提交预发审批</li>
+    <li>部署到预发环境</li>
+    <li>验证预发环境</li>
+    <li>灰度发布</li>
+    <li>全量发布</li>
+    <li>最终验证</li>
+  </ol>
+
+  <h3><span class="sub-icon"></span>EC2 vs K8s 对比</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>维度</th><th>EC2 部署</th><th>K8s 部署</th></tr></thead>
+      <tbody>
+        <tr><td><strong>构建方式</strong></td><td>在 CI 机器上编译，打包成 tar/zip 等制品，上传到 S3 或制品仓库</td><td>Dockerfile 构建镜像，推送到镜像仓库（ECR / Docker Hub）</td></tr>
+        <tr><td><strong>部署方式</strong></td><td>通过 SSH/Ansible 等工具拉取制品到目标 EC2，停止旧进程，启动新进程</td><td><code>kubectl set image</code> 或更新 Deployment 镜像版本，由 K8s 完成滚动更新</td></tr>
+        <tr><td><strong>环境管理</strong></td><td>手动配置 EC2 实例环境，OS 和运行时差异可能引入环境问题</td><td>容器封装了运行时依赖，环境一致性高，环境差异问题较少</td></tr>
+        <tr><td><strong>验证方式</strong></td><td>部署后通过 curl/health endpoint 或手动检查进程状态</td><td>利用 ReadinessProbe / LivenessProbe + Service 自动检测，天然支持健康检查</td></tr>
+        <tr><td><strong>回滚方式</strong></td><td>重新部署旧版本制品，或通过 AMI 快照恢复</td><td><code>kubectl rollout undo</code> 快速回滚到上一版本，支持历史版本管理</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3><span class="sub-icon"></span>适用场景</h3>
+  <ul>
+    <li>团队有成熟的 CI/CD 基础设施</li>
+    <li>对发布质量要求高的核心业务</li>
+    <li>需要多环境验证的正式发布</li>
+    <li>合规性要求严格的场景（如金融、医疗）</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>优点</h3>
+  <ul>
+    <li>流程完整，质量保障全面</li>
+    <li>多环境验证降低了生产故障概率</li>
+    <li>审批环节提供了安全管控</li>
+    <li>灰度发布可提前发现潜在问题</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>缺点</h3>
+  <ul>
+    <li>发布周期长，从构建到全量发布耗时较多</li>
+    <li>流程繁琐，需要多次人工干预和审批</li>
+    <li>资源消耗大，多环境维护成本高</li>
+    <li>不适合紧急修复或频繁小版本迭代</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>常见陷阱</h3>
+  <div class="alert-warning">
+    <h3>⚠️ 环境差异</h3>
+    <p>开发、测试、预发环境配置不一致可能导致验证失效。建议使用基础设施即代码（IaC）工具统一环境配置。</p>
+  </div>
+  <div class="alert-warning">
+    <h3>⚠️ 审批过长</h3>
+    <p>多层审批可能导致发布延迟。建议设置审批超时机制，超时自动升级或默认通过。</p>
+  </div>
+  <div class="alert-warning">
+    <h3>⚠️ 产物过期</h3>
+    <p>构建产物在长时间流水线中可能因依赖更新而过期。建议对制品进行签名和完整性校验。</p>
+  </div>
+  <div class="alert-warning">
+    <h3>⚠️ 部署顺序混乱</h3>
+    <p>多服务依赖关系未梳理清楚可能导致部署失败。建议使用拓扑排序确定部署顺序。</p>
+  </div>
+
+  <h3><span class="sub-icon"></span>面试 Q&A</h3>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-adv">进阶</span> Q: 常规发布中，如何保证多环境的一致性？</div>
+    <div class="qa-a">
+      <p>① <strong>基础设施即代码（IaC）</strong>：使用 Terraform / CloudFormation 等工具统一环境定义，避免手动配置漂移。</p>
+      <p>② <strong>容器化</strong>：使用 Docker 封装运行时依赖，确保开发和生产的运行环境一致。</p>
+      <p>③ <strong>环境配置文件管理</strong>：通过配置中心（如 Consul / Apollo / K8s ConfigMap）管理环境差异变量，而非硬编码。</p>
+      <p>④ <strong>自动化验证</strong>：每个环境部署后自动运行冒烟测试和集成测试，确保功能一致。</p>
+      <p>⑤ <strong>不可变基础设施</strong>：禁止手动修改运行环境，任何变更必须通过 CI/CD 流水线完成。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-adv">进阶</span> Q: 常规发布的流水线中，哪个阶段最容易出问题？如何应对？</div>
+    <div class="qa-a">
+      <p><strong>最容易出问题的阶段是测试环境部署后的集成验证阶段</strong>。原因：测试环境的数据量和并发度与生产环境差异大，且多服务依赖关系复杂，容易暴露环境配置问题和接口兼容性问题。</p>
+      <p><strong>应对措施</strong>：① 在测试环境建立自动化回归测试套件；② 使用生产流量回放（Replay）技术提前发现性能问题；③ 实施契约测试确保服务间接口兼容。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-scene">场景</span> Q: 常规发布如何平衡「速度」和「安全」？</div>
+    <div class="qa-a">
+      <p>① <strong>并行化流水线</strong>：将无依赖的阶段并行执行（如可同时运行单元测试、静态扫描、安全扫描）。</p>
+      <p>② <strong>自动化门禁</strong>：用自动化测试和扫描替代人工审批，将审批节点从"必经关卡"改为"异常触发"。<p>
+      <p>③ <strong>渐进式发布</strong>：通过灰度发布和小流量验证降低全量发布风险，同时不影响发布效率。</p>
+      <p>④ <strong>一键回滚能力</strong>：确保在发现问题的第一时间可以快速回滚，这样即使出问题也能快速恢复，从而敢于"快速前进"。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-scene">场景</span> Q: 如果常规发布在生产环境部署到一半失败了，怎么办？</div>
+    <div class="qa-a">
+      <p>① <strong>立即停止发布</strong>：暂停后续部署操作，防止影响范围扩大。</p>
+      <p>② <strong>执行回滚</strong>：使用回滚发布将已部署的实例恢复到上一版本。</p>
+      <p>③ <strong>保留现场</strong>：收集失败实例的日志和监控数据，用于根因分析。</p>
+      <p>④ <strong>评估影响面</strong>：判断失败是否影响用户流量，是否需要降级或熔断。</p>
+      <p>⑤ <strong>复盘改进</strong>：分析失败原因，补充自动化门禁，避免同类问题再次发生。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section id="mode-incremental">
+  <h2><span class="section-num">02</span> 增量发布（Incremental Release）</h2>
+
+  <h3><span class="sub-icon"></span>概念</h3>
+  <p>增量发布是指<mark class="key">只部署新增或发生变化的目标</mark>，不影响未变更的实例。相比全量发布，增量发布大幅减少部署的工作量和时间，特别适合大规模集群或频繁迭代的场景。</p>
+
+  <h3><span class="sub-icon"></span>工作流程</h3>
+  <ol>
+    <li>分析当前部署状态</li>
+    <li>识别未部署目标</li>
+    <li>筛选差异目标列表</li>
+    <li>仅对差异目标执行部署</li>
+    <li>验证新部署目标</li>
+    <li>更新部署状态记录</li>
+    <li>完成</li>
+  </ol>
+
+  <h3><span class="sub-icon"></span>EC2 vs K8s 对比</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>维度</th><th>EC2 部署</th><th>K8s 部署</th></tr></thead>
+      <tbody>
+        <tr><td><strong>增量识别</strong></td><td>对比 EC2 实例列表与发布目标列表，找出未部署或版本不一致的实例</td><td>对比 Deployment 当前 replicas 与期望状态，或对比 Pod 镜像版本</td></tr>
+        <tr><td><strong>部署操作</strong></td><td>仅对目标 EC2 实例执行 SSH/Codedeploy 操作</td><td>K8s 滚动更新本身即增量（逐步替换 Pod），不会同时更新所有 Pod</td></tr>
+        <tr><td><strong>影响范围</strong></td><td>仅影响被部署的目标实例</td><td>由 ReplicaSet 控制，逐步替换，最小化影响</td></tr>
+        <tr><td><strong>回滚</strong></td><td>仅回滚已部署的增量实例</td><td><code>kubectl rollout undo</code> 恢复到上一 ReplicaSet</td></tr>
+        <tr><td><strong>复杂度</strong></td><td>需要维护实例部署状态清单，管理复杂度高</td><td>K8s 原生支持，管理复杂度低</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3><span class="sub-icon"></span>适用场景</h3>
+  <ul>
+    <li>大规模集群的渐进式更新</li>
+    <li>频繁小版本迭代（每天多次发布）</li>
+    <li>仅部分节点需要更新的场景</li>
+    <li>混合部署（部分新版本 + 部分旧版本）</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>优点</h3>
+  <ul>
+    <li>部署速度快，仅处理变更目标</li>
+    <li>资源消耗低，减少不必要的构建和传输</li>
+    <li>风险可控，变更范围小，回滚代价低</li>
+    <li>适合高频发布的敏捷开发模式</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>缺点</h3>
+  <ul>
+    <li>部署状态管理复杂，需要精确追踪每个目标的状态</li>
+    <li>可能出现增量目标依赖未更新目标的问题</li>
+    <li>版本一致性管理难度增加</li>
+    <li>调试困难，需要区分新旧版本的日志和监控</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>常见陷阱</h3>
+  <div class="alert-warning">
+    <h3>⚠️ 依赖未更新</h3>
+    <p>增量发布的服务可能依赖于尚未更新的下游服务，导致接口兼容性问题。建议在增量发布前进行依赖拓扑分析。</p>
+  </div>
+  <div class="alert-warning">
+    <h3>⚠️ 状态漂移</h3>
+    <p>长时间只做增量部署会导致不同实例间的配置差异累积（配置漂移）。建议定期执行全量同步或使用不可变基础设施。</p>
+  </div>
+
+  <h3><span class="sub-icon"></span>面试 Q&A</h3>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-adv">进阶</span> Q: 增量发布如何保证版本一致性？</div>
+    <div class="qa-a">
+      <p>① <strong>版本锁</strong>：在发布期间锁定待发布目标的版本，防止并发发布导致状态冲突。</p>
+      <p>② <strong>全量校验</strong>：增量发布完成后，执行一次全量版本校验，确保所有实例版本符合预期。</p>
+      <p>③ <strong>定期全量同步</strong>：设置定期任务（如每周）全量同步一次，消除版本差异。</p>
+      <p>④ <strong>蓝绿部署配合</strong>：在增量无法满足一致性要求时，切换为蓝绿部署模式。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-basic">基础</span> Q: 增量发布和蓝绿部署有什么区别？</div>
+    <div class="qa-a">
+      <p>增量发布是在现有实例基础上逐步替换部分实例；蓝绿部署是维护两套完整环境，通过流量切换完成发布。增量发布适合频繁小更新，蓝绿部署适合大版本变更且要求零停机。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-scene">场景</span> Q: 什么情况下不适合用增量发布？</div>
+    <div class="qa-a">
+      <p>① 数据库 Schema 变更需要全量同步的场景。</p>
+      <p>② 前后端强依赖，必须同时更新的场景。</p>
+      <p>③ 合规审计要求实例版本完全一致的场景（如金融行业）。</p>
+      <p>④ 实例数量很少（如只有 1~2 台）时增量意义不大。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section id="mode-compensation">
+  <h2><span class="section-num">03</span> 补偿发布（Compensation Release）</h2>
+
+  <h3><span class="sub-icon"></span>概念</h3>
+  <p>补偿发布是指针对<mark class="key">上次发布过程中失败的部署目标进行重新部署</mark>，类似于"补考"机制。它不是重新执行完整流水线，而是只对失败目标进行重试，避免重复成功目标的开销。</p>
+
+  <h3><span class="sub-icon"></span>工作流程</h3>
+  <ol>
+    <li>分析上次发布结果</li>
+    <li>筛选失败目标列表</li>
+    <li>分析失败原因</li>
+    <li>（可选）修复环境问题</li>
+    <li>仅对失败目标执行部署</li>
+    <li>验证部署结果</li>
+    <li>更新部署状态</li>
+    <li>完成</li>
+  </ol>
+
+  <h3><span class="sub-icon"></span>EC2 vs K8s 对比</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>维度</th><th>EC2 部署</th><th>K8s 部署</th></tr></thead>
+      <tbody>
+        <tr><td><strong>失败识别</strong></td><td>根据部署脚本退出码、日志、或健康检查判断失败实例</td><td>根据 Pod 状态（CrashLoopBackOff / ImagePullBackOff / OOM）识别失败 Pod</td></tr>
+        <tr><td><strong>重试范围</strong></td><td>仅对失败 EC2 实例重新执行部署脚本</td><td>仅对失败 Pod 进行重新调度或手动删除后重建</td></tr>
+        <tr><td><strong>失败原因</strong></td><td>常见于磁盘空间不足、依赖未安装、端口冲突</td><td>常见于镜像拉取失败、资源不足（CPU/内存）、配置错误</td></tr>
+        <tr><td><strong>自动恢复</strong></td><td>通常需人工介入，手动修复后重试</td><td>K8s 自动重启（RestartPolicy），但持续失败需人工介入</td></tr>
+        <tr><td><strong>重试策略</strong></td><td>线性重试，通常限制重试次数</td><td>指数退避重试，配合 Pod 反亲和避免集中失败</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3><span class="sub-icon"></span>适用场景</h3>
+  <ul>
+    <li>大规模发布中部分实例因临时原因失败</li>
+    <li>网络抖动或资源竞争导致的偶发失败</li>
+    <li>环境修复后对失败目标的重试</li>
+    <li>多批次发布中的局部失败处理</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>优点</h3>
+  <ul>
+    <li>节省时间：只重试失败目标，避免全量重试</li>
+    <li>精准定位：失败目标明确，便于根因分析</li>
+    <li>资源高效：减少不必要的部署开销</li>
+    <li>降低影响：避免重复发布已成功的实例</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>缺点</h3>
+  <ul>
+    <li>需要精确的失败记录和状态追踪</li>
+    <li>如果失败原因具有普遍性，补偿发布可能重复失败</li>
+    <li>补偿发布后可能出现版本不一致</li>
+    <li>过度依赖补偿发布可能掩盖系统性问题</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>常见陷阱</h3>
+  <div class="alert-warning">
+    <h3>⚠️ 补偿循环</h3>
+    <p>如果失败原因是系统性的（如镜像仓库不可用），补偿发布会反复失败。建议设置最大重试次数，超过后自动终止并告警。</p>
+  </div>
+  <div class="alert-warning">
+    <h3>⚠️ 版本碎片化</h3>
+    <p>多次补偿后，不同实例可能处于不同版本。建议补偿完成后同步做一次全量版本校验。</p>
+  </div>
+
+  <h3><span class="sub-icon"></span>面试 Q&A</h3>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-adv">进阶</span> Q: 补偿发布和增量发布的本质区别是什么？</div>
+    <div class="qa-a">
+      <p>增量发布是针对"从未部署过的目标"进行部署，而补偿发布是针对"上次部署失败的目标"进行重试。增量是"做新的事"，补偿是"补救没做成的事"。实际系统中两者可能组合使用。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-scene">场景</span> Q: 补偿发布后仍然失败该如何处理？</div>
+    <div class="qa-a">
+      <p>① 达到最大重试次数后自动停止补偿发布。</p>
+      <p>② 将失败目标标记为"人工介入"，通知运维人员排查。</p>
+      <p>③ 分析失败模式：如果多个目标因相同原因失败，应先修复根因再重试。</p>
+      <p>④ 考虑切换部署方式：如从 EC2 的 SSH 部署改为使用自动化配置管理工具。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-basic">基础</span> Q: 补偿发布的最佳重试次数是多少？</div>
+    <div class="qa-a">
+      <p>一般建议 3 次。第 1 次处理临时故障，第 2 次处理短暂的资源竞争，第 3 次作为兜底。超过 3 次仍失败的实例大概率存在非临时性问题，需要人工介入。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section id="mode-quick">
+  <h2><span class="section-num">04</span> 快速发布（Quick Release）</h2>
+
+  <h3><span class="sub-icon"></span>概念</h3>
+  <p>快速发布是指<mark class="key">跳过构建阶段，直接复用上一次成功的构建产物进行部署</mark>。当代码没有任何变更，或仅需要重新部署已有版本时，快速发布能显著缩短发布周期。</p>
+
+  <h3><span class="sub-icon"></span>工作流程</h3>
+  <ol>
+    <li>检查构建产物可用性</li>
+    <li>查找最近成功构建</li>
+    <li>复用制品/镜像</li>
+    <li>跳过构建阶段</li>
+    <li>直接进入部署阶段</li>
+    <li>部署到目标环境</li>
+    <li>验证部署结果</li>
+    <li>完成</li>
+  </ol>
+
+  <h3><span class="sub-icon"></span>EC2 vs K8s 对比</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>维度</th><th>EC2 部署</th><th>K8s 部署</th></tr></thead>
+      <tbody>
+        <tr><td><strong>产物复用</strong></td><td>直接使用上次构建的 tar/zip 制品，无需重新编译</td><td>直接使用上次推送的镜像（相同 tag 或最新成功镜像）</td></tr>
+        <tr><td><strong>构建跳过</strong></td><td>CI 阶段跳过编译、单元测试、打包步骤</td><td>CI 阶段跳过 Docker build、镜像推送步骤</td></tr>
+        <tr><td><strong>部署速度</strong></td><td>快（分钟级），取决于制品下载和进程重启</td><td>极快（秒级到分钟级），仅需更新 Deployment 的 Pod 副本</td></tr>
+        <tr><td><strong>适用条件</strong></td><td>制品仓库中存在可用的历史制品</td><td>镜像仓库中存在可用的历史镜像 tag</td></tr>
+        <tr><td><strong>风险</strong></td><td>重新部署相同的制品，风险低</td><td>如果镜像 tag 已被覆盖（如使用 latest），可能部署了意外版本</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3><span class="sub-icon"></span>适用场景</h3>
+  <ul>
+    <li>同一版本部署到不同环境（如从测试环境提升到预发环境）</li>
+    <li>环境迁移或灾备恢复</li>
+    <li>水平扩展时新增实例的部署</li>
+    <li>误删除服务的恢复</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>优点</h3>
+  <ul>
+    <li>发布速度快，省去构建和测试时间</li>
+    <li>构建产物确定性高（与上次发布完全一致）</li>
+    <li>减少 CI 资源消耗</li>
+    <li>适合多环境间提版操作</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>缺点</h3>
+  <ul>
+    <li>构建产物可能已过期（依赖安全漏洞未修复）</li>
+    <li>无法验证新代码变更（因为没有构建）</li>
+    <li>依赖制品仓库的可靠性和可用性</li>
+    <li>不适合需要重新构建的场景</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>常见陷阱</h3>
+  <div class="alert-warning">
+    <h3>⚠️ 产物过期</h3>
+    <p>复用的构建产物可能包含已知安全漏洞。建议对复用产物进行安全扫描，或设定产物有效期。</p>
+  </div>
+  <div class="alert-warning">
+    <h3>⚠️ 镜像 tag 覆盖</h3>
+    <p>如果镜像使用可变 tag（如 <code>latest</code> 或 <code>v1.0</code>），下次构建可能覆盖原有镜像。建议使用不可变 tag（如 Git commit SHA）。</p>
+  </div>
+
+  <h3><span class="sub-icon"></span>面试 Q&A</h3>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-adv">进阶</span> Q: 快速发布如何保证复用产物的安全性？</div>
+    <div class="qa-a">
+      <p>① <strong>产物签名</strong>：构建时对制品进行 GPG 签名，快速发布时验证签名完整性。</p>
+      <p>② <strong>安全扫描记录</strong>：复用前检查该产物构建时的安全扫描报告，确保无高危漏洞。</p>
+      <p>③ <strong>产物有效期</strong>：设定产物的可用期限（如 7 天），过期后强制重新构建。</p>
+      <p>④ <strong>SBOM（软件物料清单）</strong>：追踪产物的所有依赖信息，便于追溯漏洞影响。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-scene">场景</span> Q: 什么情况下不适合使用快速发布？</div>
+    <div class="qa-a">
+      <p>① 代码有变更但希望跳过构建——快速发布不适用于此场景，应使用常规发布。</p>
+      <p>② 依赖版本有安全更新需要重新构建的基础镜像。</p>
+      <p>③ 构建产物已从制品仓库中清理（如设置了自动清理策略）。</p>
+      <p>④ 需要更新配置或环境变量，但复用旧产物后配置无法热加载。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-basic">基础</span> Q: 快速发布和增量发布的区别？</div>
+    <div class="qa-a">
+      <p>快速发布是针对"构建阶段"的优化——跳过构建，复用旧制品；增量发布是针对"部署范围"的优化——只部署变更的目标。两者可以组合使用：增量 + 快速，即跳过构建、只部署差异目标。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section id="mode-rollback">
+  <h2><span class="section-num">05</span> 回滚发布（Rollback Release）</h2>
+
+  <h3><span class="sub-icon"></span>概念</h3>
+  <p>回滚发布是指<mark class="key">将服务恢复到上一个稳定版本</mark>的操作。回滚是发布系统最重要的安全兜底机制之一，在发布出现故障时能够快速恢复服务，是衡量发布系统成熟度的关键指标。</p>
+
+  <h3><span class="sub-icon"></span>工作流程</h3>
+  <ol>
+    <li>触发回滚</li>
+    <li>确定回滚目标版本</li>
+    <li>获取回滚版本制品</li>
+    <li>验证制品可用性</li>
+    <li>执行回滚部署</li>
+    <li>验证回滚结果</li>
+    <li>记录回滚日志</li>
+    <li>通知相关人员</li>
+  </ol>
+
+  <h3><span class="sub-icon"></span>回滚策略对比</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>策略</th><th>描述</th><th>适用场景</th><th>风险</th></tr></thead>
+      <tbody>
+        <tr><td><strong>立即回滚</strong></td><td>检测到故障后立即将所有实例恢复到上一版本</td><td>严重故障（P0/P1）需要最快速度恢复</td><td>回滚操作本身可能失败</td></tr>
+        <tr><td><strong>逐步回滚</strong></td><td>分批回滚，每次回滚一部分实例，观察稳定后再继续</td><td>中等故障，希望最小化影响范围</td><td>回滚周期较长</td></tr>
+        <tr><td><strong>金丝雀回滚</strong></td><td>先回滚少量金丝雀实例，验证通过后回滚剩余实例</td><td>对回滚版本质量不确定时</td><td>金丝雀实例可能承受故障流量</td></tr>
+        <tr><td><strong>版本偏移</strong></td><td>不限于回滚到上一版本，可以回滚到任意指定历史版本</td><td>跨多个版本的问题，或新版本依赖了旧版数据</td><td>数据兼容性风险，Schema 变更可能导致回滚失败</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3><span class="sub-icon"></span>EC2 vs K8s 对比</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>维度</th><th>EC2 部署</th><th>K8s 部署</th></tr></thead>
+      <tbody>
+        <tr><td><strong>回滚速度</strong></td><td>依赖制品下载和进程重启，通常需要几分钟</td><td>秒级到分钟级，<code>kubectl rollout undo</code> 快速完成</td></tr>
+        <tr><td><strong>版本管理</strong></td><td>需要手动维护制品版本列表</td><td>K8s 自动保留 ReplicaSet 历史版本（默认保留 10 个）</td></tr>
+        <tr><td><strong>回滚验证</strong></td><td>回滚后手动检查进程和接口</td><td>ReadinessProbe 自动检测 Pod 健康状态</td></tr>
+        <tr><td><strong>数据兼容性</strong></td><td>回滚后旧代码可能无法读取新格式数据</td><td>同样存在数据兼容性问题，需应用层处理</td></tr>
+        <tr><td><strong>回滚粒度</strong></td><td>整机粒度，回滚整台 EC2</td><td>Pod 粒度，支持细粒度控制和灰度回滚</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3><span class="sub-icon"></span>适用场景</h3>
+  <ul>
+    <li>新版本出现严重 Bug 或性能退化</li>
+    <li>发布后发现数据不一致或功能异常</li>
+    <li>紧急修复失败需要回退到稳定版本</li>
+    <li>灰度发布发现问题后回滚剩余实例</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>优点</h3>
+  <ul>
+    <li>故障恢复速度快，降低 MTTR</li>
+    <li>操作简单，成熟系统的回滚高度自动化</li>
+    <li>适用于大多数故障场景</li>
+    <li>用户影响最小化</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>缺点</h3>
+  <ul>
+    <li>回滚可能导致数据不一致（如 Schema 变更后无法回退）</li>
+    <li>多次回滚后版本管理复杂</li>
+    <li>回滚操作本身也有失败风险</li>
+    <li>无法解决所有类型的问题（如数据损坏）</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>常见陷阱</h3>
+  <div class="alert-warning">
+    <h3>⚠️ Schema 变更陷阱</h3>
+    <p>数据库 Schema 向前兼容变更（新增字段）可以回滚，但破坏性变更（删除字段/重命名）回滚后旧代码可能无法运行。建议遵循"向后兼容"原则进行数据库变更。</p>
+  </div>
+  <div class="alert-warning">
+    <h3>⚠️ 回滚链过长</h3>
+    <p>连续发布多个版本后回滚，中间版本的依赖变化可能导致回滚失败。建议定期清理过期的历史版本，并测试回滚链的可用性。</p>
+  </div>
+
+  <h3><span class="sub-icon"></span>面试 Q&A</h3>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-adv">进阶</span> Q: 什么情况下回滚比向前修复更合适？什么情况下反之？</div>
+    <div class="qa-a">
+      <p><strong>更适合回滚的场景</strong>：① 严重故障需要秒级恢复；② 修复代码需要较长时间；③ 问题原因不明确。④ 新版本存在多个问题。</p>
+      <p><strong>更适合向前修复的场景</strong>：① Schema 变更导致回滚困难；② 回滚会丢失用户数据；③ 问题范围小且修复简单；④ 旧版本已不再支持。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-scene">场景</span> Q: 回滚发布后如何保证数据一致性？</div>
+    <div class="qa-a">
+      <p>① <strong>数据库迁移的向前兼容</strong>：所有 DDL 变更必须保证向前兼容（只新增不删除，只扩展不改动）。</p>
+      <p>② <strong>补偿事务</strong>：回滚后对新产生的旧版不兼容数据执行补偿操作。</p>
+      <p>③ <strong>功能开关</strong>：使用 Feature Flag 控制新功能，回滚时只需关闭开关，无需回退代码。</p>
+      <p>④ <strong>数据备份</strong>：发布前对关键数据做快照备份，回滚时可还原数据。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-basic">基础</span> Q: K8s 中如何配置回滚保留版本数？</div>
+    <div class="qa-a">
+      <p>通过 Deployment 的 <code>spec.revisionHistoryLimit</code> 字段配置，默认值为 10。建议根据发布频率和磁盘空间调整为合适的值，例如高频发布场景可设置为 3~5。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section id="mode-emergency">
+  <h2><span class="section-num">06</span> 紧急发布 / Hotfix（Emergency Release）</h2>
+
+  <h3><span class="sub-icon"></span>概念</h3>
+  <p>紧急发布是<mark class="key">针对生产环境紧急问题，跳过常规审批流程，快速将修复版本部署到生产环境</mark>的发布模式。其核心目标是最大限度缩短故障修复时间（MTTR）。</p>
+
+  <h3><span class="sub-icon"></span>工作流程</h3>
+  <ol>
+    <li>发现紧急问题（监控告警 / 用户反馈）</li>
+    <li>快速修复代码</li>
+    <li>提交紧急发布申请</li>
+    <li>简化审批（单人审批或自动审批）</li>
+    <li>快速构建</li>
+    <li>跳过部分测试（仅运行关键冒烟测试）</li>
+    <li>直接部署生产环境</li>
+    <li>监控 + 自动回滚就绪</li>
+    <li>事后补流程（补充测试、审批单、复盘）</li>
+  </ol>
+
+  <h3><span class="sub-icon"></span>与常规发布的差异对比</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>维度</th><th>常规发布</th><th>紧急发布</th></tr></thead>
+      <tbody>
+        <tr><td><strong>触发条件</strong></td><td>代码提交、版本迭代</td><td>生产故障、安全漏洞</td></tr>
+        <tr><td><strong>审批流程</strong></td><td>多层审批（开发 → 测试 → 运维 → 经理）</td><td>单人审批或免审批</td></tr>
+        <tr><td><strong>构建方式</strong></td><td>完整 CI 构建 + 测试</td><td>快速构建，仅做必要编译</td></tr>
+        <tr><td><strong>测试要求</strong></td><td>全量测试（单元、集成、E2E、性能）</td><td>仅关键冒烟测试或跳过测试</td></tr>
+        <tr><td><strong>部署环境</strong></td><td>开发 → 测试 → 预发 → 灰度 → 全量</td><td>直接部署生产环境</td></tr>
+        <tr><td><strong>灰度策略</strong></td><td>强制灰度验证</td><td>可选，视严重程度决定</td></tr>
+        <tr><td><strong>回滚准备</strong></td><td>标准回滚流程</td><td>必须提前准备好自动回滚</td></tr>
+        <tr><td><strong>事后复盘</strong></td><td>常规复盘</td><td>必须复盘，补充测试和流程</td></tr>
+        <tr><td><strong>发布时间</strong></td><td>工作日、计划内</td><td>随时，7×24 小时</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3><span class="sub-icon"></span>审批简化策略</h3>
+  <ul>
+    <li><strong>单人审批</strong>：仅需运维负责人或值班人员一人审批即可发布</li>
+    <li><strong>自动审批</strong>：系统根据故障级别自动批准（如 P0 级故障自动通过）</li>
+    <li><strong>事后审批</strong>：先发布再补审批流程，适用于严重故障</li>
+    <li><strong>预设审批人</strong>：提前指定紧急发布的审批人列表，确保 7×24 可联系</li>
+    <li><strong>审批豁免期</strong>：设定窗口期（如 30 分钟），窗口期内可免审批发布</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>适用场景</h3>
+  <ul>
+    <li>生产环境 P0/P1 级别故障（服务不可用、大量报错）</li>
+    <li>安全漏洞紧急修复（CVE 高危漏洞）</li>
+    <li>数据损坏或丢失需要紧急恢复</li>
+    <li>第三方依赖故障需要紧急降级</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>优点</h3>
+  <ul>
+    <li>修复速度快，最大限度减少故障影响时间</li>
+    <li>流程灵活，可根据故障级别调整发布策略</li>
+    <li>事后追溯机制确保流程合规</li>
+    <li>提升了系统的可用性和用户体验</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>缺点</h3>
+  <ul>
+    <li>跳过测试环节，引入新问题的风险较高</li>
+    <li>打乱了团队的工作节奏</li>
+    <li>流程简化可能导致合规风险</li>
+    <li>频繁紧急发布说明系统稳定性存在问题</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>安全风险与防范</h3>
+  <div class="alert-error">
+    <h3>🚨 Hotfix 引入新问题的风险</h3>
+    <p>紧急发布跳过完整测试，修复代码本身可能引入新 Bug。建议：① 紧急修复代码必须经过 Code Review（哪怕事后补）；② 发布前至少运行核心冒烟测试；③ 准备好回滚方案。</p>
+  </div>
+  <div class="alert-error">
+    <h3>🚨 越权发布风险</h3>
+    <p>紧急发布的审批简化可能导致未经授权的变更进入生产环境。建议：① 紧急发布权限基于最小权限原则；② 所有紧急发布操作记录审计日志；③ 事后进行安全审计。</p>
+  </div>
+
+  <h3><span class="sub-icon"></span>面试 Q&A</h3>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-adv">进阶</span> Q: 如何防止紧急发布被滥用？</div>
+    <div class="qa-a">
+      <p>① <strong>紧急发布次数 KPI</strong>：将紧急发布次数作为团队稳定性指标，设定目标（如每月不超过 2 次）。</p>
+      <p>② <strong>事后复盘强制要求</strong>：每次紧急发布后必须在 24 小时内完成复盘，提交 Root Cause Analysis 报告。</p>
+      <p>③ <strong>权限分级</strong>：仅限运维负责人和技术经理具备紧急发布审批权限。</p>
+      <p>④ <strong>自动降级机制</strong>：如果系统检测到紧急发布频率异常，自动限制紧急发布通道。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-scene">场景</span> Q: 紧急发布后发现修复代码有 Bug 怎么办？</div>
+    <div class="qa-a">
+      <p>① <strong>立即回滚</strong>：如果问题比原故障更严重，立即执行回滚发布恢复到修复前的状态。</p>
+      <p>② <strong>二次修复</strong>：如果新 Bug 影响较小，在现有修复基础上继续修复。</p>
+      <p>③ <strong>开启 Feature Flag</strong>：如果修复使用了功能开关，直接关闭开关降级。</p>
+      <p>④ <strong>熔断降级</strong>：对受影响的功能执行熔断，保证核心功能可用。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-basic">基础</span> Q: 紧急发布和回滚发布应该如何选择？</div>
+    <div class="qa-a">
+      <p>如果故障是"新版本引入的"，且回滚不会导致数据兼容性问题，优先选择回滚——回滚速度更快、风险更低。如果故障是"外部原因"（如安全漏洞、依赖变更）或"累积性问题"，回滚无法解决，则需要紧急修复发布。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section id="mode-scheduled">
+  <h2><span class="section-num">07</span> 定时发布（Scheduled Release）</h2>
+
+  <h3><span class="sub-icon"></span>概念</h3>
+  <p>定时发布是指<mark class="key">预先设定发布时间，由系统在指定时间自动触发发布流程</mark>的模式。它适用于对时间窗口有严格要求的发布场景，如业务低峰期发布、定期版本发布等。</p>
+
+  <h3><span class="sub-icon"></span>实现方式</h3>
+  <ul>
+    <li><strong>Cron 定时任务</strong>：在 CI/CD 系统中配置 Cron 表达式，定时触发流水线（如每天凌晨 3 点执行）</li>
+    <li><strong>CI/CD 平台的 Scheduled Pipeline</strong>：Jenkins / GitLab CI / GitHub Actions 等平台内置的定时流水线功能</li>
+    <li><strong>发布系统的定时任务模块</strong>：自研发布系统中内置定时器模块，支持灵活的调度策略和依赖管理</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>适用场景</h3>
+  <ul>
+    <li>定期版本发布（如每周四发版）</li>
+    <li>低峰期发布以减少对用户的影响</li>
+    <li>需要协调跨团队、跨系统的发布时间窗口</li>
+    <li>合规性要求（如必须在指定时间窗口内发布）</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>优点</h3>
+  <ul>
+    <li>减少人工值守，7×24 自动化发布</li>
+    <li>可精确控制发布时间窗口，避开业务高峰期</li>
+    <li>便于跨团队协调，形成固定发布节奏</li>
+    <li>发布失败时可配置自动重试或告警</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>缺点</h3>
+  <ul>
+    <li>灵活性不足，无法应对紧急情况</li>
+    <li>定时触发时若代码状态不符合预期，可能导致发布失败</li>
+    <li>需要处理节假日、运维窗口等特殊时间场景</li>
+    <li>定时发布失败后的重试逻辑需要精心设计</li>
+  </ul>
+
+  <h3><span class="sub-icon"></span>与常规发布的对比</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>维度</th><th>常规发布</th><th>定时发布</th></tr></thead>
+      <tbody>
+        <tr><td><strong>触发方式</strong></td><td>人工手动触发或代码提交触发</td><td>系统自动按预设时间触发</td></tr>
+        <tr><td><strong>发布时间</strong></td><td>不固定，取决于准备就绪时间</td><td>固定时间窗口（如每周四 22:00）</td></tr>
+        <tr><td><strong>审批流程</strong></td><td>发布前需要人工审批</td><td>可在定时触发前预设审批，或免审批</td></tr>
+        <tr><td><strong>失败处理</strong></td><td>人工介入处理</td><td>自动重试、自动告警、或降级为人工处理</td></tr>
+        <tr><td><strong>适用性</strong></td><td>灵活，适用于各类发布</td><td>适合有计划、有周期的发布</td></tr>
+        <tr><td><strong>资源利用</strong></td><td>发布资源随时可用但可能存在竞争</td><td>低峰期资源充裕，发布效率更高</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3><span class="sub-icon"></span>面试 Q&A</h3>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-adv">进阶</span> Q: 定时发布如何保证在预定时间代码已经准备好？</div>
+    <div class="qa-a">
+      <p>① <strong>代码冻结</strong>：在定时发布前设定代码冻结窗口，冻结窗口内禁止提交新代码。</p>
+      <p>② <strong>预检机制</strong>：定时发布触发前执行自动化预检（代码是否合并、测试是否通过、制品是否存在）。</p>
+      <p>③ <strong>多级回退</strong>：如果定时发布失败，自动回退到上一个稳定版本，并通知负责人。</p>
+      <p>④ <strong>版本标签管理</strong>：提前打好 Release 分支和版本 tag，确保定时发布时使用的代码版本是确定可控的。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-scene">场景</span> Q: 定时发布与灰度发布如何结合？</div>
+    <div class="qa-a">
+      <p>可以在定时发布的流水线中内置灰度策略：定时触发发布后，先部署到灰度实例（例如 5% 的流量），自动观察一段时间（如 30 分钟）的监控指标，如果指标正常则自动全量发布，否则自动回滚并告警。这种方式兼顾了定时发布的自动化和灰度发布的安全性。</p>
+    </div>
+  </div>
+  <div class="qa-block">
+    <div class="qa-q"><span class="badge badge-basic">基础</span> Q: 定时发布失败后如何处理？</div>
+    <div class="qa-a">
+      <p>首先设置合理的重试策略（如重试 3 次，间隔 5 分钟）。如果仍然失败，系统应自动告警并通知值班人员，同时将发布状态标记为"失败"。对于非关键业务，可以等待下一个定时窗口；对于关键业务，应降级为紧急发布流程由人工介入处理。</p>
+    </div>
+  </div>
+</section>
+
+</div><!-- /container -->
+
+<footer>
+  <div class="container" style="text-align:center;color:var(--muted);font-size:0.85rem;padding-bottom:40px;">
+    <p>发布方式概览 · 持续更新中</p>
+  </div>
+</footer>
+
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var toc = document.getElementById('doc-toc');
+  var showBtn = document.getElementById('doc-toc-show');
+  var hideBtn = document.getElementById('doc-toc-hide');
+  var links = Array.prototype.slice.call(
+    document.querySelectorAll('.doc-toc-nav a[href^="#"]')
+  );
+  var items = links.map(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    return el ? { id: id, el: el, a: a } : null;
+  }).filter(Boolean);
+  if (!items.length) { return; }
+
+  function highlight() {
+    var pos = window.scrollY + 120;
+    var active = null;
+    for (var i = 0; i < items.length; i++) {
+      var top = items[i].el.getBoundingClientRect().top + window.scrollY;
+      if (top <= pos) { active = items[i].id; }
+    }
+    var activeEl = active ? items.filter(function (x) { return x.id === active; })[0].a : null;
+    items.forEach(function (x) {
+      x.a.classList.toggle('active', x.a === activeEl);
+    });
+  }
+  // srcdoc sandbox iframe 内 scroll/IntersectionObserver 事件不可靠，
+  // 故用轮询驱动高亮，scroll/resize 事件仅作加速。
+  window.setInterval(highlight, 150);
+  window.addEventListener('scroll', highlight, { passive: true });
+  window.addEventListener('resize', highlight, { passive: true });
+  highlight();
+
+  // 拦截目录链接点击：srcdoc iframe 内原生锚点 <a href="#id"> 会解析到
+  // 父页面 URL 而被沙箱拦截，必须改用 scrollIntoView 实现平滑/即时跳转。
+  links.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) el.scrollIntoView(true);
+    });
+  });
+
+  if (hideBtn && toc) {
+    hideBtn.addEventListener('click', function () {
+      toc.classList.add('is-hidden');
+      if (showBtn) showBtn.classList.add('is-visible');
+    });
+  }
+  if (showBtn) {
+    showBtn.addEventListener('click', function () {
+      if (toc) toc.classList.remove('is-hidden');
+      showBtn.classList.remove('is-visible');
+    });
+  }
+})();
+</script>
+</body>
+</html>

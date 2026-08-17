@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABAC 标准架构详解 — 从理论到实践</title>
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --accent: #4f6ef7;
+    --accent-light: #eef1ff;
+    --text: #1a1a2e;
+    --text-secondary: #5a5a7a;
+    --border: #e2e5f0;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --code-bg: #1e1e2e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: white;
+    padding: 64px 24px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 2.4rem; font-weight: 700; margin-bottom: 12px; }
+  .hero p  { font-size: 1.1rem; opacity: .85; max-width: 720px; margin: 0 auto; }
+
+  /* ── Layout ── */
+  .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 32px;
+    margin-bottom: 28px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    border: 1px solid var(--border);
+  }
+  .card h2 {
+    font-size: 1.4rem;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+    display: inline-block;
+  }
+  .card h3 {
+    font-size: 1.1rem;
+    margin: 20px 0 10px;
+    color: var(--accent);
+  }
+
+  /* ── Architecture Diagram ── */
+  .arch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin: 24px 0;
+    font-size: .9rem;
+  }
+  .arch-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .arch-box {
+    background: var(--accent-light);
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px 22px;
+    font-weight: 600;
+    min-width: 120px;
+    text-align: center;
+    position: relative;
+  }
+  .arch-box .sub {
+    display: block;
+    font-weight: 400;
+    font-size: .8rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+  .arch-arrow { color: var(--accent); font-size: 1.2rem; }
+  .arch-label {
+    background: var(--code-bg);
+    color: #ccc;
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-size: .75rem;
+    font-family: monospace;
+  }
+
+  /* ── Comparison Table ── */
+  .cmp-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: .9rem;
+  }
+  .cmp-table th {
+    background: var(--accent);
+    color: white;
+    padding: 10px 14px;
+    text-align: left;
+  }
+  .cmp-table th:first-child { border-radius: 8px 0 0 0; }
+  .cmp-table th:last-child  { border-radius: 0 8px 0 0; }
+  .cmp-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cmp-table tr:last-child td { border-bottom: none; }
+  .cmp-table tr:hover td { background: #f8faff; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: .75rem;
+    font-weight: 600;
+  }
+  .tag-green  { background: #dcfce7; color: #166534; }
+  .tag-yellow { background: #fef3c7; color: #92400e; }
+  .tag-red    { background: #fee2e2; color: #991b1b; }
+  .tag-blue   { background: #dbeafe; color: #1e40af; }
+
+  /* ── Code ── */
+  code {
+    background: #f0f2f8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: .85em;
+  }
+  pre {
+    background: var(--code-bg);
+    color: #e4e4e7;
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-size: .85rem;
+    line-height: 1.6;
+    margin: 12px 0;
+  }
+  pre .kw  { color: #c792ea; }
+  pre .str { color: #c3e88d; }
+  pre .cmt { color: #676e95; font-style: italic; }
+  pre .fn  { color: #82aaff; }
+  pre .num { color: #f78c6c; }
+  pre .op  { color: #89ddff; }
+
+  /* ── Flow ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+    font-size: .85rem;
+  }
+  .flow-step {
+    background: var(--accent-light);
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-weight: 500;
+  }
+  .flow-arrow { color: var(--accent); font-size: 1.1rem; }
+
+  /* ── Highlight box ── */
+  .highlight {
+    background: #fefce8;
+    border-left: 4px solid var(--warning);
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    font-size: .9rem;
+  }
+  .highlight strong { color: #92400e; }
+  .highlight.good { background: #f0fdf4; border-left-color: var(--success); }
+  .highlight.good strong { color: #166534; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 1.6rem; }
+    .card { padding: 20px; }
+    .arch-box { min-width: 80px; padding: 10px 14px; font-size: .85rem; }
+    .cmp-table { font-size: .8rem; }
+    .cmp-table th, .cmp-table td { padding: 6px 8px; }
+  }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 8px 18px;
+    border: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-size: .85rem;
+    transition: all .2s;
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--text-secondary);
+    font-size: .85rem;
+  }
+</style>
+<style>
+
+/* ===== 文章自包含导航 (由 add_article_toc.py 注入) ===== */
+/* 注意: 不使用 scroll-behavior: smooth，srcdoc sandbox iframe 内动画会导致 scroll 事件不可靠 */
+[id] { scroll-margin-top: 14px; }
+.doc-layout { display: flex; gap: 28px; align-items: flex-start; }
+.doc-toc {
+  width: 236px; flex-shrink: 0; box-sizing: border-box;
+  position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+  padding: 8px 4px 24px 0; border-right: 1px solid #eef0f6;
+}
+.doc-toc.is-hidden { display: none; }
+.doc-toc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 10px 10px; font-size: 13px; font-weight: 700; color: #4a5568;
+  letter-spacing: .5px;
+}
+.doc-toc-hide {
+  cursor: pointer; border: none; background: transparent; color: #a0aec0;
+  font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.doc-toc-hide:hover { color: #1a202c; background: #f1f5f9; }
+.doc-toc-nav { display: flex; flex-direction: column; gap: 1px; }
+.doc-toc-nav a {
+  display: block; padding: 6px 10px; border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0; color: #4a5568; text-decoration: none;
+  font-size: 13px; line-height: 1.5; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; transition: all .15s;
+}
+.doc-toc-nav a:hover { color: #1677ff; background: #f0f6ff; }
+.doc-toc-nav a.active {
+  color: #1677ff; background: #e6f4ff; border-left-color: #1677ff; font-weight: 600;
+}
+.doc-toc-show {
+  display: none; position: sticky; top: 8px; z-index: 30;
+  border: 1px solid #c7d7f5; background: #fff; color: #1677ff;
+  font-size: 13px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(22,119,255,.15);
+}
+.doc-toc-show.is-visible { display: inline-block; }
+.doc-main { flex: 1; min-width: 0; }
+@media (max-width: 820px) {
+  .doc-layout { flex-direction: column; gap: 12px; }
+  .doc-toc {
+    position: static; width: 100%; max-height: 220px;
+    border-right: none; border-bottom: 1px solid #eef0f6;
+  }
+}
+</style>
+</head>
+<body>
+<div class="doc-layout">
+  <button class="doc-toc-show" id="doc-toc-show" type="button">📑 目录</button>
+  <aside class="doc-toc" id="doc-toc">
+  <div class="doc-toc-head">
+    <span class="doc-toc-title">📑 本文章节</span>
+    <button class="doc-toc-hide" id="doc-toc-hide" type="button" title="收起目录">✕</button>
+  </div>
+  <nav class="doc-toc-nav">
+    <a href="#sec-1">1. 什么是 ABAC</a>
+    <a href="#sec-2">2. 标准 ABAC 四组件架构（NIST 标准）</a>
+    <a href="#sec-3">3. 策略语言：如何描述"谁能在什么条件下做什么"</a>
+    <a href="#sec-4">4. 你们的 ABAC-lite 与标准 ABAC 的对比</a>
+    <a href="#sec-5">5. 业界实践案例</a>
+    <a href="#sec-6">6. 面试话术：如何讲清楚这套架构</a>
+    <a href="#sec-7">7. 未来演进路径：从 ABAC-lite 走向更完整的 ABAC</a>
+    <a href="#sec-8">附：关键术语对照表</a>
+  </nav>
+</aside>
+  <main class="doc-main">
+
+
+<!-- ════════════ Hero ════════════ -->
+<div class="hero">
+  <h1>🔐 ABAC 标准架构详解</h1>
+  <p>Attribute-Based Access Control — 从理论到业界实践，理解为什么你的"ABAC-lite"是正确方向</p>
+</div>
+
+<div class="container">
+
+<!-- ════════════ 1. 什么是 ABAC ════════════ -->
+<div class="card">
+  <h2 id="sec-1">1. 什么是 ABAC</h2>
+
+  <p><strong>ABAC</strong>（Attribute-Based Access Control，基于属性的访问控制）是一种授权模型，它根据 <strong>用户（主体）</strong>、<strong>资源（客体）</strong>和 <strong>环境</strong> 的 <strong>属性</strong>，通过策略引擎动态判定是否允许某个操作。</p>
+
+  <div class="flow">
+    <span class="flow-step">👤 主体属性</span>
+    <span class="flow-arrow">+</span>
+    <span class="flow-step">📦 资源属性</span>
+    <span class="flow-arrow">+</span>
+    <span class="flow-step">🌐 环境属性</span>
+    <span class="flow-arrow">+</span>
+    <span class="flow-step">⚡ 操作</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step" style="background:#dcfce7;border-color:#22c55e;">✅ 允许 / ❌ 拒绝</span>
+  </div>
+
+  <h3>核心公式</h3>
+  <pre><span class="kw">允许</span> = 策略评估(
+    主体属性: { 角色, 部门, 安全等级, 地理位置... },
+    资源属性: { 类型, 所有者, 分类, 敏感度... },
+    环境属性: { 时间, IP, 设备状态, 威胁等级... },
+    操作:     { 读取, 写入, 删除, 部署... }
+  )</pre>
+
+  <h3>与 RBAC 的本质区别</h3>
+  <table class="cmp-table">
+    <tr><th style="width:18%">维度</th><th style="width:41%">RBAC（基于角色）</th><th style="width:41%">ABAC（基于属性）</th></tr>
+    <tr><td>授权依据</td><td>静态角色 → 权限点映射</td><td>动态属性组合评估</td></tr>
+    <tr><td>粒度</td><td>粗（角色级）</td><td>细（属性级，理论上无限）</td></tr>
+    <tr><td>变更成本</td><td>高（改角色=改所有人）</td><td>低（改策略即可，不影响用户）</td></tr>
+    <tr><td>上下文感知</td><td>❌ 不能</td><td>✅ 可以（时间、地点、设备等）</td></tr>
+    <tr><td>数据量</td><td>小</td><td>大（需要属性存储和策略引擎）</td></tr>
+    <tr><td>典型场景</td><td>企业内部管理系统</td><td>云平台（AWS IAM）、SaaS、零信任</td></tr>
+  </table>
+</div>
+
+<!-- ════════════ 2. 标准四组件架构 ════════════ -->
+<div class="card">
+  <h2 id="sec-2">2. 标准 ABAC 四组件架构（NIST 标准）</h2>
+  <p>NIST SP 800-162 定义了 ABAC 的标准参考架构，包含四个核心组件：</p>
+
+  <div class="arch" style="margin-top:24px;">
+    <!-- Row 1: PAP -->
+    <div class="arch-row">
+      <div class="arch-box" style="background:#fef3c7;border-color:#f59e0b;">
+        📝 PAP
+        <span class="sub">Policy Administration Point<br>策略管理点</span>
+      </div>
+    </div>
+    <div class="arch-arrow">⬇ 定义策略</div>
+
+    <!-- Row 2: PDP -->
+    <div class="arch-row">
+      <div class="arch-box" style="background:#dbeafe;border-color:#4f6ef7;">
+        🧠 PDP
+        <span class="sub">Policy Decision Point<br>策略决策点</span>
+      </div>
+    </div>
+    <div class="arch-arrow">↕</div>
+
+    <!-- Row 3: PEP + PIP -->
+    <div class="arch-row">
+      <div class="arch-box" style="background:#dcfce7;border-color:#22c55e;">
+        🚪 PEP
+        <span class="sub">Policy Enforcement Point<br>策略执行点</span>
+      </div>
+      <div class="arch-box" style="background:#fee2e2;border-color:#ef4444;">
+        🔍 PIP
+        <span class="sub">Policy Information Point<br>策略信息点</span>
+      </div>
+    </div>
+    <div class="arch-arrow">⬇</div>
+
+    <!-- Row 4: Resource -->
+    <div class="arch-row">
+      <div class="arch-box" style="background:#f3e8ff;border-color:#a855f7;">
+        🎯 目标资源
+        <span class="sub">API / 数据 / 页面 / 按钮</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>组件详解</h3>
+
+  <table class="cmp-table">
+    <tr><th style="width:12%">组件</th><th style="width:22%">职责</th><th>类比</th></tr>
+    <tr>
+      <td><span class="tag tag-yellow">PAP</span></td>
+      <td>策略的定义、存储、版本管理</td>
+      <td>立法机构——制定法律条文</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-blue">PDP</span></td>
+      <td>接收鉴权请求，加载策略+属性，做出 allow/deny 决策</td>
+      <td>法官——依据法律+事实做出判决</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-green">PEP</span></td>
+      <td>拦截请求，转发给 PDP，根据结果执行或拒绝</td>
+      <td>门卫——拦住你，问法官能不能放行</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-red">PIP</span></td>
+      <td>从数据源获取主体/资源/环境的属性值</td>
+      <td>调查员——去查户口本、房产证</td>
+    </tr>
+  </table>
+
+  <h3>一次完整鉴权流程</h3>
+  <pre>
+┌──────┐   ① 请求       ┌──────┐   ② 鉴权请求    ┌──────┐
+│ 用户 │ ─────────────→ │ PEP  │ ─────────────→ │ PDP  │
+└──────┘                └──────┘                └──┬───┘
+                                                    │ ③ 获取属性
+                                                    ▼
+                                                 ┌──────┐
+                                                 │ PIP  │ ← 用户表/资源表/LDAP/...
+  ┌──────┐   ⑥ 响应       ┌──────┐   ⑤ 决策      └──────┘
+  │ 用户 │ ←───────────── │ PEP  │ ←───────────── │ PDP  │
+  └──────┘   ✅/❌        └──────┘   allow/deny   └──────┘
+                                                    │ ④ 查询策略
+                                                    ▼
+                                                 ┌──────┐
+                                                 │ PAP  │ ← 策略存储
+                                                 └──────┘</pre>
+
+  <div class="highlight">
+    <strong>💡 关键理解：</strong>在你们的系统中，<code>check_user_can()</code> 就是 <strong>PDP</strong>，<code>@require_resource_permission</code> 装饰器就是 <strong>PEP</strong>，<code>User</code>/<code>Group</code>/<code>BusinessLine</code> 模型就是 <strong>PIP</strong> 的数据源，而策略函数本身（<code>_policy_group_manage</code>）就是 <strong>PAP</strong> 定义的策略。
+  </div>
+</div>
+
+<!-- ════════════ 3. 策略语言 ════════════ -->
+<div class="card">
+  <h2 id="sec-3">3. 策略语言：如何描述"谁能在什么条件下做什么"</h2>
+
+  <p>标准 ABAC 使用专用的策略语言来描述规则。业界有两大流派：</p>
+
+  <div class="tabs" id="policyTabs">
+    <button class="tab-btn active" data-tab="xacml">XACML</button>
+    <button class="tab-btn" data-tab="rego">OPA / Rego</button>
+    <button class="tab-btn" data-tab="json">AWS IAM / Google</button>
+  </div>
+
+  <!-- XACML -->
+  <div class="tab-content active" id="xacml">
+    <p><strong>XACML</strong>（eXtensible Access Control Markup Language）是 OASIS 标准，基于 XML，2003 年提出。它是 ABAC 的"学院派"实现。</p>
+    <pre>&lt;Policy RuleId="group-manage" Effect="Permit"&gt;
+  &lt;Target&gt;
+    &lt;Subjects&gt;
+      &lt;Subject&gt;
+        &lt;SubjectMatch MatchId="string-equal"&gt;
+          &lt;AttributeValue&gt;audit_admin&lt;/AttributeValue&gt;
+          &lt;SubjectAttributeDesignator AttributeId="is_audit_admin"/&gt;
+        &lt;/SubjectMatch&gt;
+      &lt;/Subject&gt;
+    &lt;/Subjects&gt;
+  &lt;/Target&gt;
+  &lt;Condition&gt;
+    &lt;Apply FunctionId="not"&gt;  &lt;!-- 审计管理员拒绝 --&gt;
+      &lt;Apply FunctionId="boolean-equal"&gt;
+        &lt;SubjectAttributeDesignator AttributeId="is_audit_admin"/&gt;
+        &lt;AttributeValue&gt;true&lt;/AttributeValue&gt;
+      &lt;/Apply&gt;
+    &lt;/Apply&gt;
+  &lt;/Condition&gt;
+&lt;/Policy&gt;</pre>
+    <div class="highlight">
+      <strong>优缺点：</strong>功能完整但极其冗长。一个简单的"组负责人可管理本组"需要用上百行 XML 描述。这导致 XACML 在实践中几乎被抛弃。
+    </div>
+  </div>
+
+  <!-- OPA/Rego -->
+  <div class="tab-content" id="rego">
+    <p><strong>OPA</strong>（Open Policy Agent）是 CNCF 毕业项目，使用 <strong>Rego</strong> 声明式语言描述策略。它是当前业界最流行的 ABAC 引擎。</p>
+    <pre><span class="cmt"># 策略: 组管理权限</span>
+<span class="kw">package</span> <span class="fn">org.access</span>
+
+<span class="cmt"># 默认拒绝</span>
+<span class="kw">default</span> <span class="fn">allow</span> = <span class="k">false</span>
+
+<span class="cmt"># 审计管理员不可管理</span>
+<span class="fn">allow</span> <span class="op">{</span>
+    <span class="k">not</span> <span class="fn">input.user.is_audit_admin</span>
+    <span class="fn">input.resource.type</span> == <span class="str">"group"</span>
+    <span class="fn">input.action</span> == <span class="str">"manage"</span>
+    <span class="fn">is_group_leader</span>(<span class="fn">input.user.id</span>, <span class="fn">input.resource.id</span>)
+<span class="op">}</span>
+
+<span class="cmt"># 辅助函数: 判断是否为组负责人</span>
+<span class="fn">is_group_leader</span>(user_id, group_id) <span class="op">{</span>
+    group := <span class="fn">data.groups[group_id]</span>
+    group.leader_id == user_id
+<span class="op">}</span></pre>
+    <p>OPA 的优势：</p>
+    <ul style="margin-left:20px;margin-bottom:10px;">
+      <li>策略独立部署（sidecar 或独立服务）</li>
+      <li>热加载，无需重启应用</li>
+      <li>输入输出 JSON，和语言无关</li>
+      <li>内置策略测试框架</li>
+    </ul>
+    <div class="highlight good">
+      <strong>你们现在的 Python 策略函数</strong>其实就是 Rego 策略的"硬编码版"——逻辑一样，只是没有用独立策略语言。对于不经常变的策略，硬编码更简单直接。
+    </div>
+  </div>
+
+  <!-- AWS IAM / Google -->
+  <div class="tab-content" id="json">
+    <p><strong>AWS IAM</strong> 使用 JSON 策略文档，是业界最大规模的 ABAC 实践。</p>
+    <pre>{
+  <span class="str">"Version"</span>: <span class="str">"2012-10-17"</span>,
+  <span class="str">"Statement"</span>: [{
+    <span class="str">"Effect"</span>: <span class="str">"Allow"</span>,
+    <span class="str">"Action"</span>: [<span class="str">"ec2:StartInstances"</span>, <span class="str">"ec2:StopInstances"</span>],
+    <span class="str">"Resource"</span>: <span class="str">"arn:aws:ec2:*:*:instance/*"</span>,
+    <span class="str">"Condition"</span>: {
+      <span class="str">"StringEquals"</span>: {
+        <span class="str">"aws:ResourceTag/Environment"</span>: <span class="str">"dev"</span>
+      }
+    }
+  }]
+}</pre>
+    <p>而 <strong>Google 的 Zanzibar</strong>（全球权限系统）采用关系图谱（ReBAC）：</p>
+    <pre><span class="cmt"># Zanzibar 风格的元组</span>
+(<span class="str">"group:payment-arch"</span>, <span class="str">"member"</span>, <span class="str">"user:zhaoliu"</span>)
+(<span class="str">"user:lisi"</span>, <span class="str">"owner"</span>, <span class="str">"group:payment-arch"</span>)
+
+<span class="cmt"># 查询: 赵六能否查看支付架构组?</span>
+<span class="fn">Check</span>(<span class="str">"user:zhaoliu"</span>, <span class="str">"view"</span>, <span class="str">"group:payment-arch"</span>)
+→ 遍历关系图: member → group → owner? 没有直接关系 → <span style="color:#ef4444;">deny</span></pre>
+    <div class="highlight">
+      <strong>Zanzibar 的关键洞察：</strong>绝大多数权限都可以表示为资源之间的<strong>关系</strong>。Google 用它支撑了 Gmail、Drive、YouTube 等所有产品的权限系统，日处理超过 200 亿次鉴权请求。你们的 <code>Group.leader</code>、<code>SubjectMembership</code> 本质上就是 Zanzibar 关系元组的简化版。
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ 4. ABAC-lite vs Full ABAC ════════════ -->
+<div class="card">
+  <h2 id="sec-4">4. 你们的 ABAC-lite 与标准 ABAC 的对比</h2>
+
+  <p>你们当前的实现确实是 ABAC 的简化版，但不是"缩水版"——而是<strong>有意识的范围裁剪</strong>。以下是逐项对比：</p>
+
+  <table class="cmp-table">
+    <tr><th style="width:22%">维度</th><th style="width:39%">标准 ABAC</th><th style="width:39%">你们的 ABAC-lite</th></tr>
+
+    <tr>
+      <td><strong>PAP 策略定义</strong></td>
+      <td>独立策略语言（Rego / XACML / JSON）<br><span class="tag tag-yellow">灵活但学习成本高</span></td>
+      <td>Python 函数硬编码<br><span class="tag tag-green">简单直观，零学习成本</span></td>
+    </tr>
+    <tr>
+      <td><strong>PDP 决策引擎</strong></td>
+      <td>独立服务（OPA sidecar）<br><span class="tag tag-yellow">可热加载，独立升级</span></td>
+      <td><code>check_user_can()</code> 函数<br><span class="tag tag-green">无需额外部署，进程内调用</span></td>
+    </tr>
+    <tr>
+      <td><strong>PEP 执行点</strong></td>
+      <td>API 网关 / Sidecar 拦截<br><span class="tag tag-yellow">统一入口，对应用透明</span></td>
+      <td>Django 装饰器<br><span class="tag tag-green">按需加在视图函数上</span></td>
+    </tr>
+    <tr>
+      <td><strong>PIP 属性源</strong></td>
+      <td>LDAP、HR 系统、CMDB、AD…<br><span class="tag tag-yellow">多源聚合，需要适配层</span></td>
+      <td>Django ORM（User/Group/BusinessLine）<br><span class="tag tag-green">单一数据源，零集成成本</span></td>
+    </tr>
+    <tr>
+      <td><strong>策略粒度</strong></td>
+      <td>支持任意属性组合<br>如：<code>时间>9:00 AND 部门=技术 AND IP∈内网</code></td>
+      <td>基于组织关系的策略<br>如：<code>Group.leader=当前用户</code></td>
+    </tr>
+    <tr>
+      <td><strong>策略变更</strong></td>
+      <td>修改策略文件 → 热加载 → 立即生效</td>
+      <td>改代码 → 重启服务 → 生效<br><span class="tag tag-yellow">需要发版</span></td>
+    </tr>
+    <tr>
+      <td><strong>审计与可视化</strong></td>
+      <td>有独立的审计日志、策略模拟器</td>
+      <td>❌ 尚未实现</td>
+    </tr>
+  </table>
+
+  <h3>为什么 ABAC-lite 对你们是正确选择</h3>
+
+  <div class="highlight good">
+    <strong>你们的已知约束：</strong><br>
+    • 用户规模不大（数百～数千）<br>
+    • 属性维度有限（核心是组织关系树）<br>
+    • 策略变更频率低（组织架构变动不频繁）<br>
+    • 没有多租户需求<br><br>
+    → 在这些约束下，<strong>标准 ABAC 的灵活性是过度设计</strong>。你们用更简单的方案覆盖了 99% 的场景。
+  </div>
+</div>
+
+<!-- ════════════ 5. 业界案例 ════════════ -->
+<div class="card">
+  <h2 id="sec-5">5. 业界实践案例</h2>
+
+  <table class="cmp-table">
+    <tr><th>公司</th><th>方案</th><th>核心思路</th></tr>
+    <tr>
+      <td><strong>AWS</strong></td>
+      <td><span class="tag tag-blue">IAM + ABAC</span></td>
+      <td>基于资源标签（Tag）的 ABAC。策略用 JSON 描述。<br>特点：用户不需要权限→资源需要标签匹配。<br>你们的数据权限模型与此异曲同工——资源（应用）有 owner_group，用户通过组织关系匹配。</td>
+    </tr>
+    <tr>
+      <td><strong>Google</strong></td>
+      <td><span class="tag tag-blue">Zanzibar (ReBAC)</span></td>
+      <td>关系图谱：<code>(object, relation, subject)</code> 三元组授权。<br>你们代码中 <code>(user, 'primary', group)</code> 的 SubjectMembership 就是 Zanzibar 关系元组。<br>Google 使用 Spanner 存储，日处理 200 亿+ 鉴权。</td>
+    </tr>
+    <tr>
+      <td><strong>GitHub</strong></td>
+      <td><span class="tag tag-blue">ReBAC (借鉴 Zanzibar)</span></td>
+      <td>资源通过层级关系继承权限：Team → Repo → Branch。<br>你们的 Group → BusinessLine 层级继承与此一致。</td>
+    </tr>
+    <tr>
+      <td><strong>字节跳动</strong></td>
+      <td><span class="tag tag-blue">自研 ABAC 引擎</span></td>
+      <td>内部权限中台，支持可视化策略配置。本质上也是用组织关系 + 资源标签做策略评估。</td>
+    </tr>
+    <tr>
+      <td><strong>Kubernetes</strong></td>
+      <td><span class="tag tag-blue">RBAC + ABAC 可选</span></td>
+      <td>RBAC 作为默认。从你们 v1→v2→v3 的演进路径，K8s 也走过：<br>1.x 只有 RBAC → 后来引入 ABAC 模式 → 最终推荐 RBAC + 准入控制器的组合。</td>
+    </tr>
+    <tr>
+      <td><strong>你们（Demo）</strong></td>
+      <td><span class="tag tag-green">ABAC-lite</span></td>
+      <td>在 RBAC 的教训基础上，去掉权限点，保留组织关系作为核心属性，用策略函数评估。</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ════════════ 6. 面试话术 ════════════ -->
+<div class="card">
+  <h2 id="sec-6">6. 面试话术：如何讲清楚这套架构</h2>
+
+  <p>如果面试时被问到"你们系统的权限是怎么设计的"，可以按这个思路回答：</p>
+
+  <pre style="font-size:.9rem;line-height:1.7;">
+<span class="cmt">// ── 第一句：定位问题 ──</span>
+<span class="str">"我们经历过传统 RBAC 的阶段：角色→权限点映射。
+结果就是权限点爆炸，几百个 API 需要手动勾选，漏配就报错。
+用户侧也抱怨我们功能藏着不给用。
+所以我们决定不再用'用户拥有哪些权限点'这种做加法的模型。"</span>
+
+<span class="cmt">// ── 第二句：方案选择 ──</span>
+<span class="str">"我们调研了业界方案，包括 OPA/Rego、AWS IAM 和 Google Zanzibar。
+考虑到我们的场景——组织关系树是核心属性维度，策略变动不频繁，团队规模不大——
+我们选择了 ABAC-lite 方案。"</span>
+
+<span class="cmt">// ── 第三句：实现要点 ──</span>
+<span class="str">"核心技术是：不同'用户有没有权限点'，而是问'用户在某个资源上能不能做某个操作'。
+判定依据是组织关系链——你是不是业务线负责人？是不是组负责人？是不是成员？
+每次请求实时计算，不缓存权限结果。
+后端用装饰器做 PEP 守卫，前端用树节点的 manageable 标记做 UX 适配。"</span>
+
+<span class="cmt">// ── 第四句：与标准 ABAC 的差异 ──</span>
+<span class="str">"标准 ABAC 有四个组件：PAP/PDP/PEP/PIP。
+我们的 PDP 就是 check_user_can() 函数，PEP 就是 @require_resource_permission 装饰器，
+PIP 就是 Django ORM，PAP 就是 Python 策略函数本身。
+我们没有引入独立策略语言（如 Rego/XACML），
+因为我们属性维度固定、策略变化少，硬编码更简洁，零学习成本。"</span>
+
+<span class="cmt">// ── 第五句：安全设计 ──</span>
+<span class="str">"我们特意不设超级管理员。只有审计管理员，能看到全部数据但任何操作都被拒绝。
+is_audit_admin 字段只能通过手动 SQL 设置，没有页面也没有 API。
+这是为了减小攻击面——管理员账号即使被攻破，也只能看不能改。"</span>
+
+<span class="cmt">// ── 第六句：与行业趋势的关联 ──</span>
+<span class="str">"有趣的是，我们的 SubjectMembership（用户-组关系）
+和 Google Zanzibar 的 (object, relation, subject) 三元组本质上是一个模式。
+只是 Zanzibar 在全局规模用 Spanner 存储，我们在本地用 SQLite。
+我们的方向和业界趋势一致——从静态角色定义走向动态关系评估。"</span></pre>
+
+  <div class="highlight good">
+    <strong>总结一句话：</strong>"我们用简化的 ABAC 模型，以组织关系为核心属性，通过实时策略函数评估替代了传统 RBAC 的静态权限点映射。在灵活性和复杂度之间找到了适合我们场景的平衡点。"
+  </div>
+</div>
+
+<!-- ════════════ 7. 演进路径 ════════════ -->
+<div class="card">
+  <h2 id="sec-7">7. 未来演进路径：从 ABAC-lite 走向更完整的 ABAC</h2>
+
+  <p>你们当前的实现是一个很好的起点。如果未来系统规模增长，可以按以下路径逐步演进：</p>
+
+  <table class="cmp-table">
+    <tr><th>阶段</th><th>改造</th><th>触发条件</th></tr>
+    <tr>
+      <td><strong>现在</strong> 🟢</td>
+      <td>Python 函数策略 + Django ORM 属性源</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><strong>阶段 1</strong></td>
+      <td>策略注册表可配置化（将策略条件存入数据库，允许页面配置）</td>
+      <td>非技术人员需要自定义授权规则</td>
+    </tr>
+    <tr>
+      <td><strong>阶段 2</strong></td>
+      <td>引入 OPA sidecar 替代硬编码策略函数</td>
+      <td>策略变更频繁，需要热加载；或需要统一策略引擎给多个服务使用</td>
+    </tr>
+    <tr>
+      <td><strong>阶段 3</strong></td>
+      <td>PEP 下沉到 API 网关，对业务代码完全透明</td>
+      <td>微服务化，需要统一鉴权入口</td>
+    </tr>
+    <tr>
+      <td><strong>阶段 4</strong></td>
+      <td>引入 Zanzibar 风格的关系图谱存储（如 SpiceDB）</td>
+      <td>用户量百万级，需要水平扩展和低延迟</td>
+    </tr>
+  </table>
+
+  <div class="highlight">
+    <strong>但建议：</strong>不要提前复杂化。你们的 ABAC-lite 可以支撑到数百人甚至上千人的团队。等到真的遇到痛点再演进，而不是为了"用上 OPA"而用 OPA。
+  </div>
+</div>
+
+<!-- ════════════ 8. 术语对照 ════════════ -->
+<div class="card">
+  <h2 id="sec-8">附：关键术语对照表</h2>
+
+  <table class="cmp-table">
+    <tr><th>术语</th><th>全称</th><th>你们的对应</th></tr>
+    <tr><td><strong>ABAC</strong></td><td>Attribute-Based Access Control</td><td>整体架构方向</td></tr>
+    <tr><td><strong>RBAC</strong></td><td>Role-Based Access Control</td><td>你们的 v1/v2（已废弃）</td></tr>
+    <tr><td><strong>ReBAC</strong></td><td>Relationship-Based Access Control</td><td>Zanzibar 风格，你们的 SubjectMembership 与此类似</td></tr>
+    <tr><td><strong>PAP</strong></td><td>Policy Administration Point</td><td><code>access_control.py</code> 中的策略函数</td></tr>
+    <tr><td><strong>PDP</strong></td><td>Policy Decision Point</td><td><code>check_user_can()</code></td></tr>
+    <tr><td><strong>PEP</strong></td><td>Policy Enforcement Point</td><td><code>@require_resource_permission</code> 装饰器</td></tr>
+    <tr><td><strong>PIP</strong></td><td>Policy Information Point</td><td>Django ORM（User / Group / BusinessLine）</td></tr>
+    <tr><td><strong>OPA</strong></td><td>Open Policy Agent</td><td>业界标准 ABAC 引擎（CNCF 项目）</td></tr>
+    <tr><td><strong>XACML</strong></td><td>eXtensible Access Control Markup Language</td><td>ABAC 的 XML 标准（过于复杂，已边缘化）</td></tr>
+    <tr><td><strong>Zanzibar</strong></td><td>Google 的全局权限系统</td><td>ReBAC 的业界标杆</td></tr>
+  </table>
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  ABAC 标准架构详解 · 发布系统 Demo · 2026
+</div>
+
+<script>
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+</script>
+
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var toc = document.getElementById('doc-toc');
+  var showBtn = document.getElementById('doc-toc-show');
+  var hideBtn = document.getElementById('doc-toc-hide');
+  var links = Array.prototype.slice.call(
+    document.querySelectorAll('.doc-toc-nav a[href^="#"]')
+  );
+  var items = links.map(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    return el ? { id: id, el: el, a: a } : null;
+  }).filter(Boolean);
+  if (!items.length) { return; }
+
+  function highlight() {
+    var pos = window.scrollY + 120;
+    var active = null;
+    for (var i = 0; i < items.length; i++) {
+      var top = items[i].el.getBoundingClientRect().top + window.scrollY;
+      if (top <= pos) { active = items[i].id; }
+    }
+    var activeEl = active ? items.filter(function (x) { return x.id === active; })[0].a : null;
+    items.forEach(function (x) {
+      x.a.classList.toggle('active', x.a === activeEl);
+    });
+  }
+  // srcdoc sandbox iframe 内 scroll/IntersectionObserver 事件不可靠，
+  // 故用轮询驱动高亮，scroll/resize 事件仅作加速。
+  window.setInterval(highlight, 150);
+  window.addEventListener('scroll', highlight, { passive: true });
+  window.addEventListener('resize', highlight, { passive: true });
+  highlight();
+
+  // 拦截目录链接点击：srcdoc iframe 内原生锚点 <a href="#id"> 会解析到
+  // 父页面 URL 而被沙箱拦截，必须改用 scrollIntoView 实现平滑/即时跳转。
+  links.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) el.scrollIntoView(true);
+    });
+  });
+
+  if (hideBtn && toc) {
+    hideBtn.addEventListener('click', function () {
+      toc.classList.add('is-hidden');
+      if (showBtn) showBtn.classList.add('is-visible');
+    });
+  }
+  if (showBtn) {
+    showBtn.addEventListener('click', function () {
+      if (toc) toc.classList.remove('is-hidden');
+      showBtn.classList.remove('is-visible');
+    });
+  }
+})();
+</script>
+</body>
+</html>

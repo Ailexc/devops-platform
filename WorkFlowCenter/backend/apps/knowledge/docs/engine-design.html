@@ -1,0 +1,40 @@
+<h1>流程引擎设计</h1>
+
+<h2>一、设计目标</h2>
+<p>让「人工审批」与「系统自动执行」在同一张流程图上无缝衔接：审批人点一下，后面的建单、发通知、改状态等操作由引擎自动完成。</p>
+
+<h2>二、定义归一化</h2>
+<p>设计器产出的是 Beeflow 树形 <code>nodeConfig</code>（父子 + 条件分支），引擎无法直接遍历。因此先归一化为扁平结构：</p>
+<pre><code>nodeConfig(树)  →  normalized_definition  →  nodes[] + edges[]
+nodes:  start / approve / cc / condition / gateway / handle / trigger / end
+edges:  from → to（可带 condition，用于分支求值）</code></pre>
+
+<h2>三、生命周期</h2>
+<table>
+<thead><tr><th>阶段</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>start</td><td>校验提单人权限 → 创建实例（记录发起）→ 推进到首个节点</td></tr>
+<tr><td>advance</td><td>按当前节点类型推进：审批/办理建任务、条件/网关求值跳转、结束完成实例</td></tr>
+<tr><td>complete</td><td>审批通过/办理完成 → 记录审批流水 → 推进下一节点（会签/或签单独处理）</td></tr>
+<tr><td>reject / suspend / resume / terminate / delegate</td><td>驳回终止、挂起恢复、撤销、转办</td></tr>
+</tbody>
+</table>
+
+<h2>四、审批节点</h2>
+<ul>
+<li><strong>审批人解析</strong>：兼容 Beeflow 的 <code>assigneeType</code>（0发起人/1上级/2部门负责人/3角色/4指定/7自选）与引擎平铺 <code>type</code> 两种格式。</li>
+<li><strong>多人审批</strong>：单人、会签（需全部同意）、或签（一人同意即通过）、序签。</li>
+<li><strong>多渠道</strong>：审批人可通过 Web / Lark(飞书) 多渠道处理（演示环境模拟展示）。</li>
+</ul>
+
+<h2>五、办理节点（自动化的核心）</h2>
+<p>办理节点通过 <code>taskConfig</code> 声明动作，三种模式：</p>
+<table>
+<thead><tr><th>模式</th><th>语义</th><th>交互</th></tr></thead>
+<tbody>
+<tr><td>manual</td><td>人工办理</td><td>生成待办，人处理</td></tr>
+<tr><td>auto</td><td>完全自动执行</td><td>引擎直接调任务执行器跑动作，无人工参与</td></tr>
+<tr><td>confirm</td><td>自动执行 + 人工确认</td><td>先生成确认待办，确认后执行动作</td></tr>
+</tbody>
+</table>
+<p>动作支持 <strong>串行 / 并行</strong> 编排，前序动作的输出可绑定到后续动作的入参，构成小的「自动化流水线」。</p>

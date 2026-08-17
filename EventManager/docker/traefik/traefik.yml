@@ -1,0 +1,33 @@
+# ═══════════════════════════════════════════════════════
+# Traefik 静态配置
+# 负责统一入口：监听 80 端口，按域名路由到各容器
+# ═══════════════════════════════════════════════════════
+
+global:
+  sendAnonymousUsage: false
+
+log:
+  level: INFO
+
+api:
+  dashboard: true
+  # 安全：Dashboard 只在内网可访问
+  # 访问地址: http://traefik.local/dashboard/
+
+entryPoints:
+  web:
+    address: ":80"
+    # 如需 HTTPS，取消下面注释
+    # http:
+    #   redirections:
+    #     entryPoint:
+    #       to: websecure
+    #       scheme: https
+  # websecure:
+  #   address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false  # 只有显式 label 的服务才会被路由
+    network: eventflow-net

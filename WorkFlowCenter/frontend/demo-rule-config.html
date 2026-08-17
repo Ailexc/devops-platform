@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>业务规则配置器（Demo）</title>
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+  <style>
+    :root {
+      --c-bg:#f7f8fa; --c-border:#e5e6eb; --c-text:#1d2129; --c-sub:#86909c;
+      --c-ok:#00b42a; --c-warn:#ff7d00; --c-err:#f53f3f; --c-blue:#165dff;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--c-bg); color:var(--c-text); font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+    [v-cloak]{display:none}
+    .wrap { max-width:1360px; margin:0 auto; padding:24px; }
+
+    .top { margin-bottom:16px; }
+    .top h2 { margin:0 0 6px; font-size:20px; }
+    .top .sub { margin:0; font-size:13px; color:var(--c-sub); line-height:1.7; max-width:900px; }
+
+    .row { display:flex; gap:16px; align-items:flex-start; }
+    .col-l { flex:0 0 340px; min-width:300px; position:sticky; top:16px; }
+    .col-r { flex:1; min-width:0; }
+    @media(max-width:1024px){ .row{flex-direction:column} .col-l{position:static;flex:1 1 auto} }
+
+    .card { background:#fff; border:1px solid var(--c-border); border-radius:8px; margin-bottom:16px; overflow:hidden; }
+    .card .ch { display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid #f2f3f5; font-weight:600; font-size:14px; }
+    .card .ch .bar { width:3px; height:14px; border-radius:2px; background:var(--c-blue); }
+    .card .ch .tip { font-weight:400; font-size:12px; color:var(--c-sub); }
+    .card .cb { padding:12px 16px; }
+
+    /* 数据源目录 */
+    .ds-group { margin-bottom:14px; }
+    .ds-group:last-child { margin-bottom:0; }
+    .ds-group-title { font-size:12px; color:var(--c-sub); font-weight:600; margin-bottom:6px; }
+    .ds-item { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:13px; border:1px solid transparent; }
+    .ds-item:hover { background:#f2f7ff; border-color:#cbe1ff; }
+    .ds-item .ds-ic { width:22px; height:22px; border-radius:5px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; flex-shrink:0; }
+    .ds-item .ds-info { flex:1; min-width:0; }
+    .ds-item .ds-name { font-weight:500; }
+    .ds-item .ds-meta { font-size:11px; color:var(--c-sub); }
+    .ds-item .ds-plus { color:var(--c-blue); font-size:14px; opacity:0; transition:.15s; }
+    .ds-item:hover .ds-plus { opacity:1; }
+    .type-num{background:#165dff}.type-text{background:#722ed1}.type-enum{background:#ff7d00}.type-array{background:#00b42a}.type-money{background:#f53f3f}
+
+    /* 能力边界 */
+    .cap-row { display:flex; gap:8px; align-items:flex-start; padding:7px 0; font-size:13px; border-bottom:1px dashed #f2f3f5; }
+    .cap-row:last-child { border-bottom:none; }
+    .cap-row .cap-ok { color:var(--c-ok); font-weight:700; }
+    .cap-row .cap-no { color:var(--c-err); font-weight:700; }
+    .cap-row .cap-l { flex-shrink:0; width:52px; font-size:11px; color:#fff; border-radius:3px; text-align:center; padding:1px 0; margin-top:1px; }
+    .cap-l.l1{background:#165dff}.cap-l.l2{background:#00b42a}.cap-l.l3{background:#722ed1}.cap-l.l4{background:#ff7d00}.cap-l.x{background:#86909c}
+    .cap-row .cap-t { flex:1; }
+    .cap-row .cap-t .cap-name { font-weight:500; }
+    .cap-row .cap-t .cap-ex { font-size:12px; color:var(--c-sub); }
+
+    /* 规则列表 */
+    .list-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .list-head .cnt { font-size:13px; color:var(--c-sub); }
+    .rule { border:1px solid var(--c-border); border-left:3px solid #c9cdd4; border-radius:6px; padding:12px 14px; margin-bottom:12px; background:#fbfbfc; }
+    .rule--error{ border-left-color:var(--c-err); }
+    .rule--warning{ border-left-color:var(--c-warn); }
+    .rule-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .rule-head .rid { font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--c-blue); background:#e8f3ff; border-radius:4px; padding:1px 6px; font-weight:600; }
+    .rule-head .rname { font-weight:600; font-size:13px; }
+    .rule-head .r-actions { margin-left:auto; display:flex; gap:4px; }
+    .rule-cond { margin-top:8px; font-size:13px; color:#4e5969; line-height:1.7; }
+    .rule-cond .and{color:var(--c-blue)} .rule-cond .or{color:#ff7d00}
+    .rule-msg { margin-top:6px; font-size:12px; color:var(--c-sub); }
+    .rule-msg b{color:var(--c-text);font-weight:600}
+    .rule-foot { display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
+    .rule-hit { font-size:12px; font-weight:600; }
+    .hit-hit{color:var(--c-err)} .hit-warn{color:var(--c-warn)} .hit-pass{color:var(--c-ok)}
+    .logic-code { font-size:11px; color:#4e5969; background:#f2f3f5; border-radius:4px; padding:8px; white-space:pre-wrap; word-break:break-all; margin-top:8px; line-height:1.5; }
+
+    /* 表单值模拟 */
+    .sim-row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    .sim-row .sim-item { display:flex; align-items:center; gap:6px; font-size:12px; color:#4e5969; }
+    .sim-row .sim-item .sim-lbl { white-space:nowrap; }
+
+    footer { font-size:12px; color:var(--c-sub); text-align:center; padding:12px 0 24px; line-height:1.8; }
+  </style>
+</head>
+<body>
+<div id="app" v-cloak>
+  <div class="wrap">
+    <header class="top">
+      <h2>业务规则配置器（Demo）· 表单化配置，不写表达式</h2>
+      <p class="sub">
+        体验「怎么配置一条规则」：<b>下拉选数据源 → 选操作符 → 填/引用参考值</b>，全程表单化，底层自动生成 JSON Logic（可展开查看）。
+        左侧目录展示「能配置哪些规则」：表单字段 + 业务上下文指标 + 能力约束 + 能力边界。改表单值，右侧规则实时模拟检测命中。
+      </p>
+    </header>
+
+    <div class="row">
+      <!-- 左列 -->
+      <div class="col-l">
+        <!-- 数据源目录 -->
+        <div class="card">
+          <div class="ch"><span class="bar"></span>可配置的数据源 <span class="tip">点击「+」快速新建规则</span></div>
+          <div class="cb">
+            <div class="ds-group" v-for="g in sourceGroups" :key="g.name">
+              <div class="ds-group-title">{{ g.name }}</div>
+              <div class="ds-item" v-for="s in g.items" :key="s.name" @click="quickNew(s)">
+                <span class="ds-ic" :class="'type-' + s.type">{{ typeBadge(s.type) }}</span>
+                <div class="ds-info">
+                  <div class="ds-name">{{ s.label }}</div>
+                  <div class="ds-meta">{{ s.provider || '表单字段' }}{{ s.unit ? ' · 单位 ' + s.unit : '' }}</div>
+                </div>
+                <span class="ds-plus">＋</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 能力边界 -->
+        <div class="card">
+          <div class="ch"><span class="bar"></span>能配置哪些规则 · 能力边界</div>
+          <div class="cb">
+            <div class="cap-row" v-for="c in capabilityMatrix" :key="c.label">
+              <span class="cap-l" :class="c.level">{{ c.levelLabel }}</span>
+              <div class="cap-t">
+                <div class="cap-name">{{ c.supported ? '✅ ' : '❌ ' }}{{ c.label }}</div>
+                <div class="cap-ex">{{ c.example }}</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--c-sub);margin-top:10px;line-height:1.7">
+              * L3 能力输入约束（必填/类型/枚举/范围）由 <code>Capability.input_schema</code> 声明即得，<b>零配置</b>。<br/>
+              * 自定义操作符（如 <code>contains / in / matches</code>）可在引擎侧扩展注册。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右列 -->
+      <div class="col-r">
+        <!-- 表单值模拟 -->
+        <div class="card">
+          <div class="ch"><span class="bar"></span>表单值模拟 <span class="tip">修改下方值 → 右侧规则实时模拟检测命中</span></div>
+          <div class="cb">
+            <div class="sim-row">
+              <div class="sim-item"><span class="sim-lbl">申请CPU(核)</span><el-input-number v-model="simForm.cpu" :min="1" :max="128" size="small" style="width:110px" /></div>
+              <div class="sim-item"><span class="sim-lbl">申请内存(GB)</span><el-input-number v-model="simForm.memory" :min="1" :max="512" size="small" style="width:120px" /></div>
+              <div class="sim-item"><span class="sim-lbl">业务类型</span>
+                <el-select v-model="simForm.biz_type" size="small" style="width:100px">
+                  <el-option v-for="o in ['生产','测试','开发']" :key="o" :label="o" :value="o" />
+                </el-select>
+              </div>
+              <div class="sim-item"><span class="sim-lbl">网络方式</span>
+                <el-select v-model="simForm.net_type" size="small" style="width:140px">
+                  <el-option v-for="o in ['prod-vpc','dev-vpc','internet-direct']" :key="o" :label="o" :value="o" />
+                </el-select>
+              </div>
+              <div class="sim-item" style="margin-left:auto">
+                <el-button size="small" type="primary" @click="openDrawer()">＋ 新增规则</el-button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 规则列表 -->
+        <div class="card">
+          <div class="ch"><span class="bar"></span>已配置规则 <span class="tip">点击「模拟检测」用当前表单值求值；可编辑 / 删除 / 新增</span></div>
+          <div class="cb">
+            <div class="list-head">
+              <span class="cnt">共 {{ rules.length }} 条规则 · {{ ruleErrors }} 错误 · {{ ruleWarnings }} 警告</span>
+            </div>
+            <div class="rule" v-for="(r, idx) in rules" :key="r.id" :class="'rule--' + r.level">
+              <div class="rule-head">
+                <span class="rid">{{ r.id }}</span>
+                <span class="rname">{{ r.name }}</span>
+                <el-tag size="small" :type="r.level==='error' ? 'danger' : 'warning'" effect="light">{{ r.level==='error' ? '错误 · 提交拦截' : '警告 · 提醒附注' }}</el-tag>
+                <span class="r-actions">
+                  <el-button size="small" text type="primary" @click="runSim(r)">模拟检测</el-button>
+                  <el-button size="small" text @click="openDrawer(r)">编辑</el-button>
+                  <el-button size="small" text type="danger" @click="removeRule(r)">删除</el-button>
+                </span>
+              </div>
+              <div class="rule-cond" v-html="humanText(r)"></div>
+              <div class="rule-msg"><b>命中提示：</b>{{ r.message }} <b style="margin-left:8px">建议：</b>{{ r.suggestion }}</div>
+              <div class="rule-foot">
+                <span class="rule-hit" :class="r._simClass">{{ r._simText }}</span>
+                <el-tag size="small" effect="plain" style="margin-left:auto;cursor:pointer" @click="r._open=!r._open">{{ r._open ? '收起 JSON Logic' : '查看 JSON Logic' }}</el-tag>
+              </div>
+              <pre v-if="r._open" class="logic-code">{{ r._logic }}</pre>
+            </div>
+            <el-empty v-if="!rules.length" description="还没有规则，点击「＋ 新增规则」配置一条" :image-size="70" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      说明：本页为<b>本地静态演示</b>（模拟数据，未接后端）。<br/>
+      ① 配置规则 = 表单化下拉（数据源 / 操作符 / 参考值），底层 JSON Logic 自动生成，无需手写表达式；参考值支持「固定值」与「引用字段/指标」两种模式（字段对字段比较）。<br/>
+      ② 数据源 = 表单字段 + 业务上下文指标（由后端 ContextProvider 暴露）；能力输入约束（L3）由 schema 声明即得，零配置。<br/>
+      ③ 预置规则为示例，可编辑 / 删除 / 新增；「模拟检测」用左侧表单值实时求值。
+    </footer>
+  </div>
+
+  <!-- 规则配置抽屉 -->
+  <el-drawer v-model="drawer" :title="editing ? '编辑规则' : '新增规则'" size="520px" :with-header="true">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:13px;color:#4e5969;margin-bottom:6px;font-weight:600">规则名称</div>
+        <el-input v-model="draft.name" placeholder="如：部门配额检测" />
+      </div>
+
+      <div>
+        <div style="font-size:13px;color:#4e5969;margin-bottom:6px;font-weight:600">触发条件（多个条件 = 且，多个条件组 = 或）</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div v-for="(g, gi) in draft.groups" :key="gi" style="border:1px solid #e5e6eb;border-radius:8px;padding:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:12px;color:#86909c;font-weight:600">条件组 {{ gi+1 }}</span>
+              <el-button size="small" text type="danger" @click="rmGroup(gi)" :disabled="draft.groups.length<=1">删除组</el-button>
+            </div>
+            <div v-for="(c, ci) in g" :key="ci" style="display:flex;flex-direction:column;gap:6px;border-top:1px dashed #f2f3f5;padding-top:8px;margin-top:6px">
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="font-size:12px;color:#86909c;width:34px">{{ ci===0?'当': '且' }}</span>
+                <el-select v-model="c.source" size="small" placeholder="数据源" style="flex:1.2" @change="onSourceChange(c)">
+                  <el-option-group v-for="g2 in sourceGroups" :key="g2.name" :label="g2.name">
+                    <el-option v-for="s in g2.items" :key="s.name" :label="s.label" :value="s.name" />
+                  </el-option-group>
+                </el-select>
+                <el-select v-model="c.op" size="small" placeholder="操作符" style="width:108px">
+                  <el-option v-for="o in opsFor(sourceOf(c.source))" :key="o" :label="opLabel(o)" :value="o" />
+                </el-select>
+                <el-button size="small" text type="danger" @click="rmCondition(g, c)" :disabled="g.length<=1">✕</el-button>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;padding-left:40px">
+                <span style="font-size:12px;color:#86909c;width:34px">参考</span>
+                <el-radio-group v-model="c.refType" size="small">
+                  <el-radio-button value="fixed">固定值</el-radio-button>
+                  <el-radio-button value="field">引用字段/指标</el-radio-button>
+                </el-radio-group>
+                <template v-if="c.refType==='fixed'">
+                  <el-input-number v-if="isNumType(c.source)" v-model="c.fixed" size="small" style="width:130px" :controls="false" />
+                  <el-select v-if="isEnumType(c.source)" v-model="c.fixed" size="small" style="width:150px">
+                    <el-option v-for="o in (sourceOf(c.source)||{}).options||[]" :key="o" :label="o" :value="o" />
+                  </el-select>
+                  <el-input v-if="isTextType(c.source)" v-model="c.fixed" size="small" placeholder="值" style="width:150px" />
+                </template>
+                <template v-if="c.refType==='field'">
+                  <el-select v-model="c.refField" size="small" placeholder="选择字段/指标" style="flex:1">
+                    <el-option-group v-for="g2 in sourceGroups" :key="g2.name" :label="g2.name">
+                      <el-option v-for="s in g2.items" :key="s.name" :label="s.label" :value="s.name" />
+                    </el-option-group>
+                  </el-select>
+                  <el-input-number v-model="c.offset" size="small" placeholder="±" style="width:80px" :controls="false" />
+                  <span style="font-size:11px;color:#86909c">偏移</span>
+                </template>
+              </div>
+            </div>
+            <el-button size="small" text type="primary" style="margin-top:6px" @click="addCondition(g)">＋ 添加条件（且）</el-button>
+          </div>
+        </div>
+        <el-button size="small" text type="primary" style="margin-top:6px" @click="addGroup()">＋ 添加条件组（或）</el-button>
+      </div>
+
+      <div>
+        <div style="font-size:13px;color:#4e5969;margin-bottom:6px;font-weight:600">规则行为</div>
+        <div style="display:flex;gap:16px;align-items:center;margin-bottom:8px">
+          <el-radio-group v-model="draft.level">
+            <el-radio-button value="error">错误 · 提交拦截</el-radio-button>
+            <el-radio-button value="warning">警告 · 提醒附注</el-radio-button>
+          </el-radio-group>
+        </div>
+        <el-input v-model="draft.message" size="small" placeholder="命中提示文案（给提单人看）" style="margin-bottom:6px" />
+        <el-input v-model="draft.suggestion" size="small" placeholder="建议文案（指导提单人如何修改）" />
+      </div>
+
+      <div style="background:#f7f8fa;border-radius:8px;padding:10px">
+        <div style="font-size:12px;color:#86909c;margin-bottom:6px">实时预览</div>
+        <div style="font-size:13px;color:#4e5969;line-height:1.7" v-html="draftHuman"></div>
+        <pre class="logic-code" style="margin-top:6px">{{ draftLogic }}</pre>
+      </div>
+    </div>
+    <template #footer>
+      <el-button @click="drawer=false">取消</el-button>
+      <el-button type="primary" @click="saveRule">保存规则</el-button>
+    </template>
+  </el-drawer>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/element-plus/dist/index.full.min.js"></script>
+<script src="https://unpkg.com/@element-plus/icons-vue/dist/index.iife.min.js"></script>
+<script>
+const { createApp, ref, computed, watch } = Vue;
+
+// ---------- 数据源目录 ----------
+const SOURCES = [
+  // 表单字段
+  { name:'cpu', label:'申请CPU核数', type:'number', unit:'核', group:'表单字段' },
+  { name:'memory', label:'申请内存(GB)', type:'number', unit:'GB', group:'表单字段' },
+  { name:'disk_size', label:'申请磁盘(GB)', type:'number', unit:'GB', group:'表单字段' },
+  { name:'os', label:'操作系统', type:'enum', options:['CentOS 7.9','Ubuntu 22.04','Debian 12'], group:'表单字段' },
+  { name:'net_type', label:'网络方式', type:'enum', options:['prod-vpc','dev-vpc','internet-direct'], group:'表单字段' },
+  { name:'biz_type', label:'业务类型', type:'enum', options:['生产','测试','开发'], group:'表单字段' },
+  { name:'hostname', label:'主机名', type:'text', group:'表单字段' },
+  { name:'email', label:'通知邮箱', type:'text', group:'表单字段' },
+  // 业务上下文指标
+  { name:'dept.cpu_quota.remaining', label:'部门剩余CPU配额', type:'number', unit:'核', group:'业务上下文', provider:'配额系统' },
+  { name:'dept.mem_quota.remaining', label:'部门剩余内存配额', type:'number', unit:'GB', group:'业务上下文', provider:'配额系统' },
+  { name:'dept.budget_remaining', label:'部门剩余预算', type:'money', unit:'元', group:'业务上下文', provider:'预算系统' },
+  { name:'estimate.cost_month', label:'估算月成本', type:'money', unit:'元/月', group:'业务上下文', provider:'定价模型' },
+  { name:'pool.cpu_available', label:'资源池可用CPU', type:'number', unit:'核', group:'业务上下文', provider:'监控系统' },
+  { name:'pool.mem_available', label:'资源池可用内存', type:'number', unit:'GB', group:'业务上下文', provider:'监控系统' },
+  { name:'network.reachable_list', label:'可达网络列表', type:'array', group:'业务上下文', provider:'网络拓扑' },
+  { name:'history.same_spec_count', label:'近7天同规格申请数', type:'number', unit:'台', group:'业务上下文', provider:'历史工单' },
+];
+const sourceGroups = computed(() => {
+  const map = {};
+  SOURCES.forEach(s => { (map[s.group] = map[s.group] || []).push(s); });
+  return Object.keys(map).map(name => ({ name, items: map[name] }));
+});
+const sourceOf = (name) => SOURCES.find(s => s.name === name) || {};
+const typeOf = (name) => sourceOf(name).type;
+
+const OP_LABELS = { '>':'大于','>=':'大于等于','<':'小于','<=':'小于等于','==':'等于','!=':'不等于','contains':'包含','not_contains':'不包含','in':'属于','not_in':'不属于' };
+function opsFor(src) {
+  const t = src && src.type;
+  if (['number','money'].includes(t)) return ['>','>=','<','<=','==','!='];
+  if (t === 'enum') return ['==','!='];
+  if (t === 'array') return ['in','not_in'];
+  return ['==','!=','contains','not_contains'];
+}
+const opLabel = (o) => OP_LABELS[o] || o;
+const typeBadge = (t) => ({ number:'#', money:'¥', text:'T', enum:'☰', array:'[]' }[t] || '?');
+const isNumType = (n) => ['number','money'].includes(typeOf(n));
+const isEnumType = (n) => typeOf(n) === 'enum';
+const isTextType = (n) => !['number','money','enum','array'].includes(typeOf(n));
+
+// ---------- 模拟上下文（供 evalLogic） ----------
+const ctxData = () => ({
+  form: { hostname:'web-prod-01', cpu:simForm.value.cpu, memory:simForm.value.memory, disk_size:100, os:'CentOS 7.9', net_type:simForm.value.net_type, biz_type:simForm.value.biz_type, email:'admin@company.com' },
+  dept: { cpu_quota:{ remaining:8 }, mem_quota:{ remaining:152 }, budget_remaining:120000 },
+  estimate: { cost_month: 8820 },
+  pool: { cpu_available:24, mem_available:96 },
+  network: { reachable_list:['prod-vpc','dev-vpc'] },
+  history: { same_spec_count:0 },
+});
+const simForm = ref({ cpu:8, memory:16, biz_type:'生产', net_type:'prod-vpc' });
+
+// ---------- 轻量 JSON Logic 求值器（演示用） ----------
+function resolvePath(data, path) {
+  const p = String(path);
+  let v = p.split('.').reduce((o, k) => (o == null ? undefined : o[k]), data);
+  // 表单字段名不带 form. 前缀，做兜底解析
+  if (v === undefined && !p.startsWith('form.')) {
+    v = p.split('.').reduce((o, k) => (o == null ? undefined : o[k]), data.form || {});
+  }
+  return v;
+}
+function evalLogic(node, data) {
+  if (node == null) return null;
+  if (typeof node !== 'object') return node;
+  if (node.var !== undefined) return resolvePath(data, node.var);
+  const key = Object.keys(node)[0];
+  const args = node[key];
+  const A = (i) => evalLogic(args[i], data);
+  switch (key) {
+    case 'and': return args.every(a => evalLogic(a, data));
+    case 'or': return args.some(a => evalLogic(a, data));
+    case 'not': return !evalLogic(args, data);
+    case '>': return A(0) > A(1);
+    case '>=': return A(0) >= A(1);
+    case '<': return A(0) < A(1);
+    case '<=': return A(0) <= A(1);
+    case '==': return A(0) == A(1);
+    case '!=': return A(0) != A(1);
+    case 'in': return Array.isArray(A(1)) ? A(1).includes(A(0)) : (A(1) || '').includes(A(0));
+    case 'not_in': return Array.isArray(A(1)) ? !A(1).includes(A(0)) : !(A(1) || '').includes(A(0));
+    case 'contains': return String(A(0) || '').includes(String(A(1) || ''));
+    case 'not_contains': return !String(A(0) || '').includes(String(A(1) || ''));
+    case '-': return A(0) - A(1);
+    default: return null;
+  }
+}
+
+// ---------- 规则条件 → JSON Logic / 人话 ----------
+function condRhs(c) {
+  if (c.refType === 'field') {
+    const ref = { var: c.refField };
+    return c.offset ? { '-': [ref, c.offset] } : ref;
+  }
+  return typeof c.fixed === 'number' ? c.fixed : `"${c.fixed}"`;
+}
+function condLogic(c) {
+  const lhs = { var: c.source };
+  if (['in','not_in','contains','not_contains'].includes(c.op)) return { [c.op]: [lhs, condRhs(c)] };
+  return { [c.op]: [lhs, condRhs(c)] };
+}
+function groupsLogic(groups) {
+  const andGroups = groups.map(g => g.length === 1 ? condLogic(g[0]) : { and: g.map(condLogic) });
+  return andGroups.length === 1 ? andGroups[0] : { or: andGroups };
+}
+function buildLogic(rule) {
+  return JSON.stringify(groupsLogic(rule.groups || []), null, 2);
+}
+function condHuman(c) {
+  const s = sourceOf(c.source);
+  let rhs;
+  if (c.refType === 'field') {
+    rhs = sourceOf(c.refField).label || c.refField;
+    if (c.offset) rhs += (c.offset > 0 ? ' − ' + c.offset : ' + ' + (-c.offset));
+  } else {
+    rhs = c.fixed;
+  }
+  return `<span style="color:#1d2129">${s.label || c.source}</span> ${OP_LABELS[c.op] || c.op} <span style="color:#165dff">${rhs}</span>`;
+}
+function groupsHuman(groups) {
+  return (groups || []).map(g => g.map(condHuman).join('<span class="and"> 且 </span>'))
+    .join('<span class="or"> 或 </span>');
+}
+function humanText(r) {
+  return '当 ' + groupsHuman(r.groups || []) + ' 时';
+}
+
+// ---------- 规则状态 ----------
+let uid = 7;  // 预置 6 条，新规则从 RULE-007 起
+const rules = ref([
+  {
+    id:'RULE-001', name:'部门配额检测', level:'error',
+    message:'部门 CPU/内存配额不足，本次申请将被拦截', suggestion:'请先申请扩容配额或释放资源',
+    groups:[[
+      { source:'cpu', op:'>', refType:'field', refField:'dept.cpu_quota.remaining', offset:0 },
+      { source:'memory', op:'>', refType:'field', refField:'dept.mem_quota.remaining', offset:0 },
+    ]],
+  },
+  {
+    id:'RULE-002', name:'资源池容量预留', level:'error',
+    message:'资源池可用内存不足（含 8GB 预留）', suggestion:'请换用内存更充裕的资源池或降低配置',
+    groups:[[
+      { source:'memory', op:'>', refType:'field', refField:'pool.mem_available', offset:8 },
+    ]],
+  },
+  {
+    id:'RULE-003', name:'网络可达性检测', level:'error',
+    message:'所选网络不在可达网络列表内', suggestion:'请改用可达网络（如 prod-vpc）或先提交网络变更单',
+    groups:[[
+      { source:'net_type', op:'not_in', refType:'field', refField:'network.reachable_list', offset:0 },
+    ]],
+  },
+  {
+    id:'RULE-004', name:'部门预算支持', level:'error',
+    message:'估算月成本超出部门剩余预算', suggestion:'需上级追加预算或降低配置',
+    groups:[[
+      { source:'estimate.cost_month', op:'>', refType:'field', refField:'dept.budget_remaining', offset:0 },
+    ]],
+  },
+  {
+    id:'RULE-005', name:'测试环境规格建议', level:'warning',
+    message:'测试类型申请高规格，可能造成资源浪费', suggestion:'测试环境建议 ≤8 核；如确需压测请补充压测方案说明',
+    groups:[[
+      { source:'biz_type', op:'==', refType:'fixed', fixed:'测试', offset:0 },
+      { source:'cpu', op:'>', refType:'fixed', fixed:8, offset:0 },
+    ]],
+  },
+  {
+    id:'RULE-006', name:'重复申请检测', level:'warning',
+    message:'近 7 天同规格申请已达阈值', suggestion:'确认是否仍需新增，避免资源冗余',
+    groups:[[
+      { source:'history.same_spec_count', op:'>=', refType:'fixed', fixed:2, offset:0 },
+    ]],
+  },
+]);
+
+const ruleErrors = computed(() => rules.value.filter(r => r.level==='error').length);
+const ruleWarnings = computed(() => rules.value.filter(r => r.level==='warning').length);
+
+// 模拟检测
+function runSim(r) {
+  const logic = groupsLogic(r.groups || []);
+  const data = ctxData();
+  const hit = evalLogic(logic, data);
+  if (hit) {
+    r._simText = r.level==='error' ? '✕ 命中 · 提交将被拦截' : '⚠ 命中 · 提交附警告';
+    r._simClass = r.level==='error' ? 'hit-hit' : 'hit-warn';
+  } else {
+    r._simText = '✓ 通过（当前表单值未命中）';
+    r._simClass = 'hit-pass';
+  }
+}
+function refreshSim() { rules.value.forEach(r => runSim(r)); }
+refreshSim();
+watch(simForm, () => refreshSim(), { deep: true });
+function initOpenState() { rules.value.forEach(r => { if (r._open === undefined) r._open = false; }); }
+initOpenState();
+
+// ---------- 配置器 ----------
+const drawer = ref(false);
+const editing = ref(null);
+const draft = ref(null);
+
+function newCond(presetSource) {
+  const c = { source: presetSource || '', op: '', refType:'fixed', fixed:null, refField:'', offset:0 };
+  if (presetSource) { c.op = opsFor(sourceOf(presetSource))[0]; }
+  return c;
+}
+function openDrawer(rule) {
+  if (rule) {
+    editing.value = rule;
+    draft.value = {
+      name: rule.name, level: rule.level, message: rule.message, suggestion: rule.suggestion,
+      groups: JSON.parse(JSON.stringify(rule.groups)),
+    };
+  } else {
+    editing.value = null;
+    draft.value = { name:'', level:'error', message:'', suggestion:'', groups:[[newCond()]] };
+  }
+  drawer.value = true;
+}
+function quickNew(src) {
+  openDrawer(null);
+  draft.value.groups = [[newCond(src.name)]];
+  if (!draft.value.name) draft.value.name = '检测 ' + src.label;
+}
+function addCondition(g) { g.conditions.push(newCond()); }
+function rmCondition(g, c) { if (g.conditions.length>1) g.conditions.splice(g.conditions.indexOf(c),1); }
+function addGroup() { draft.value.groups.push([newCond()]); }
+function rmGroup(gi) { if (draft.value.groups.length>1) draft.value.groups.splice(gi,1); }
+function onSourceChange(c) { c.op = opsFor(sourceOf(c.source))[0]; c.fixed = null; c.refField = ''; }
+
+const draftHuman = computed(() => draft.value ? '当 ' + groupsHuman(draft.value.groups || []) + ' 时 → 命中提示' : '');
+const draftLogic = computed(() => draft.value ? buildLogic(draft.value) : '');
+
+function saveRule() {
+  const d = draft.value;
+  if (!d.name) { ElementPlus.ElMessage.warning('请填写规则名称'); return; }
+  // 校验每个条件
+  for (const g of d.groups) {
+    for (const c of g) {
+      if (!c.source) { ElementPlus.ElMessage.warning('请选择数据源'); return; }
+      if (!c.op) { ElementPlus.ElMessage.warning('请选择操作符'); return; }
+      if (c.refType==='fixed' && (c.fixed===null || c.fixed==='')) { ElementPlus.ElMessage.warning('请填写参考值'); return; }
+      if (c.refType==='field' && !c.refField) { ElementPlus.ElMessage.warning('请选择引用的字段/指标'); return; }
+    }
+  }
+  if (editing.value) {
+    Object.assign(editing.value, { name:d.name, level:d.level, message:d.message, suggestion:d.suggestion, groups:d.groups });
+  } else {
+    rules.value.push({ id:'RULE-' + String(uid++).padStart(3,'0'), name:d.name, level:d.level, message:d.message, suggestion:d.suggestion, groups:d.groups, _open:false });
+  }
+  refreshSim();
+  drawer.value = false;
+  ElementPlus.ElMessage.success('规则已保存');
+}
+function removeRule(r) {
+  rules.value = rules.value.filter(x => x !== r);
+}
+
+// ---------- 能力边界 ----------
+const capabilityMatrix = [
+  { level:'l1', levelLabel:'L1', supported:true, label:'表单内规则（必填 / 范围 / 枚举 / 联动）', example:'配置层已支持：类型=临时 → 必填天数；CPU ∈ 1-128' },
+  { level:'l2', levelLabel:'L2', supported:true, label:'表单 × 业务上下文（数值 / 字段对字段 / 包含 / 聚合）', example:'申请CPU > 部门剩余配额 · 所选网络 ∈ 可达列表 · 近7天同规格 ≥ 2' },
+  { level:'l3', levelLabel:'L3', supported:true, label:'能力输入约束（必填 / 类型 / 枚举 / 范围）', example:'由 Capability.input_schema 声明即得，零配置' },
+  { level:'l4', levelLabel:'L4', supported:true, label:'预警类规则（不阻断，产 warning 附注）', example:'测试类型建议 ≤8 核 · 预算紧张提醒' },
+  { level:'x', levelLabel:'✕', supported:false, label:'需真实执行才能判断（如实际创建后是否成功）', example:'只能 DRY 预演，预检做不到' },
+  { level:'x', levelLabel:'✕', supported:false, label:'跨系统实时联动决策 / 高并发实时计费', example:'交给流程编排或专用服务' },
+  { level:'x', levelLabel:'✕', supported:false, label:'规则 ≠ 权威校验', example:'规则只做预检/提醒，后端 submit_check 仍权威复检（防绕过）' },
+];
+
+// ---------- 挂载 ----------
+const app = createApp({
+  setup() {
+    return {
+      sourceGroups, capabilityMatrix, rules, ruleErrors, ruleWarnings, simForm,
+      humanText, runSim, removeRule, openDrawer, quickNew, typeBadge,
+      drawer, editing, draft, draftHuman, draftLogic,
+      addCondition, rmCondition, addGroup, rmGroup, onSourceChange,
+      opsFor, opLabel, sourceOf, typeOf, isNumType, isEnumType, isTextType, saveRule,
+    };
+  },
+});
+for (const [name, comp] of Object.entries(ElementPlusIconsVue)) app.component(name, comp);
+app.use(ElementPlus);
+app.mount('#app');
+</script>
+</body>
+</html>

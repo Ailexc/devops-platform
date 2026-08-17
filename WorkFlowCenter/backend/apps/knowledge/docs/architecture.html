@@ -1,0 +1,31 @@
+<h1>系统架构</h1>
+<p>本系统是一套<strong>流程驱动的业务自动化平台</strong>：通过可视化流程设计器编排审批链路与自动化动作，让「人工审批」与「系统自动执行」在同一张流程图上无缝衔接，并配套业务规则引擎、提单预检、能力编排等核心能力。</p>
+
+<h2>一、总体分层</h2>
+<table>
+<thead><tr><th>层次</th><th>说明</th><th>关键技术</th></tr></thead>
+<tbody>
+<tr><td>接入层</td><td>Web 管理端、程序发起（OpenAPI）、飞书审批渠道</td><td>JWT、X-App-Code / X-App-Key、多渠道</td></tr>
+<tr><td>前端</td><td>申请/审批/配置/管理全部交互</td><td>Vue3、Vite、Element Plus、Arco、form-create、ECharts</td></tr>
+<tr><td>API 层</td><td>RESTful 接口，统一认证/鉴权/异常/幂等</td><td>Django REST Framework</td></tr>
+<tr><td>业务核心</td><td>流程引擎、规则引擎、能力编排、预检预演、事件总线</td><td>Django、django-fsm、自定义解释器</td></tr>
+<tr><td>数据层</td><td>流程定义/实例/任务/审批记录/能力作业</td><td>SQLite（演示）/ PostgreSQL（生产）</td></tr>
+</tbody>
+</table>
+
+<h2>二、核心组件</h2>
+<ul>
+<li><strong>流程设计器（Beeflow）</strong>：拖拽编排 发起/审批/抄送/条件/网关/办理/触发器 节点，产出树形 <code>nodeConfig</code> 定义。</li>
+<li><strong>流程引擎</strong>：把树形定义归一化为 <code>nodes + edges</code>，驱动 启动 → 推进 → 完成 的完整生命周期。</li>
+<li><strong>任务执行器</strong>：办理节点支持 人工办理 / 完全自动执行 / 自动执行+人工确认，串行/并行编排能力动作。</li>
+<li><strong>业务规则引擎</strong>：结构化规则 AST，支持上下文指标（配额/预算/网络可达等）校验，预检拦截 + 提交复检。</li>
+<li><strong>事件总线 &amp; Webhook</strong>：流程/任务事件驱动外部集成。</li>
+</ul>
+
+<h2>三、关键数据流</h2>
+<pre><code>提单(表单) → 规则预检(基础校验+业务规则+办理节点DryRun) → 发起实例
+           → 引擎推进 → 审批任务(多用户/多渠道) / 自动办理(能力动作)
+           → 实例完成 → 事件通知 → 可查询(我的申请/待办/已办/审批记录)</code></pre>
+
+<h2>四、部署形态</h2>
+<p>Docker Compose 一键部署：<code>api</code>（Django 开发服务器 + SQLite）与 <code>frontend</code>（Nginx 托管 Vue 构建产物），演示环境零外部依赖即可运行。</p>

@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevOps 平台全家桶 · 个人作品集</title>
+<meta name="description" content="7 个企业级全栈系统：统一认证 / 多云管理 / 事件治理 / 权限中心 / 发布流水线 / CMDB 数据平台 / 流程自动化 —— 个人技术作品集展示页">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ============ 基础 ============ */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f6f4ff; --ink:#120d24; --muted:#5d5672;
+  --card:#ffffff; --line:rgba(18,13,36,.09);
+  --g1:#6366f1; --g2:#8b5cf6; --g3:#d946ef; --g4:#f59e0b;
+  --font:"Space Grotesk","Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font); background:var(--bg); color:var(--ink);
+  -webkit-font-smoothing:antialiased; overflow-x:hidden; line-height:1.6;
+}
+::selection{background:#8b5cf6;color:#fff}
+a{color:inherit;text-decoration:none}
+
+/* 背景：点阵 + 顶部渐变 */
+body::before{
+  content:""; position:fixed; inset:0; z-index:-2;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(217,70,239,.12), transparent 60%),
+    radial-gradient(1000px 500px at 10% 0%, rgba(99,102,241,.12), transparent 55%),
+    var(--bg);
+}
+.dot-grid{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+  background-image:radial-gradient(rgba(18,13,36,.10) 1px, transparent 1px);
+  background-size:26px 26px;
+  -webkit-mask-image:linear-gradient(180deg,transparent,#000 20%,#000 80%,transparent);
+          mask-image:linear-gradient(180deg,transparent,#000 20%,#000 80%,transparent);
+}
+
+/* ============ 进度条 ============ */
+.progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:100;
+  background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3),var(--g4));border-radius:0 3px 3px 0}
+
+/* ============ 导航 ============ */
+nav{position:fixed;top:0;left:0;right:0;z-index:90;display:flex;align-items:center;justify-content:space-between;
+  padding:16px 28px;transition:.3s}
+nav .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
+nav .logo .dot{width:12px;height:12px;border-radius:4px;background:linear-gradient(135deg,var(--g1),var(--g3));box-shadow:0 0 12px rgba(139,92,246,.6)}
+nav .links{display:flex;gap:26px;font-size:14px;color:var(--muted)}
+nav .links a{transition:.2s}
+nav .links a:hover{color:var(--ink)}
+nav .cta{font-size:14px;font-weight:600;color:#fff;padding:10px 20px;border-radius:999px;
+  background:linear-gradient(135deg,var(--g1),var(--g2),var(--g3));box-shadow:0 6px 20px rgba(139,92,246,.35);transition:.25s}
+nav .cta:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(139,92,246,.5)}
+nav.scrolled{background:rgba(246,244,255,.85);backdrop-filter:blur(14px);box-shadow:0 1px 0 var(--line)}
+@media(max-width:760px){nav .links{display:none}}
+
+/* ============ 通用容器 / 章节 ============ */
+.wrap{max-width:1200px;margin:0 auto;padding:0 28px}
+section{position:relative}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:13px;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--g2)}
+.eyebrow::before{content:"";width:26px;height:2px;background:linear-gradient(90deg,var(--g1),var(--g3));border-radius:2px}
+h1,h2,h3{font-weight:900;line-height:1.15;letter-spacing:-.01em}
+.grad-text{background:linear-gradient(120deg,var(--g1),var(--g2) 40%,var(--g3) 75%,var(--g4));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ============ Hero ============ */
+.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:120px 24px 80px;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;pointer-events:none;z-index:-1;animation:float 12s ease-in-out infinite}
+.blob.b1{width:420px;height:420px;background:#a78bfa;top:-60px;left:-60px}
+.blob.b2{width:360px;height:360px;background:#f0abfc;bottom:-40px;right:-40px;animation-delay:-4s}
+.blob.b3{width:300px;height:300px;background:#818cf8;top:40%;left:55%;animation-delay:-8s}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-40px) scale(1.08)}}
+.hero .badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--g2);
+  background:#fff;border:1px solid var(--line);padding:8px 16px;border-radius:999px;box-shadow:0 4px 16px rgba(18,13,36,.06)}
+.hero .badge .pulse{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--g1),var(--g3));animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,.5)}50%{box-shadow:0 0 0 7px rgba(139,92,246,0)}}
+.hero h1{font-size:clamp(44px,7.5vw,96px);margin:26px auto 18px;max-width:16ch}
+.hero .sub{font-size:clamp(16px,2vw,20px);color:var(--muted);max-width:720px;margin:0 auto}
+.hero .stats{display:flex;gap:0;justify-content:center;margin-top:46px;flex-wrap:wrap}
+.hero .stat{min-width:150px;padding:0 30px}
+.hero .stat + .stat{border-left:1px solid var(--line)}
+.hero .stat b{display:block;font-size:34px;font-weight:900;background:linear-gradient(135deg,var(--g1),var(--g3));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .stat span{font-size:13px;color:var(--muted)}
+.hero .scroll-hint{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:12px;letter-spacing:.12em}
+.hero .scroll-hint .mouse{width:22px;height:34px;border:2px solid var(--muted);border-radius:12px;position:relative}
+.hero .scroll-hint .mouse::after{content:"";position:absolute;top:6px;left:50%;width:4px;height:8px;margin-left:-2px;border-radius:2px;background:var(--g2);animation:wheel 1.6s infinite}
+@keyframes wheel{0%{opacity:0;transform:translateY(0)}40%{opacity:1}100%{opacity:0;transform:translateY(12px)}}
+
+/* ============ 跑马灯 ============ */
+.marquee{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;overflow:hidden;padding:16px 0}
+.marquee .track{display:flex;gap:48px;width:max-content;animation:mq 26s linear infinite}
+.marquee span{font-size:15px;font-weight:600;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:12px}
+.marquee span i{width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,var(--g2),var(--g4))}
+@keyframes mq{to{transform:translateX(-50%)}}
+
+/* ============ 概览卡片 ============ */
+.overview{padding:120px 0 60px}
+.overview .head{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:46px;flex-wrap:wrap}
+.overview .head h2{font-size:clamp(30px,4.4vw,52px);max-width:15ch}
+.overview .head p{color:var(--muted);max-width:420px;font-size:15px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:26px;cursor:pointer;
+  box-shadow:0 4px 18px rgba(18,13,36,.05);transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:linear-gradient(90deg,var(--ac,var(--g1)),var(--ac2,var(--g3)));opacity:.9}
+.card:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(18,13,36,.10)}
+.card .ico{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;
+  background:linear-gradient(135deg,var(--ac,var(--g1)),var(--ac2,var(--g3)));color:#fff;margin-bottom:16px;box-shadow:0 6px 16px color-mix(in srgb,var(--ac,var(--g1)) 45%,transparent)}
+.card h3{font-size:18px;margin-bottom:6px}
+.card .tagline{font-size:13px;color:var(--g2);font-weight:600;margin-bottom:10px}
+.card p{font-size:13.5px;color:var(--muted)}
+.card .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.card .chips span{font-size:11px;color:var(--muted);background:#f1effc;border:1px solid var(--line);padding:3px 9px;border-radius:999px;font-weight:600}
+
+/* ============ 架构（钉住滚动） ============ */
+.arch{height:320vh}
+.arch .pin{position:sticky;top:0;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.arch .stage{position:relative;display:flex;flex-direction:column;align-items:center;gap:0}
+.arch .layer{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:16px;
+  padding:14px 20px;box-shadow:0 8px 26px rgba(18,13,36,.07);font-weight:700;font-size:15px;white-space:nowrap;opacity:0}
+.arch .layer .ico{font-size:20px}
+.arch .conn{width:2px;height:26px;background:linear-gradient(180deg,var(--g2),var(--g4));opacity:0;transform-origin:top}
+.arch .layer.grid .inner{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.arch .layer.grid .chip{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:600;
+  padding:10px 12px;border-radius:12px;background:#f4f1ff;border:1px solid var(--line);color:var(--ink);text-align:center}
+.arch .layer.grid .chip .e{font-size:18px}
+.arch .side-note{position:absolute;right:4%;top:50%;transform:translateY(-50%);text-align:right;max-width:240px;opacity:0}
+.arch .side-note .idx{font-size:56px;font-weight:900;line-height:1;background:linear-gradient(135deg,var(--g1),var(--g3));-webkit-background-clip:text;background-clip:text;color:transparent}
+.arch .side-note p{color:var(--muted);font-size:13px;margin-top:6px}
+.arch .side-note h4{font-size:20px;margin-bottom:4px}
+.arch .hint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);font-size:12px;color:var(--muted);letter-spacing:.1em;opacity:.7}
+@media(max-width:860px){.arch .side-note{display:none}.arch .layer.grid .inner{grid-template-columns:repeat(2,1fr)}}
+
+/* ============ 系统详情 ============ */
+.sys{padding:90px 0}
+.sys .grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.sys .grid.rev .text{order:2}
+.sys .text .num{font-size:15px;font-weight:700;letter-spacing:.2em;color:var(--g2)}
+.sys .text h2{font-size:clamp(28px,4vw,46px);margin:10px 0 10px}
+.sys .text .lead{font-size:16px;color:var(--muted);margin-bottom:22px}
+.sys .tech{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px}
+.sys .tech span{font-size:12px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--line);padding:6px 12px;border-radius:999px}
+.sys .points{display:grid;gap:12px}
+.sys .point{display:flex;gap:12px;align-items:flex-start}
+.sys .point .pi{width:22px;height:22px;flex-shrink:0;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;
+  background:linear-gradient(135deg,var(--ac,var(--g1)),var(--ac2,var(--g3)))}
+.sys .point b{font-size:14px;display:block}
+.sys .point p{font-size:13px;color:var(--muted)}
+.sys .more{display:inline-flex;align-items:center;gap:8px;margin-top:26px;font-size:14px;font-weight:700;color:var(--g2)}
+.sys .more:hover{gap:14px;transition:.25s}
+
+/* 模拟浏览器窗口 */
+.mock{border-radius:18px;background:#fff;border:1px solid var(--line);box-shadow:0 24px 60px rgba(18,13,36,.14);overflow:hidden;transform-origin:center}
+.mock-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#faf9ff;border-bottom:1px solid var(--line)}
+.mock-bar .tl{width:11px;height:11px;border-radius:50%}
+.mock-bar .tl:nth-child(1){background:#ff5f57}.mock-bar .tl:nth-child(2){background:#febc2e}.mock-bar .tl:nth-child(3){background:#28c840}
+.mock-bar .url{flex:1;margin-left:10px;font-size:12px;color:var(--muted);background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.mock-body{padding:0;position:relative}
+
+/* —— 认证门户 mock —— */
+.mu-portal{font-size:11px}
+.mu-portal .head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+.mu-portal .head .brand{font-weight:800;display:flex;align-items:center;gap:6px}
+.mu-portal .head .avatar{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--g1),var(--g3));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.mu-portal .body{padding:14px 16px}
+.mu-portal .apps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.mu-portal .app{border:1px solid var(--line);border-radius:12px;padding:12px 10px;text-align:center;background:#faf9ff;transition:.2s}
+.mu-portal .app .a{font-size:22px}
+.mu-portal .app b{display:block;margin-top:6px;font-size:11px}
+.mu-portal .app small{color:var(--muted);font-size:10px}
+.mu-portal .app.active{border-color:var(--g2);background:linear-gradient(135deg,#eef2ff,#faf5ff);box-shadow:0 4px 12px rgba(139,92,246,.15)}
+.mu-portal .chip-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.mu-portal .chip-row span{font-size:10px;background:#eef2ff;color:var(--g1);padding:3px 8px;border-radius:999px;font-weight:600}
+
+/* —— 云管 console mock —— */
+.mu-cloud{display:flex;font-size:11px;min-height:210px}
+.mu-cloud .side{width:34%;background:#0f1422;color:#cfd6e6;padding:12px}
+.mu-cloud .side .m{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;margin-bottom:2px}
+.mu-cloud .side .m.on{background:rgba(56,132,255,.18);color:#5aa2ff;font-weight:600}
+.mu-cloud .main{flex:1;padding:14px;background:#f4f6fb}
+.mu-cloud .main .s{font-weight:700;color:#1c2434;margin-bottom:10px}
+.mu-cloud .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.mu-cloud .stats div{background:#fff;border:1px solid #e5e9f2;border-radius:10px;padding:8px}
+.mu-cloud .stats b{display:block;font-size:15px;color:#1c2434}
+.mu-cloud .stats small{color:#8a93a6}
+.mu-cloud table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden}
+.mu-cloud th,.mu-cloud td{padding:6px 8px;text-align:left;font-size:10px}
+.mu-cloud th{background:#fafbfd;color:#8a93a6;font-weight:600}
+.mu-cloud td b{color:#1c2434}
+.mu-cloud .st{font-size:9px;padding:2px 7px;border-radius:999px;font-weight:700}
+.mu-cloud .st.ok{background:#e6f7ef;color:#0f9d63}
+.mu-cloud .st.pending{background:#fff3e0;color:#e07c00}
+
+/* —— 事件管理 mock —— */
+.mu-event{font-size:11px;padding:14px}
+.mu-event .row{display:flex;gap:10px;margin-bottom:12px}
+.mu-event .kpi{flex:1;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#faf9ff}
+.mu-event .kpi b{font-size:18px;display:block}
+.mu-event .kpi small{color:var(--muted)}
+.mu-event .bar{height:6px;border-radius:6px;background:#eef0ff;overflow:hidden;margin-top:6px}
+.mu-event .bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--g1),var(--g3))}
+.mu-event .table .tr{display:grid;grid-template-columns:2.2fr 1.2fr 1fr 1fr;gap:8px;padding:7px 8px;border-bottom:1px solid var(--line);align-items:center}
+.mu-event .table .tr.h{border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;font-size:10px}
+.mu-event .pill{font-size:9px;padding:2px 8px;border-radius:999px;font-weight:700;justify-self:start}
+.mu-event .pill.ok{background:#e6f7ef;color:#0f9d63}
+.mu-event .pill.fail{background:#fee9ea;color:#e5484d}
+.mu-event .pill.dlq{background:#fff0f7;color:#d6409f}
+.mu-event .pill.warn{background:#fff3e0;color:#e07c00}
+.mu-event .src{font-size:10px;color:var(--muted)}
+
+/* —— 权限中心 mock —— */
+.mu-iam{font-size:11px;display:flex;min-height:220px}
+.mu-iam .side{width:32%;border-right:1px solid var(--line);padding:12px;background:#faf9ff}
+.mu-iam .side .g{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:8px 0 4px}
+.mu-iam .side .m{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px}
+.mu-iam .side .m.on{background:#eef2ff;color:var(--g1);font-weight:700}
+.mu-iam .main{flex:1;padding:12px}
+.mu-iam .main .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.mu-iam .main .head b{font-size:12px}
+.mu-iam .policy{border:1px solid var(--line);border-radius:12px;padding:8px;background:#faf9ff;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.mu-iam .policy .tag{font-size:9px;padding:2px 8px;border-radius:999px;font-weight:700}
+.mu-iam .policy .allow{background:#e6f7ef;color:#0f9d63}
+.mu-iam .policy .deny{background:#fee9ea;color:#e5484d}
+.mu-iam .policy b{font-size:10px}
+.mu-iam .policy small{color:var(--muted);font-size:9px;flex:1;text-align:right}
+.mu-iam .flow{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding:10px 12px;border:1px dashed var(--g2);border-radius:12px;background:#faf5ff}
+.mu-iam .flow span{font-size:9px;color:var(--muted);text-align:center}
+.mu-iam .flow .st{font-weight:700;color:var(--g1);font-size:10px}
+.mu-iam .flow .ar{color:var(--g3)}
+
+/* —— 发布系统 mock —— */
+.mu-rel{font-size:11px;padding:14px}
+.mu-rel .pipeline{display:flex;align-items:center;gap:6px;margin:12px 0}
+.mu-rel .stage{flex:1;text-align:center;padding:10px 4px;border-radius:12px;background:#f4f1ff;border:1px solid var(--line);position:relative}
+.mu-rel .stage .s{font-size:18px}
+.mu-rel .stage b{display:block;font-size:10px;margin-top:4px}
+.mu-rel .stage small{font-size:8.5px;color:var(--muted)}
+.mu-rel .stage.done{background:#e6f7ef;border-color:#bfe9d4}
+.mu-rel .stage.now{background:linear-gradient(135deg,#eef2ff,#faf5ff);border-color:var(--g2);box-shadow:0 4px 12px rgba(139,92,246,.18)}
+.mu-rel .stage .bar2{height:4px;border-radius:4px;background:#e6e6f5;margin-top:6px;overflow:hidden}
+.mu-rel .stage .bar2 i{display:block;height:100%;background:linear-gradient(90deg,var(--g1),var(--g3))}
+.mu-rel .deploy{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:12px}
+.mu-rel .deploy .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.mu-rel .deploy .top b{font-size:11px}
+.mu-rel .deploy .top .mode{font-size:9px;padding:2px 8px;border-radius:999px;background:#fde9f4;color:#d6409f;font-weight:700}
+.mu-rel .gauge{height:10px;border-radius:6px;background:#f0eefc;overflow:hidden}
+.mu-rel .gauge i{display:block;height:100%;width:62%;border-radius:6px;background:linear-gradient(90deg,var(--g1),var(--g3));animation:gauge 2.4s ease-in-out infinite alternate}
+@keyframes gauge{from{width:38%}to{width:78%}}
+.mu-rel .deploy .tags{display:flex;gap:6px;margin-top:10px}
+.mu-rel .deploy .tags span{font-size:9px;background:#faf9ff;border:1px solid var(--line);border-radius:999px;padding:3px 8px}
+
+/* —— CMDB 大盘 mock —— */
+.mu-cmdb{font-size:11px;display:flex;min-height:210px}
+.mu-cmdb .side{width:36%;background:#faf9ff;border-right:1px solid var(--line);padding:12px}
+.mu-cmdb .side .tree .t{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:8px}
+.mu-cmdb .side .tree .t.on{background:#eef2ff;color:var(--g1);font-weight:700}
+.mu-cmdb .side .tree .t.c{color:var(--muted);font-size:10px}
+.mu-cmdb .main{flex:1;padding:12px}
+.mu-cmdb .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.mu-cmdb .kpis div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px}
+.mu-cmdb .kpis b{font-size:16px;display:block}
+.mu-cmdb .kpis small{color:var(--muted)}
+.mu-cmdb .chart{display:flex;align-items:flex-end;gap:6px;height:64px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:10px}
+.mu-cmdb .chart i{flex:1;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--g2),var(--g4));opacity:.85}
+.mu-cmdb .foot{display:flex;justify-content:space-between;margin-top:10px;font-size:10px;color:var(--muted)}
+
+/* —— 工作流 mock —— */
+.mu-wf{font-size:11px;padding:14px}
+.mu-wf .canvas{height:150px;border:1px dashed var(--g2);border-radius:12px;background:
+  radial-gradient(circle,rgba(18,13,36,.08) 1px,transparent 1px);background-size:18px 18px;position:relative;overflow:hidden}
+.mu-wf .node{position:absolute;border-radius:10px;padding:6px 10px;text-align:center;font-size:9px;font-weight:700;
+  background:#fff;border:1.5px solid var(--g2);box-shadow:0 4px 10px rgba(18,13,36,.08)}
+.mu-wf .node b{display:block;font-size:9px}
+.mu-wf .node small{display:block;font-size:8px;color:var(--muted);font-weight:500}
+.mu-wf .node.start{border-color:#10b981;background:#ecfdf5}
+.mu-wf .node.end{border-color:#e5484d;background:#fef2f2}
+.mu-wf .node.run{border-color:var(--g2);background:linear-gradient(135deg,#eef2ff,#faf5ff)}
+.mu-wf .edge{position:absolute;height:2px;background:linear-gradient(90deg,var(--g2),var(--g4));transform-origin:0 50%;border-radius:2px}
+.mu-wf .panel{display:flex;gap:8px;margin-top:12px}
+.mu-wf .panel .p{flex:1;border:1px solid var(--line);border-radius:10px;padding:8px}
+.mu-wf .panel .p b{font-size:10px;display:block}
+.mu-wf .panel .p small{color:var(--muted);font-size:8.5px}
+.mu-wf .toggle{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:10px}
+.mu-wf .toggle .sw{width:30px;height:16px;border-radius:999px;background:linear-gradient(90deg,var(--g1),var(--g3));position:relative}
+.mu-wf .toggle .sw::after{content:"";position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:50%;background:#fff}
+
+/* ============ 技术栈 ============ */
+.stack{padding:120px 0}
+.stack .head{text-align:center;margin-bottom:56px}
+.stack .head h2{font-size:clamp(30px,4.4vw,52px)}
+.stack .head p{color:var(--muted);margin-top:12px}
+.stack-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.stack-card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:0 4px 18px rgba(18,13,36,.05)}
+.stack-card h3{font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.stack-card .desc{font-size:12.5px;color:var(--muted);margin-bottom:16px}
+.stack-card .tags{display:flex;flex-wrap:wrap;gap:8px}
+.stack-card .tags span{font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:10px;background:#f4f1ff;border:1px solid var(--line);transition:.2s}
+.stack-card .tags span:hover{transform:translateY(-2px);background:linear-gradient(135deg,#eef2ff,#faf5ff);border-color:var(--g2)}
+
+/* ============ 部署 ============ */
+.deploy{padding:120px 0}
+.deploy .head{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:46px;flex-wrap:wrap}
+.deploy .head h2{font-size:clamp(30px,4.4vw,52px);max-width:14ch}
+.deploy .head p{color:var(--muted);max-width:400px;font-size:15px}
+.deploy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.dep-card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:0 4px 18px rgba(18,13,36,.05)}
+.dep-card .e{font-size:30px;margin-bottom:12px}
+.dep-card h3{font-size:17px;margin-bottom:6px}
+.dep-card p{font-size:13px;color:var(--muted);margin-bottom:12px}
+.dep-card .steps{display:grid;gap:8px}
+.dep-card .steps .s{display:flex;gap:10px;font-size:12.5px;align-items:flex-start}
+.dep-card .steps .n{width:20px;height:20px;flex-shrink:0;border-radius:7px;background:linear-gradient(135deg,var(--g1),var(--g3));color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+/* ============ CTA ============ */
+.cta{padding:120px 0 80px}
+.cta .panel{border-radius:32px;padding:80px 40px;text-align:center;position:relative;overflow:hidden;color:#fff;
+  background:linear-gradient(135deg,#4f46e5,#7c3aed 45%,#c026d3 75%,#f59e0b)}
+.cta .panel::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(500px 300px at 15% 0%,rgba(255,255,255,.25),transparent 60%),
+  radial-gradient(500px 300px at 85% 100%,rgba(255,255,255,.18),transparent 60%)}
+.cta .panel .inner{position:relative}
+.cta .panel h2{font-size:clamp(32px,5vw,60px);margin-bottom:14px}
+.cta .panel p{font-size:16px;opacity:.9;max-width:640px;margin:0 auto 34px}
+.cta .btn{display:inline-flex;align-items:center;gap:12px;font-size:17px;font-weight:800;color:#4f46e5;background:#fff;
+  padding:18px 38px;border-radius:999px;box-shadow:0 16px 40px rgba(0,0,0,.25);transition:.28s}
+.cta .btn:hover{transform:translateY(-4px) scale(1.03);box-shadow:0 22px 52px rgba(0,0,0,.32)}
+.cta .btn .ar{transition:.28s}
+.cta .btn:hover .ar{transform:translateX(6px)}
+.cta .note{margin-top:18px;font-size:13px;opacity:.75}
+.cta .acc{margin-top:30px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.cta .acc span{font-size:12px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);padding:8px 16px;border-radius:999px;backdrop-filter:blur(6px)}
+
+/* ============ Footer ============ */
+footer{padding:40px 0 60px;text-align:center;color:var(--muted);font-size:13px}
+footer .row{display:flex;justify-content:center;gap:22px;flex-wrap:wrap;margin-bottom:14px}
+footer .row a{font-weight:600;color:var(--ink)}
+footer .row a:hover{color:var(--g2)}
+
+/* ============ 响应式 ============ */
+@media(max-width:900px){
+  .sys .grid{grid-template-columns:1fr;gap:34px}
+  .sys .grid.rev .text{order:0}
+  .hero .stat{min-width:110px;padding:0 16px}
+  .hero .stat b{font-size:26px}
+  .arch{height:300vh}
+}
+@media(max-width:560px){
+  nav{padding:12px 16px}
+  .wrap{padding:0 18px}
+  .overview,.stack,.deploy,.cta{padding-top:80px}
+  .sys{padding:60px 0}
+  .cta .panel{padding:56px 24px}
+}
+</style>
+</head>
+<body>
+
+<div class="dot-grid"></div>
+<div class="progress" id="progress"></div>
+
+<!-- ==================== 导航 ==================== -->
+<nav id="nav">
+  <a class="logo" href="#top"><span class="dot"></span>DevOpsPlatform</a>
+  <div class="links">
+    <a href="#overview">全家桶</a>
+    <a href="#arch">架构</a>
+    <a href="#systems">系统</a>
+    <a href="#stack">技术栈</a>
+    <a href="#deploy">部署</a>
+  </div>
+  <a class="cta" id="navCta" href="#" target="_blank" rel="noopener">进入统一门户 →</a>
+</nav>
+
+<main id="top">
+
+<!-- ==================== HERO ==================== -->
+<section class="hero">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  <div class="wrap">
+    <span class="badge"><span class="pulse"></span>个人技术作品集 · 企业级内部系统合集</span>
+    <h1>一套<span class="grad-text">多云 DevOps</span><br>平台全家桶</h1>
+    <p class="sub">从「一次登录」到「一键发布」，7 个独立研发的全栈系统，串联成一条完整的企业平台故事线。</p>
+    <div class="stats">
+      <div class="stat"><b data-count="7">0</b><span>个全栈系统</span></div>
+      <div class="stat"><b data-count="6">0</b><span>条技术栈</span></div>
+      <div class="stat"><b data-count="100">0</b><span>% 可运行</span></div>
+      <div class="stat"><b data-count="4">0</b><span>种编程语言</span></div>
+    </div>
+  </div>
+  <div class="scroll-hint"><div class="mouse"></div>向下滚动</div>
+</section>
+
+<!-- ==================== 跑马灯 ==================== -->
+<div class="marquee" aria-hidden="true">
+  <div class="track" id="marquee">
+    <span>React<i></i></span><span>Vue 3<i></i></span><span>Python<i></i></span><span>Go<i></i></span>
+    <span>FastAPI<i></i></span><span>Django<i></i></span><span>DRF<i></i></span><span>Traefik<i></i></span>
+    <span>RS256 JWT<i></i></span><span>JWKS<i></i></span><span>Casbin<i></i></span><span>OpenFGA<i></i></span>
+    <span>LogicFlow<i></i></span><span>PostgreSQL<i></i></span><span>Redis<i></i></span><span>RabbitMQ<i></i></span>
+    <span>Celery<i></i></span><span>Docker Compose<i></i></span><span>OrbStack<i></i></span><span>kind K8s<i></i></span>
+  </div>
+</div>
+
+<!-- ==================== 概览 ==================== -->
+<section class="overview" id="overview">
+  <div class="wrap">
+    <div class="head">
+      <div>
+        <span class="eyebrow">Portfolio · 全家桶总览</span>
+        <h2>七个系统，<span class="grad-text">一条主线</span></h2>
+      </div>
+      <p>覆盖企业内部平台的高频场景：身份、权限、资源、事件、发布与流程。每一套都独立可跑，合起来就是完整的 DevOps 平台。</p>
+    </div>
+    <div class="cards" id="sysCards">
+      <!-- 由 JS 渲染 -->
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 架构（钉住滚动） ==================== -->
+<section class="arch" id="arch">
+  <div class="pin">
+    <div class="stage" id="archStage">
+      <div class="layer" data-l="0"><span class="ico">👤</span> 用户 / 浏览器</div>
+      <div class="conn"></div>
+      <div class="layer" data-l="1"><span class="ico">🚪</span> 统一门户 · Authentication Portal（React 19 · 应用广场）</div>
+      <div class="conn"></div>
+      <div class="layer" data-l="2"><span class="ico">🛡</span> 统一网关 Traefik · forwardAuth &nbsp;→&nbsp; <span class="ico">🔐</span> 认证中心 FastAPI · RS256 JWT / JWKS</div>
+      <div class="conn"></div>
+      <div class="layer grid" data-l="3">
+        <div class="inner">
+          <div class="chip"><span class="e">🔐</span>认证中心</div>
+          <div class="chip"><span class="e">⚙️</span>权限中心</div>
+          <div class="chip"><span class="e">🚀</span>发布系统</div>
+          <div class="chip"><span class="e">🧩</span>工作流</div>
+          <div class="chip"><span class="e">☁️</span>多云管理</div>
+          <div class="chip"><span class="e">🗄️</span>CMDB 平台</div>
+          <div class="chip"><span class="e">⚡</span>事件管理</div>
+          <div class="chip"><span class="e">➕</span>可扩展</div>
+        </div>
+      </div>
+      <div class="conn"></div>
+      <div class="layer" data-l="4"><span class="ico">📦</span> 基础设施 · PostgreSQL / SQLite / Redis / RabbitMQ / kind K8s</div>
+    </div>
+    <div class="side-note" id="archNote">
+      <div class="idx" id="archIdx">01</div>
+      <h4 id="archTitle">接入层</h4>
+      <p id="archDesc">一切从用户的一次访问开始</p>
+    </div>
+    <div class="hint">↓ 继续滚动 · 架构逐层展开</div>
+  </div>
+</section>
+
+<!-- ==================== 系统详情 ==================== -->
+<section class="sys" id="systems" style="padding-top:60px">
+  <div class="wrap">
+    <div class="head" style="text-align:center;margin-bottom:60px">
+      <span class="eyebrow">Deep Dive · 逐个深挖</span>
+      <h2 style="font-size:clamp(30px,4.4vw,52px);margin-top:14px">每个系统，<span class="grad-text">独立成军</span></h2>
+    </div>
+  </div>
+
+  <!-- 1 认证 -->
+  <div class="wrap sys-row" style="padding-top:20px">
+    <div class="grid">
+      <div class="text" data-reveal>
+        <div class="num">01 / AUTHENTICATION</div>
+        <h2>统一认证中心</h2>
+        <p class="lead">统一门户 · SSO 单点登录 · 统一网关鉴权。一次登录，多系统无感访问。</p>
+        <div class="tech"><span>React 19</span><span>FastAPI</span><span>Traefik</span><span>OpenLDAP</span><span>SQLite</span></div>
+        <div class="points">
+          <div class="point"><div class="pi">◈</div><div><b>身份源抽象 + 降级链</b><p>Local / LDAP / Okta 策略化 failover，身份源不可用自动降级，认证失败不降级（安全边界）</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>RS256 JWT + JWKS 公钥发布</b><p>非对称签名，异构系统（Go/Python/Node）本地验签，无需回源</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>Traefik forwardAuth 统一网关</b><p>鉴权下沉网关，业务系统零代码接入，自动注入 X-Auth-* 身份头</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>应用注册表驱动门户</b><p>注册即上架，门户由数据驱动，可扩展任意业务系统</p></div></div>
+        </div>
+        <a class="more" data-repo="Authentication" href="#">查看项目详情 →</a>
+      </div>
+      <div class="mock" data-reveal>
+        <div class="mock-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><div class="url">portal.authentication.orb.local</div></div>
+        <div class="mock-body mu-portal">
+          <div class="head"><div class="brand"><span class="dot" style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,var(--g1),var(--g3));display:inline-block"></span>统一门户</div><div class="avatar">A</div></div>
+          <div class="body">
+            <div style="font-weight:700;font-size:12px">👋 早上好，admin</div>
+            <div style="color:var(--muted);font-size:10px;margin-top:2px">已通过 RS256 JWT 安全登录 · 身份源：本地用户库</div>
+            <div class="apps">
+              <div class="app active"><div class="a">⚙️</div><b>权限中心</b><small>IAM 管控</small></div>
+              <div class="app"><div class="a">🚀</div><b>发布系统</b><small>CI/CD</small></div>
+              <div class="app"><div class="a">🧩</div><b>工作流</b><small>流程自动化</small></div>
+              <div class="app"><div class="a">☁️</div><b>云管中心</b><small>多云管理</small></div>
+              <div class="app"><div class="a">⚡</div><b>事件中心</b><small>事件监控</small></div>
+              <div class="app"><div class="a">🗄️</div><b>CMDB</b><small>数据平台</small></div>
+            </div>
+            <div class="chip-row"><span>SSO 已启用</span><span>JWT 有效期 2h</span><span>应用广场 6 个</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 云管 -->
+  <div class="wrap sys-row" style="padding-top:60px">
+    <div class="grid rev">
+      <div class="text" data-reveal>
+        <div class="num">02 / CLOUD MANAGER</div>
+        <h2>多云管理系统</h2>
+        <p class="lead">仿 AWS 控制台的多云资源管理。所有操作走工单审批，CMDB 作为唯一数据源。</p>
+        <div class="tech"><span>Vue 3</span><span>Django</span><span>MySQL</span><span>Redis</span><span>RabbitMQ</span></div>
+        <div class="points">
+          <div class="point"><div class="pi">◈</div><div><b>操作全部走工单系统</b><p>先审批后执行，合规留痕，云厂商变更只影响执行器</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>CMDB 唯一数据源</b><p>多页面数据一致，全量/增量同步 + 漂移检测兜底</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>多云适配层</b><p>AWS / 阿里云 Provider，统一资源模型，可扩展新云</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>成本优化规则引擎</b><p>成本三角分析 + 服务目录自服务，智能资源建议</p></div></div>
+        </div>
+        <a class="more" data-repo="CloudManager" href="#">查看项目详情 →</a>
+      </div>
+      <div class="mock" data-reveal>
+        <div class="mock-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><div class="url">console.cloud-manager.orb.local</div></div>
+        <div class="mock-body mu-cloud">
+          <div class="side">
+            <div class="m on">☁️ 资源总览</div>
+            <div class="m">🖥 计算</div>
+            <div class="m">🌐 网络</div>
+            <div class="m">💾 存储</div>
+            <div class="m">🛡 安全组</div>
+            <div class="m">🧩 子网</div>
+            <div class="m">📄 工单中心</div>
+            <div class="m">💰 成本分析</div>
+          </div>
+          <div class="main">
+            <div class="s">☁️ 资源总览</div>
+            <div class="stats">
+              <div><b>128</b><small>EC2 实例</small></div>
+              <div><b>42</b><small>VPC 网络</small></div>
+              <div><b>86</b><small>存储卷</small></div>
+            </div>
+            <table>
+              <tr><th>名称</th><th>类型</th><th>区域</th><th>状态</th></tr>
+              <tr><td><b>prod-web-01</b></td><td>t3.large</td><td>ap-southeast-1</td><td><span class="st ok">运行中</span></td></tr>
+              <tr><td><b>prod-db-02</b></td><td>r6g.xlarge</td><td>ap-southeast-1</td><td><span class="st ok">运行中</span></td></tr>
+              <tr><td><b>dev-api-03</b></td><td>m6i.2xlarge</td><td>cn-north-1</td><td><span class="st pending">创建中</span></td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 事件 -->
+  <div class="wrap sys-row" style="padding-top:60px">
+    <div class="grid">
+      <div class="text" data-reveal>
+        <div class="num">03 / EVENT FLOW</div>
+        <h2>事件管理系统</h2>
+        <p class="lead">AWS / GitHub Webhook / 内部系统多事件源统一接入、处理与监控。</p>
+        <div class="tech"><span>Python Django</span><span>Go</span><span>PostgreSQL</span><span>RabbitMQ</span><span>React</span></div>
+        <div class="points">
+          <div class="point"><div class="pi">◈</div><div><b>Python + Go 双栈同构</b><p>同一 API、同一数据模型，两种语言实现互证架构能力</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>多事件源接入</b><p>AWS EC2/RDS/S3、GitHub Webhook、内部健康检查统一收口</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>事件处理 + DLQ 监控</b><p>死信队列可见，失败可重放，完成率/失败率/DLQ 率一目了然</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>一键初始化</b><p>千级模拟事件 + 6 类事件模板，秒级搭建演示环境</p></div></div>
+        </div>
+        <a class="more" data-repo="EventManager" href="#">查看项目详情 →</a>
+      </div>
+      <div class="mock" data-reveal>
+        <div class="mock-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><div class="url">events.event-management.orb.local</div></div>
+        <div class="mock-body mu-event">
+          <div class="row">
+            <div class="kpi"><b>12,480</b><small>今日事件</small><div class="bar"><i style="width:72%"></i></div></div>
+            <div class="kpi"><b>98.2%</b><small>处理成功率</small><div class="bar"><i style="width:92%;background:linear-gradient(90deg,#10b981,#14b8a6)"></i></div></div>
+            <div class="kpi"><b>3.1%</b><small>DLQ 率</small><div class="bar"><i style="width:18%;background:linear-gradient(90deg,#d946ef,#ec4899)"></i></div></div>
+          </div>
+          <div class="table">
+            <div class="tr h"><span>事件类型</span><span>来源</span><span>状态</span><span>耗时</span></div>
+            <div class="tr"><span><b>aws.ec2.state-change</b><div class="src">i-0f8c2… · running</div></span><span class="src">AWS</span><span><span class="pill ok">已处理</span></span><span class="src">1.2s</span></div>
+            <div class="tr"><span><b>github.push</b><div class="src">devops/release · main</div></span><span class="src">GitHub</span><span><span class="pill ok">已处理</span></span><span class="src">0.8s</span></div>
+            <div class="tr"><span><b>internal.health</b><div class="src">api-gateway · timeout</div></span><span class="src">内部</span><span><span class="pill warn">重试中</span></span><span class="src">2.1s</span></div>
+            <div class="tr"><span><b>aws.rds.failover</b><div class="src">db-prod · failover</div></span><span class="src">AWS</span><span><span class="pill fail">失败</span></span><span class="src">5.6s</span></div>
+            <div class="tr"><span><b>github.issue</b><div class="src">devops/cmdb · #128</div></span><span class="src">GitHub</span><span><span class="pill dlq">DLQ</span></span><span class="src">-</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 权限 -->
+  <div class="wrap sys-row" style="padding-top:60px">
+    <div class="grid rev">
+      <div class="text" data-reveal>
+        <div class="num">04 / PERMISSION CENTER</div>
+        <h2>权限中心 · IAM</h2>
+        <p class="lead">现代化 IAM：API 级 + 数据级权限管控，PEP/PDP 外部化授权。</p>
+        <div class="tech"><span>Go</span><span>Vue 3</span><span>Casbin</span><span>OpenFGA</span><span>Redis</span><span>PostgreSQL</span></div>
+        <div class="points">
+          <div class="point"><div class="pi">◈</div><div><b>PEP/PDP/PAP/PIP 外部化授权</b><p>控制面 / 数据面分离，PDP 无状态可水平扩展</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>双引擎授权</b><p>Casbin 动作级 RBAC/ABAC + OpenFGA 实例级 ReBAC，业界最佳实践</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>策略分发（OPA bundle）</b><p>bundle 快照 + checksum，agent 本地动作级决策，离线可用</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>M2M 程序授权 + IGA 闭环</b><p>Client Credentials + 申请-审批-开通-回收全流程</p></div></div>
+        </div>
+        <a class="more" data-repo="PermissionCenter" href="#">查看项目详情 →</a>
+      </div>
+      <div class="mock" data-reveal>
+        <div class="mock-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><div class="url">iam.permission-center.orb.local</div></div>
+        <div class="mock-body mu-iam">
+          <div class="side">
+            <div class="g">管理</div>
+            <div class="m on">📦 应用管理</div>
+            <div class="m">👥 用户 / 组织</div>
+            <div class="m">🎭 角色</div>
+            <div class="g">策略</div>
+            <div class="m">🛡 API 策略</div>
+            <div class="m">🔗 数据策略</div>
+            <div class="m">📋 申请审批</div>
+            <div class="m">🔎 审计日志</div>
+          </div>
+          <div class="main">
+            <div class="head"><b>🛡 API 策略 · cmdb</b><span style="font-size:9px;color:var(--muted)">v3.2 · 生效中</span></div>
+            <div class="policy"><span class="tag allow">ALLOW</span><b>host:create</b><small>role:cloud_admin</small></div>
+            <div class="policy"><span class="tag allow">ALLOW</span><b>host:read</b><small>role:ops_user</small></div>
+            <div class="policy"><span class="tag deny">DENY</span><b>host:delete</b><small>仅审批通过</small></div>
+            <div class="policy"><span class="tag allow">ALLOW</span><b>instance:list</b><small>数据级：owner 或组</small></div>
+            <div class="flow">
+              <span>申请</span><span class="ar">→</span><span class="st">审批</span><span class="ar">→</span><span>开通</span><span class="ar">→</span><span>回收</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 发布 -->
+  <div class="wrap sys-row" style="padding-top:60px">
+    <div class="grid">
+      <div class="text" data-reveal>
+        <div class="num">05 / RELEASE MANAGER</div>
+        <h2>发布系统</h2>
+        <p class="lead">从创建发布单到灰度上线、一键回滚，覆盖 CI/CD 发布全链路。</p>
+        <div class="tech"><span>Django DRF</span><span>React 18</span><span>FastAPI</span><span>kind K8s</span><span>SQLite</span></div>
+        <div class="points">
+          <div class="point"><div class="pi">◈</div><div><b>发布全链路</b><p>创建 → 审批 → 部署 → 灰度 → 全量 → 回滚，状态机流转</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>三种发布策略</b><p>灰度 / 蓝绿 / 滚动发布，K8s Deployment 真实执行</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>复杂权限模型</b><p>组织树 + 数据权限 + 有效权限缓存，可见性精细控制</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>三语言 Demo 应用</b><p>Go / Node / Python 应用真实发布到本地 kind 集群</p></div></div>
+        </div>
+        <a class="more" data-repo="ReleaseManager" href="#">查看项目详情 →</a>
+      </div>
+      <div class="mock" data-reveal>
+        <div class="mock-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><div class="url">release.release-system.orb.local</div></div>
+        <div class="mock-body mu-rel">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <b style="font-size:12px">🚀 发布单 #R-2026-042</b>
+            <span style="font-size:9px;padding:2px 8px;border-radius:999px;background:#e6f7ef;color:#0f9d63;font-weight:700">进行中</span>
+          </div>
+          <div class="pipeline">
+            <div class="stage done"><div class="s">🔨</div><b>构建</b><small>2m 08s</small></div>
+            <div class="stage done"><div class="s">🧪</div><b>测试</b><small>通过</small></div>
+            <div class="stage now"><div class="s">🌗</div><b>灰度</b><small>20%</small><div class="bar2"><i></i></div></div>
+            <div class="stage"><div class="s">🚀</div><b>全量</b><small>待开始</small></div>
+          </div>
+          <div class="deploy">
+            <div class="top"><b>应用：go-app · 生产环境</b><span class="mode">灰度发布</span></div>
+            <div class="gauge"><i></i></div>
+            <div class="tags"><span>✅ 健康检查通过</span><span>✅ 流量 20%</span><span>⬅ 一键回滚</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 CMDB -->
+  <div class="wrap sys-row" style="padding-top:60px">
+    <div class="grid rev">
+      <div class="text" data-reveal>
+        <div class="num">06 / CMDB PLATFORM</div>
+        <h2>CMDB 数据维护平台</h2>
+        <p class="lead">多云资产（AWS 为主）的自动化采集、关系编排与调度监控大盘。</p>
+        <div class="tech"><span>Django</span><span>Celery</span><span>Vue 3</span><span>PostgreSQL</span><span>Redis</span></div>
+        <div class="points">
+          <div class="point"><div class="pi">◈</div><div><b>四级任务树</b><p>账号 → 区域 → 资源组 → 资源/关系，层层下钻</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>Celery Beat 动态调度</b><p>定时策略 + 手动触发 + 配置联动，并发数在线调整</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>关系自动编排</b><p>EC2→VPC、RDS→安全组等资源关联关系自动采集</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>运维大盘 + 一键重置</b><p>执行趋势 / 健康度 / 告警一览，全链路种子数据秒级恢复</p></div></div>
+        </div>
+        <a class="more" data-repo="TaskManager" href="#">查看项目详情 →</a>
+      </div>
+      <div class="mock" data-reveal>
+        <div class="mock-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><div class="url">cmdb.task-manager.orb.local</div></div>
+        <div class="mock-body mu-cmdb">
+          <div class="side">
+            <div style="font-weight:700;margin-bottom:8px">🌲 任务树</div>
+            <div class="tree">
+              <div class="t on">🏢 dev-account</div>
+              <div class="t c">└ ap-southeast-1</div>
+              <div class="t c">&nbsp;&nbsp;└ 资源组 · web</div>
+              <div class="t c">&nbsp;&nbsp;&nbsp;&nbsp;├ EC2 × 24</div>
+              <div class="t c">&nbsp;&nbsp;&nbsp;&nbsp;├ VPC × 6</div>
+              <div class="t c">&nbsp;&nbsp;&nbsp;&nbsp;└ RDS × 4</div>
+            </div>
+          </div>
+          <div class="main">
+            <div style="font-weight:700;margin-bottom:10px">📊 采集大盘</div>
+            <div class="kpis">
+              <div><b>1,284</b><small>资源总数</small></div>
+              <div><b>99.4%</b><small>采集成功率</small></div>
+              <div><b>6</b><small>活跃任务</small></div>
+            </div>
+            <div class="chart">
+              <i style="height:30%"></i><i style="height:52%"></i><i style="height:44%"></i><i style="height:70%"></i><i style="height:58%"></i><i style="height:84%"></i><i style="height:92%"></i>
+            </div>
+            <div class="foot"><span>近 7 天执行趋势</span><span style="color:#0f9d63">● 健康</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7 工作流 -->
+  <div class="wrap sys-row" style="padding-top:60px">
+    <div class="grid">
+      <div class="text" data-reveal>
+        <div class="num">07 / WORKFLOW CENTER</div>
+        <h2>工作流平台</h2>
+        <p class="lead">以流程为载体、以能力为执行单元，帮助企业「把事办成」。</p>
+        <div class="tech"><span>Django 5</span><span>Vue 3</span><span>LogicFlow</span><span>PostgreSQL 16</span><span>Celery</span></div>
+        <div class="points">
+          <div class="point"><div class="pi">◈</div><div><b>自研流程引擎</b><p>API 对齐行业标准：start / complete / claim / delegate / terminate</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>会签 / 或签 / 条件路由</b><p>多实例审批 + 完成条件，排他网关表达式求值</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>能力注册中心</b><p>JSON Schema 契约化能力，同步 / 异步执行，自动办理留痕</p></div></div>
+          <div class="point"><div class="pi">◈</div><div><b>事件总线 + Webhook</b><p>领域事件驱动，与外部系统解耦集成</p></div></div>
+        </div>
+        <a class="more" data-repo="WorkFlowCenter" href="#">查看项目详情 →</a>
+      </div>
+      <div class="mock" data-reveal>
+        <div class="mock-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><div class="url">flow.workflow.orb.local</div></div>
+        <div class="mock-body mu-wf">
+          <div class="canvas" id="wfCanvas">
+            <div class="node start" style="left:6%;top:40%"><b>▶ 发起</b><small>员工</small></div>
+            <div class="node run" style="left:28%;top:34%"><b>👤 审批</b><small>主管 · 或签</small></div>
+            <div class="node" style="left:50%;top:12%"><b>🔀 条件</b><small>金额 &gt; 10k</small></div>
+            <div class="node" style="left:74%;top:34%"><b>⚙️ 能力执行</b><small>开通主机</small></div>
+            <div class="node end" style="left:88%;top:58%"><b>■ 结束</b><small>通知</small></div>
+            <div class="edge" style="left:14%;top:52%;width:13%"></div>
+            <div class="edge" style="left:36%;top:48%;width:13%"></div>
+            <div class="edge" style="left:58%;top:26%;width:16%"></div>
+            <div class="edge" style="left:82%;top:46%;width:8%"></div>
+          </div>
+          <div class="panel">
+            <div class="p"><b>⚙️ 能力：开通主机</b><small>POST /cap/ec2 · 自动执行</small></div>
+            <div class="p"><b>👤 审批人</b><small>会签 3/5 · 或签 1/2</small></div>
+          </div>
+          <div class="toggle"><span class="sw"></span>自动办理已开启 · 审计留痕</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 技术栈 ==================== -->
+<section class="stack" id="stack">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Tech Radar</span>
+      <h2>技术栈<span class="grad-text">全景</span></h2>
+      <p>一套平台，横跨前后端、网关认证、数据与容器编排，每一层都有业界主流的选型。</p>
+    </div>
+    <div class="stack-grid">
+      <div class="stack-card" data-reveal><h3>🖥 前端</h3><div class="desc">双前端框架双管齐下</div><div class="tags"><span>React 19</span><span>React 18</span><span>Vue 3</span><span>Vite</span><span>Ant Design</span><span>Element Plus</span><span>LogicFlow</span></div></div>
+      <div class="stack-card" data-reveal><h3>⚙️ 后端</h3><div class="desc">Python + Go 双语言组合</div><div class="tags"><span>FastAPI</span><span>Django</span><span>DRF</span><span>Ninja</span><span>Celery</span><span>Go / Gin</span><span>GORM</span></div></div>
+      <div class="stack-card" data-reveal><h3>🔐 认证与授权</h3><div class="desc">企业级安全模型</div><div class="tags"><span>RS256 JWT</span><span>JWKS</span><span>SSO</span><span>OIDC</span><span>OpenLDAP</span><span>Casbin</span><span>OpenFGA</span><span>PEP/PDP</span></div></div>
+      <div class="stack-card" data-reveal><h3>🌐 网关</h3><div class="desc">统一入口与鉴权下沉</div><div class="tags"><span>Traefik</span><span>forwardAuth</span><span>动态路由</span><span>自动 HTTPS</span></div></div>
+      <div class="stack-card" data-reveal><h3>🗄 数据与消息</h3><div class="desc">存储、缓存、队列</div><div class="tags"><span>PostgreSQL</span><span>SQLite</span><span>MySQL</span><span>Redis</span><span>RabbitMQ</span></div></div>
+      <div class="stack-card" data-reveal><h3>📦 部署与编排</h3><div class="desc">从本地到公网</div><div class="tags"><span>Docker Compose</span><span>OrbStack</span><span>kind K8s</span><span>Nginx</span><span>Render</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 部署 ==================== -->
+<section class="deploy" id="deploy">
+  <div class="wrap">
+    <div class="head">
+      <div>
+        <span class="eyebrow">How It Runs</span>
+        <h2>一键起跑，<span class="grad-text">处处可部署</span></h2>
+      </div>
+      <p>本地零端口冲突，公网零成本托管，展示页纯静态零依赖。</p>
+    </div>
+    <div class="deploy-grid">
+      <div class="dep-card" data-reveal><div class="e">🖥️</div><h3>本地开发 · OrbStack</h3><p>每个系统都是独立 Docker Compose 工程，自动分配 orb.local 域名。</p>
+        <div class="steps"><div class="s"><div class="n">1</div><span>进入系统目录，<code>docker compose up -d --build</code></span></div>
+        <div class="s"><div class="n">2</div><span>访问 <code>*.orb.local</code>，无端口冲突、无 localhost 写死</span></div>
+        <div class="s"><div class="n">3</div><span>一键重置脚本还原干净演示环境</span></div></div>
+      </div>
+      <div class="dep-card" data-reveal><div class="e">🌐</div><h3>公网演示 · Render 免费</h3><p>Render Hobby 计划 + SQLite，8 个服务全部 $0/月。</p>
+        <div class="steps"><div class="s"><div class="n">1</div><span>统一门户 + 各系统独立 Web Service</span></div>
+        <div class="s"><div class="n">2</div><span>SQLite 文件库，休眠不丢数据，启动自愈初始化</span></div>
+        <div class="s"><div class="n">3</div><span>面试前预热一次，冷启动即可忽略</span></div></div>
+      </div>
+      <div class="dep-card" data-reveal><div class="e">📄</div><h3>本展示页 · 静态托管</h3><p>单个 index.html，零构建、零依赖，任意静态平台一键部署。</p>
+        <div class="steps"><div class="s"><div class="n">1</div><span>GitHub Pages / Cloudflare Pages / Render Static</span></div>
+        <div class="s"><div class="n">2</div><span>断网也能完整展示全部内容（动画优雅降级）</span></div>
+        <div class="s"><div class="n">3</div><span>最后一页直接跳转统一门户</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== CTA ==================== -->
+<section class="cta" id="cta">
+  <div class="wrap">
+    <div class="panel" data-reveal>
+      <div class="inner">
+        <h2>从登录到发布，<br>一套平台全搞定</h2>
+        <p>7 个系统、一个门户。点击下方按钮，进入统一门户，亲身体验一次登录、多系统无感访问。</p>
+        <a class="btn" id="ctaBtn" href="#" target="_blank" rel="noopener">🚪 进入统一门户 <span class="ar">→</span></a>
+        <div class="note">演示账号：admin / admin1234（管理员）</div>
+        <div class="acc"><span>🔐 SSO 单点登录</span><span>🛡 统一网关鉴权</span><span>⚙️ 7 个可运行系统</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ==================== Footer ==================== -->
+<footer>
+  <div class="row">
+    <a href="#top">回到顶部 ↑</a>
+    <a data-repo="README.md" href="#">GitHub 仓库</a>
+    <a id="footerPortal" href="#">统一门户</a>
+  </div>
+  <div>DevOps 平台全家桶 · 个人技术作品集 · 2026</div>
+</footer>
+
+<!-- ==================== GSAP（CDN，缺失时优雅降级） ==================== -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+
+<script>
+/* ==================== 配置 ==================== */
+const CONFIG = {
+  // 🔧 统一门户地址：本地是 Authentication 的 portal；部署后替换为公网地址（如 https://demo-portal.onrender.com）
+  portalUrl: 'http://portal.authentication.orb.local',
+  // 🔧 GitHub 仓库地址（可选）：填了之后系统卡片/详情会指向对应目录；留空则跳 #
+  githubRepo: '',
+};
+
+/* ==================== 数据 ==================== */
+const SYS = [
+  { id:'01', ico:'🔐', name:'统一认证中心', tag:'Authentication', desc:'统一门户 · SSO 单点登录 · 统一网关鉴权', color:'#6366f1', color2:'#3b82f6', chips:['React 19','FastAPI','Traefik','JWKS'] },
+  { id:'02', ico:'☁️', name:'多云管理系统', tag:'CloudManager', desc:'仿 AWS 控制台 · 操作走工单 · CMDB 唯一数据源', color:'#0ea5e9', color2:'#06b6d4', chips:['Vue 3','Django','MySQL','RabbitMQ'] },
+  { id:'03', ico:'⚡', name:'事件管理系统', tag:'EventManager', desc:'多事件源统一接入 · Python + Go 双栈', color:'#10b981', color2:'#14b8a6', chips:['Django','Go','PostgreSQL','DLQ'] },
+  { id:'04', ico:'⚙️', name:'权限中心 IAM', tag:'PermissionCenter', desc:'API + 数据级鉴权 · PEP/PDP 外部化授权', color:'#8b5cf6', color2:'#a855f7', chips:['Go','Casbin','OpenFGA','M2M'] },
+  { id:'05', ico:'🚀', name:'发布系统', tag:'ReleaseManager', desc:'CI/CD 流水线 · 灰度/蓝绿/滚动 · 回滚', color:'#d946ef', color2:'#ec4899', chips:['Django DRF','React 18','kind K8s'] },
+  { id:'06', ico:'🗄️', name:'CMDB 数据平台', tag:'TaskManager', desc:'多云资产自动采集 · 关系编排 · 调度大盘', color:'#f59e0b', color2:'#f97316', chips:['Django','Celery','Vue 3','PostgreSQL'] },
+  { id:'07', ico:'🧩', name:'工作流平台', tag:'WorkFlowCenter', desc:'流程驱动自动化 · 自研引擎 · 能力注册中心', color:'#f43f5e', color2:'#ef4444', chips:['Django 5','Vue 3','LogicFlow'] },
+];
+
+function repoPath(p){ return CONFIG.githubRepo ? CONFIG.githubRepo.replace(/\/+$/,'') + '/tree/main/' + p : '#'; }
+
+/* ==================== 渲染概览卡片 ==================== */
+const cardsEl = document.getElementById('sysCards');
+cardsEl.innerHTML = SYS.map(s => `
+  <div class="card" data-reveal style="--ac:${s.color};--ac2:${s.color2}" onclick="location.href='${repoPath(s.tag)}'">
+    <div class="ico">${s.ico}</div>
+    <h3>${s.name}</h3>
+    <div class="tagline">${s.tag}</div>
+    <p>${s.desc}</p>
+    <div class="chips">${s.chips.map(c=>`<span>${c}</span>`).join('')}</div>
+  </div>`).join('');
+
+/* 详情链接 + 导航 CTA + footer 链接 */
+document.querySelectorAll('[data-repo]').forEach(a => { a.href = repoPath(a.dataset.repo); });
+const portalLinks = ['navCta','ctaBtn','footerPortal'];
+portalLinks.forEach(id => { const el = document.getElementById(id); if(el) el.href = CONFIG.portalUrl; });
+
+/* 跑马灯内容翻倍实现无缝循环 */
+const mq = document.getElementById('marquee');
+mq.innerHTML += mq.innerHTML;
+
+/* ===== 架构逐层展开（vanilla 滚动驱动，不依赖 GSAP） ===== */
+(function initArch(){
+  const arch = document.getElementById('arch');
+  const layers = Array.from(arch.querySelectorAll('.layer'));
+  const conns = Array.from(arch.querySelectorAll('.conn'));
+  const noteIdx = document.getElementById('archIdx');
+  const noteTitle = document.getElementById('archTitle');
+  const noteDesc = document.getElementById('archDesc');
+  const notes = [
+    { idx:'01', t:'接入层', d:'一切从用户的一次访问开始' },
+    { idx:'02', t:'统一门户', d:'登录后进入应用广场，SSO 一次登录' },
+    { idx:'03', t:'网关 + 认证', d:'Traefik forwardAuth 统一鉴权，RS256 JWT 验签' },
+    { idx:'04', t:'业务系统矩阵', d:'7 个系统共享同一套身份与权限底座' },
+    { idx:'05', t:'基础设施', d:'数据、缓存、队列与本地 K8s 集群' },
+  ];
+  function update(){
+    const vh = innerHeight;
+    const r = arch.getBoundingClientRect();
+    const total = Math.max(1, r.height - vh);
+    const p = Math.min(1, Math.max(0, -r.top / total)); // 0..1 滚动进度
+    layers.forEach(function(L, i){
+      const from = i * .22, to = from + .16;
+      const lp = Math.min(1, Math.max(0, (p - from) / (to - from)));
+      L.style.opacity = lp;
+      L.style.visibility = lp > 0 ? 'visible' : 'hidden';
+      L.style.transform = 'translateY(' + ((1-lp)*30) + 'px) scale(' + (0.94 + 0.06*lp) + ')';
+    });
+    conns.forEach(function(C, i){
+      const from = i * .22 + .13, to = from + .07;
+      const lp = Math.min(1, Math.max(0, (p - from) / (to - from)));
+      C.style.opacity = lp;
+      C.style.transform = 'scaleY(' + lp + ')';
+    });
+    const ni = Math.min(notes.length - 1, Math.floor(p * notes.length));
+    noteIdx.textContent = notes[ni].idx;
+    noteTitle.textContent = notes[ni].t;
+    noteDesc.textContent = notes[ni].d;
+  }
+  addEventListener('resize', update, { passive:true });
+  addEventListener('scroll', update, { passive:true }); // 双保险：scroll 事件
+  // rAF 轮询 + 位置变化检测（后台标签 / 无 scroll 事件环境同样可靠）
+  let lastY = -1;
+  (function loop(){
+    requestAnimationFrame(loop);
+    const y = window.scrollY || window.pageYOffset || 0;
+    if (y !== lastY){ lastY = y; update(); }
+  })();
+  update();
+  window.__archUpdate = update; // 调试钩子
+})();
+
+/* ==================== 顶部导航 / 进度条（rAF 轮询，不依赖 scroll 事件） ==================== */
+const nav = document.getElementById('nav');
+function updateChrome(){
+  const sc = window.scrollY || window.pageYOffset || 0;
+  nav.classList.toggle('scrolled', sc > 40);
+  const h = document.documentElement.scrollHeight - innerHeight;
+  document.getElementById('progress').style.width = (h > 0 ? (sc / h) * 100 : 0) + '%';
+}
+let lastChrome = -1;
+(function loopChrome(){
+  requestAnimationFrame(loopChrome);
+  const sc = window.scrollY || window.pageYOffset || 0;
+  if (sc !== lastChrome){ lastChrome = sc; updateChrome(); }
+})();
+updateChrome();
+
+/* ==================== 动画（GSAP 可用时） ==================== */
+if (window.gsap && window.ScrollTrigger) {
+  gsap.registerPlugin(ScrollTrigger);
+
+  /* Hero 入场 */
+  const heroEls = ['.hero .badge','.hero h1','.hero .sub','.hero .stats','.hero .scroll-hint'];
+  gsap.from(heroEls, { y: 34, autoAlpha: 0, duration: .9, stagger: .12, ease: 'power3.out', delay: .15 });
+
+  /* 通用滚动入场 */
+  gsap.utils.toArray('[data-reveal]').forEach(el => {
+    gsap.from(el, {
+      y: 44, autoAlpha: 0, duration: .9, ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 86%', once: true }
+    });
+  });
+
+  /* 概览卡片依次入场 */
+  gsap.from('.card', {
+    y: 50, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .08,
+    scrollTrigger: { trigger: '#sysCards', start: 'top 82%', once: true }
+  });
+
+  /* 数字统计 */
+  gsap.utils.toArray('[data-count]').forEach(el => {
+    const end = +el.dataset.count, suffix = end === 100 ? '%' : '';
+    const obj = { v: 0 };
+    ScrollTrigger.create({
+      trigger: el, start: 'top 90%', once: true,
+      onEnter: () => gsap.to(obj, { v: end, duration: 1.4, ease: 'power2.out',
+        onUpdate: () => el.textContent = Math.round(obj.v) + suffix })
+    });
+  });
+
+  /* 系统 mock 轻微视差 */
+  gsap.utils.toArray('.sys-row .mock').forEach(m => {
+    gsap.fromTo(m, { y: 60 }, {
+      y: -60, ease: 'none',
+      scrollTrigger: { trigger: m.closest('.sys-row'), start: 'top bottom', end: 'bottom top', scrub: 1 }
+    });
+  });
+
+  /* 系统文本入场 */
+  gsap.utils.toArray('.sys-row .text').forEach(t => {
+    gsap.from(t.querySelectorAll('.point'), {
+      y: 24, autoAlpha: 0, duration: .6, stagger: .1, ease: 'power3.out',
+      scrollTrigger: { trigger: t, start: 'top 78%', once: true }
+    });
+  });
+
+} else {
+  /* GSAP 加载失败：确保所有内容可见 */
+  document.documentElement.style.opacity = 1;
+  ['.hero .badge','.hero h1','.hero .sub','.hero .stats','.hero .scroll-hint'].forEach(s =>
+    document.querySelectorAll(s).forEach(e => e.style.opacity = 1));
+  document.querySelectorAll('[data-reveal]').forEach(e => e.style.opacity = 1);
+  document.querySelectorAll('.card,.point').forEach(e => e.style.opacity = 1);
+}
+</script>
+</body>
+</html>

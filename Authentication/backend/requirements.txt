@@ -1,0 +1,11 @@
+fastapi==0.115.*
+uvicorn[standard]==0.34.*
+sqlalchemy==2.0.*
+psycopg2-binary==2.9.*
+pydantic==2.*
+pydantic-settings==2.*
+PyJWT==2.*
+cryptography==44.*
+bcrypt==4.*
+ldap3==2.*
+python-multipart==0.0.*

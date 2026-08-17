@@ -1,0 +1,25 @@
+<h1>能力编排与自动执行</h1>
+
+<h2>一、能力注册</h2>
+<p>外部系统能力（创建主机、发送邮件、开通权限…）统一注册为 <strong>Capability</strong>，声明入参 Schema 与执行方式（同步/异步）。演示环境内置 Mock 能力，真实场景可替换为真实接口调用。</p>
+
+<h2>二、动作编排</h2>
+<p>办理节点的 <code>taskConfig.actions</code> 编排多个动作：</p>
+<pre><code>actions: [
+  { key: act_create_host, capabilityCode: cmdb.create_host,
+    fieldBindings: [{ capabilityField: hostname, source: form, formField: hostname }] },
+  { key: act_send_notify, capabilityCode: mail.send,
+    fieldBindings: [{ capabilityField: to, source: form, formField: email },
+                    { capabilityField: subject, source: constant, constant: '创建完成通知' }] },
+]</code></pre>
+<p>字段绑定支持三种来源：<strong>表单字段</strong>、<strong>常量</strong>、<strong>前序动作输出</strong>。</p>
+
+<h2>三、执行模式</h2>
+<ul>
+<li><strong>串行</strong>：动作逐个执行，前序输出可供后续绑定。</li>
+<li><strong>并行</strong>：动作同时创建执行，全部完成后统一判定。</li>
+<li><strong>异常处理</strong>：动作失败 → 节点标记异常，转人工处理（支持重跑失败动作），并生成执行日志。</li>
+</ul>
+
+<h2>四、执行日志</h2>
+<p>每个动作记录完整时间线日志（时间/级别/消息），详情页流程追踪可逐节点查看入参、出参与日志，做到「自动化也可审计、可排障」。</p>

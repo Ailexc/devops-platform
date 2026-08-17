@@ -1,0 +1,67 @@
+# ──────────────────────────────────────────────────────────────────
+# Redis — 消息队列 + 缓存 + 结果存储
+# 作用: Celery Broker / 数据缓存 / Checkpoint 存储
+# ──────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: cmdb
+  labels:
+    app: cmdb
+    component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cmdb
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: cmdb
+        component: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "0.2"
+              memory: "256Mi"
+            limits:
+              cpu: "0.5"
+              memory: "512Mi"
+          readinessProbe:        # 就绪检查——Pod 就绪后才接收流量
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:          # 存活检查——失败则 K8s 自动重启
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: redis-data
+---
+# Service: 让其他 Pod 通过名称 "redis-service" 访问 Redis
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: cmdb
+spec:
+  selector:
+    app: cmdb
+    component: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

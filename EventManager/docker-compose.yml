@@ -1,0 +1,166 @@
+# ═══════════════════════════════════════════════════════
+# EventFlow - Docker Compose (Python + Go 双栈)
+#
+# 域名（OrbStack 自动 DNS）:
+#   http://frontend.event-management.orb.local → 前端
+#   http://api.event-management.orb.local      → Python API
+#   http://api.go-event-management.orb.local   → Go API
+#
+# 启动:
+#   docker compose up -d
+# ═══════════════════════════════════════════════════════
+
+services:
+
+  # ─── 基础设施（共用）──────────────────────────────
+  # PostgreSQL/Redis 已统一到根目录 infra/docker-compose.yml（devops-net 网络）
+  # 这里保留 RabbitMQ 作为 Celery broker（不在统一数据层范围内）
+
+  # ─── Python 后端 API ─────────────────────────────
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: cmdb-event-api
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DATABASE_URL: postgresql://devops:devops@devops-postgres:5432/devops_event
+      REDIS_URL: redis://devops-redis:6379/2
+      CELERY_BROKER_URL: amqp://devops:devops@devops-rabbitmq:5672//
+      DJANGO_DEBUG: "false"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,api.event-management.orb.local,frontend.event-management.orb.local,.devops.orb.local"
+      OUTPUT_DIR: "/output"
+      DOCS_DIR: "/app/docs"
+    expose:
+      - "8000"
+    command: >
+      sh -c "python wait_for_db.py &&
+        python manage.py migrate --noinput &&
+        python manage.py collectstatic --noinput --clear &&
+        gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 2 --access-logfile - --error-logfile -"
+    volumes:
+      - output_data:/output
+    restart: unless-stopped
+    networks:
+      - default
+      - devops-net
+    labels:
+      - "dev.orbstack.domains=api.event-management.orb.local"
+
+  # ─── Python Celery Worker ────────────────────────
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: cmdb-event-worker
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DATABASE_URL: postgresql://devops:devops@devops-postgres:5432/devops_event
+      REDIS_URL: redis://devops-redis:6379/2
+      CELERY_BROKER_URL: amqp://devops:devops@devops-rabbitmq:5672//
+      OUTPUT_DIR: "/output"
+    command: celery -A config worker -P eventlet --concurrency=100 -Q event -l info
+    volumes:
+      - output_data:/output
+    restart: unless-stopped
+    networks:
+      - default
+      - devops-net
+
+  # ─── Go 后端 API ─────────────────────────────────
+
+  go-api:
+    build:
+      context: ./backend-go
+      dockerfile: Dockerfile
+    container_name: cmdb-event-go-api
+    command: api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://devops:devops@devops-postgres:5432/devops_event_go
+      REDIS_URL: redis://devops-redis:6379/8
+      API_PORT: "8000"
+      OUTPUT_DIR: /output
+      DOCS_DIR: /app/docs
+      DEBUG: "false"
+    expose:
+      - "8000"
+    volumes:
+      - go-output:/output
+    restart: unless-stopped
+    networks:
+      - default
+      - devops-net
+    labels:
+      - "dev.orbstack.domains=api.go-event-management.orb.local"
+
+  # ─── Go Worker ───────────────────────────────────
+
+  go-worker:
+    build:
+      context: ./backend-go
+      dockerfile: Dockerfile
+    container_name: cmdb-event-go-worker
+    command: worker
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://devops:devops@devops-postgres:5432/devops_event_go
+      REDIS_URL: redis://devops-redis:6379/8
+      WORKER_CONCURRENCY: "10"
+      OUTPUT_DIR: /output
+    volumes:
+      - go-output:/output
+    restart: unless-stopped
+    networks:
+      - default
+      - devops-net
+
+  # ─── Go Seed 数据初始化 ──────────────────────────
+
+  go-seed:
+    build:
+      context: ./backend-go
+      dockerfile: Dockerfile
+    container_name: cmdb-event-go-seed
+    command: seed
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://devops:devops@devops-postgres:5432/devops_event_go
+      SEED_TOTAL: "1000"
+      SEED_CLEAR: "true"
+    restart: "no"
+    networks:
+      - default
+      - devops-net
+
+  # ─── 前端 ────────────────────────────────────────
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: cmdb-event-frontend
+    expose:
+      - "80"
+    depends_on:
+      - api
+      - go-api
+    restart: unless-stopped
+    networks:
+      - default
+      - devops-net
+    labels:
+      - "dev.orbstack.domains=frontend.event-management.orb.local"
+
+volumes:
+  output_data:
+  go-output:
+
+networks:
+  default:
+  devops-net:    # 统一基础设施网络（根目录 infra/docker-compose.yml）
+    external: true

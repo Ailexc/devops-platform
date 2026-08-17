@@ -1,0 +1,116 @@
+services:
+  # ── 统一数据层（由根目录 infra/docker-compose.yml 提供，devops-net 网络）──
+  # PostgreSQL: devops-postgres（库 devops_cmdb / devops_cmdb_go）
+  # Redis:      devops-redis（db index 5=cmdb, 7=cmdb-go）
+
+  backend:
+    build: ./backend
+    container_name: cmdb-task-backend      # 全局唯一容器名，避免与其他项目 DNS 冲突
+    restart: unless-stopped
+    command: >
+      sh -c "python wait_for_db.py &&
+             python manage.py migrate &&
+             python manage.py seed_demo_data &&
+             python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"           # 调试用，正式通过 Traefik 访问
+    expose:
+      - "8000"
+    volumes:
+      - ./backend:/app
+      - test_files:/tmp/cmdb_test
+      - ./backend/docs:/tmp/cmdb_docs
+    environment:
+      DEBUG: "1"
+      DATABASE_URL: "postgresql://devops:devops@devops-postgres:5432/devops_cmdb"
+      REDIS_URL: "redis://devops-redis:6379/5"
+      CELERY_BROKER_URL: "amqp://devops:devops@devops-rabbitmq:5672//"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,api.${COMPOSE_PROJECT_NAME:-task-management}.orb.local,frontend.${COMPOSE_PROJECT_NAME:-task-management}.orb.local,.devops.orb.local"
+      HTTP_PROXY: "http://host.docker.internal:7897"
+      HTTPS_PROXY: "http://host.docker.internal:7897"
+      NO_PROXY: "localhost,127.0.0.1,devops-postgres,devops-redis,devops-rabbitmq,.orb.local"
+    labels:
+      - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-task-management}.orb.local"
+    networks:
+      - default
+      - devops-net
+
+  celery_worker:
+    build: ./backend
+    restart: unless-stopped
+    command: celery -A config worker -l info -Q aws,connector,inspection,default
+    volumes:
+      - ./backend:/app
+      - test_files:/tmp/cmdb_test
+    environment:
+      DATABASE_URL: "postgresql://devops:devops@devops-postgres:5432/devops_cmdb"
+      REDIS_URL: "redis://devops-redis:6379/5"
+      CELERY_BROKER_URL: "amqp://devops:devops@devops-rabbitmq:5672//"
+      HTTP_PROXY: "http://host.docker.internal:7897"
+      HTTPS_PROXY: "http://host.docker.internal:7897"
+      NO_PROXY: "localhost,127.0.0.1,devops-postgres,devops-redis,devops-rabbitmq,.orb.local"
+    networks:
+      - default
+      - devops-net
+
+  celery_beat:
+    build: ./backend
+    restart: unless-stopped
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./backend:/app
+    environment:
+      DATABASE_URL: "postgresql://devops:devops@devops-postgres:5432/devops_cmdb"
+      REDIS_URL: "redis://devops-redis:6379/5"
+      CELERY_BROKER_URL: "amqp://devops:devops@devops-rabbitmq:5672//"
+      HTTP_PROXY: "http://host.docker.internal:7897"
+      HTTPS_PROXY: "http://host.docker.internal:7897"
+      NO_PROXY: "localhost,127.0.0.1,devops-postgres,devops-redis,devops-rabbitmq,.orb.local"
+    networks:
+      - default
+      - devops-net
+
+  go_backend:
+    build: ./go-backend
+    container_name: cmdb-task-go-backend
+    restart: unless-stopped
+    command: ["./cmdb-server", "--seed"]
+    ports:
+      - "8081:8080"          # 8080 被 OrbStack 占用，映射到 8081
+    volumes:
+      - ./go-backend/docs:/app/docs
+    environment:
+      DB_DSN: "postgresql://devops:devops@devops-postgres:5432/devops_cmdb_go?sslmode=disable"
+      REDIS_ADDR: "devops-redis:6379"
+      REDIS_DB: "7"
+      CMDB_ROLE: "all"
+      PORT: "8080"
+      HTTP_PROXY: "http://host.docker.internal:7897"
+      HTTPS_PROXY: "http://host.docker.internal:7897"
+      NO_PROXY: "localhost,127.0.0.1,devops-postgres,devops-redis,.orb.local"
+    networks:
+      - default
+      - devops-net
+
+  frontend:
+    build: ./frontend
+    container_name: cmdb-task-frontend
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    # 容器内置 nginx：/ → SPA 静态文件，/api/ → 反代 backend（见 frontend/nginx.conf）
+    labels:
+      - "dev.orbstack.domains=frontend.${COMPOSE_PROJECT_NAME:-task-management}.orb.local"
+    depends_on:
+      - backend
+    networks:
+      - default
+      - devops-net
+
+volumes:
+  test_files:
+
+networks:
+  default:                 # 项目内部网络
+  devops-net:              # 统一基础设施网络（根目录 infra/docker-compose.yml）
+    external: true

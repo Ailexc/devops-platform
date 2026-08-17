@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>升级前 vs 升级后 — 对比 Demo</title>
+  <style>
+    :root {
+      --primary: #409EFF;
+      --primary-light: #ECF5FF;
+      --success: #67C23A;
+      --warning: #E6A23C;
+      --danger: #F56C6C;
+      --info: #909399;
+      --text-primary: #1D2129;
+      --text-regular: #4E5969;
+      --text-secondary: #86909C;
+      --text-placeholder: #C9CDD4;
+      --bg-page: #F7F8FA;
+      --bg-card: #FFFFFF;
+      --border-color: #E5E6EB;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #E8ECEF;
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    /* ===================== 页面布局 ===================== */
+    .compare-page {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 100vh;
+      gap: 0;
+    }
+
+    /* ===================== 面板标题 ===================== */
+    .panel {
+      position: relative;
+      overflow-y: auto;
+      max-height: 100vh;
+    }
+    .panel-label {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .panel-label.before {
+      background: linear-gradient(135deg, #FEF0F0, #FDE2E2);
+      color: #C41D22;
+      border-bottom: 2px solid #F5A3A3;
+    }
+    .panel-label.after {
+      background: linear-gradient(135deg, #F0F9EB, #E1F3D8);
+      color: #3BA51D;
+      border-bottom: 2px solid #A3D977;
+    }
+
+    .panel-content { padding: 20px; }
+
+    /* ===================== BEFORE 样式（模拟当前 Element Plus 默认风格） ===================== */
+    .before .page-header { margin-bottom: 16px; }
+    .before .page-header h2 { font-size: 18px; margin: 0; color: #333; }
+
+    .before .filter-card {
+      border: 1px solid #ebeef5;
+      border-radius: 4px;
+      background: white;
+      margin-bottom: 16px;
+    }
+    .before .filter-card .el-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 16px;
+      align-items: flex-end;
+    }
+    .before .filter-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 16px;
+      align-items: center;
+    }
+    .before .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .before .filter-item label {
+      font-size: 14px;
+      color: #606266;
+      white-space: nowrap;
+    }
+    .before .filter-item select,
+    .before .filter-item input {
+      height: 32px;
+      border: 1px solid #dcdfe6;
+      border-radius: 4px;
+      padding: 0 12px;
+      font-size: 13px;
+      color: #606266;
+      outline: none;
+      min-width: 120px;
+    }
+    .before .filter-actions { display: flex; gap: 8px; }
+
+    .before .btn {
+      height: 32px;
+      padding: 0 15px;
+      border-radius: 4px;
+      border: 1px solid #dcdfe6;
+      background: white;
+      color: #606266;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .before .btn-primary { background: #409eff; color: white; border-color: #409eff; }
+
+    .before .table-card {
+      border: 1px solid #ebeef5;
+      border-radius: 4px;
+      background: white;
+    }
+
+    .before .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .before .data-table th {
+      background: #fafafa;
+      padding: 10px 12px;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+      color: #909399;
+      border-bottom: 1px solid #ebeef5;
+      border-right: 1px solid #ebeef5;
+    }
+    .before .data-table th:last-child { border-right: none; }
+    .before .data-table td {
+      padding: 10px 12px;
+      font-size: 13px;
+      color: #606266;
+      border-bottom: 1px solid #ebeef5;
+      border-right: 1px solid #ebeef5;
+    }
+    .before .data-table td:last-child { border-right: none; }
+    .before .data-table tr:nth-child(even) { background: #fafafa; }
+    .before .data-table tr:hover { background: #ecf5ff; }
+
+    .before .tag {
+      display: inline-block;
+      padding: 0 8px;
+      height: 22px;
+      line-height: 22px;
+      border-radius: 4px;
+      font-size: 12px;
+      border: 1px solid;
+    }
+    .before .tag-warning { background: #fdf6ec; color: #e6a23c; border-color: #faecd8; }
+    .before .tag-primary { background: #ecf5ff; color: #409eff; border-color: #d9ecff; }
+    .before .tag-success { background: #f0f9eb; color: #67c23a; border-color: #e1f3d8; }
+    .before .tag-danger { background: #fef0f0; color: #f56c6c; border-color: #fde2e2; }
+    .before .tag-info { background: #f4f4f5; color: #909399; border-color: #e9e9eb; }
+
+    .before .link-btn {
+      color: #409eff;
+      font-size: 13px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    .before .link-btn.danger { color: #f56c6c; }
+
+    .before .pagination {
+      display: flex;
+      justify-content: flex-end;
+      padding: 12px 16px;
+    }
+
+    /* ===================== AFTER 样式 ===================== */
+    .after .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .after .page-header-left { display: flex; align-items: center; gap: 12px; }
+    .after .page-header-icon {
+      width: 38px; height: 38px; border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--primary), #66B1FF);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 18px;
+    }
+    .after .page-header h1 { font-size: 20px; font-weight: 700; }
+    .after .page-header-desc { font-size: 13px; color: var(--text-secondary); }
+
+    /* 统计卡片 */
+    .after .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .after .stat-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.25s;
+    }
+    .after .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      border-radius: 3px 0 0 3px;
+    }
+    .after .stat-card:nth-child(1)::before { background: var(--primary); }
+    .after .stat-card:nth-child(2)::before { background: var(--warning); }
+    .after .stat-card:nth-child(3)::before { background: var(--success); }
+    .after .stat-card:nth-child(4)::before { background: var(--danger); }
+    .after .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .after .stat-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .after .stat-label { font-size: 12px; color: var(--text-secondary); }
+    .after .stat-value { font-size: 24px; font-weight: 700; }
+    .after .stat-icon {
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .after .stat-icon.blue { background: #E8F3FF; color: var(--primary); }
+    .after .stat-icon.orange { background: #FFF7E8; color: var(--warning); }
+    .after .stat-icon.green { background: #E8FFEA; color: var(--success); }
+    .after .stat-icon.red { background: #FFECE8; color: var(--danger); }
+    .after .stat-trend {
+      font-size: 11px; margin-top: 4px; display: inline-flex;
+      align-items: center; gap: 3px; padding: 1px 6px; border-radius: 4px;
+    }
+    .after .stat-trend.up { color: var(--danger); background: #FEF0F0; }
+    .after .stat-trend.down { color: var(--success); background: #F0F9EB; }
+
+    /* 筛选 */
+    .after .filter-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+      margin-bottom: 16px;
+    }
+    .after .filter-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px; cursor: pointer;
+    }
+    .after .filter-toggle-left { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+    .after .filter-icon {
+      width: 28px; height: 28px; border-radius: var(--radius-sm);
+      background: var(--primary-light); color: var(--primary);
+      display: flex; align-items: center; justify-content: center; font-size: 12px;
+      transition: transform 0.3s;
+    }
+    .after .filter-icon.open { transform: rotate(180deg); }
+    .after .filter-tag {
+      padding: 1px 8px; border-radius: 10px; font-size: 11px;
+      background: var(--primary-light); color: var(--primary); font-weight: 500;
+    }
+    .after .filter-body {
+      padding: 0 20px; max-height: 0; overflow: hidden;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .after .filter-body.open { padding: 0 20px 16px; max-height: 160px; }
+    .after .filter-row {
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    }
+    .after .filter-item { display: flex; align-items: center; gap: 6px; }
+    .after .filter-item label {
+      font-size: 12px; color: var(--text-secondary); white-space: nowrap; font-weight: 500;
+    }
+    .after .filter-item select,
+    .after .filter-item input {
+      height: 32px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+      padding: 0 10px; font-size: 12px; color: var(--text-primary); background: white;
+      outline: none; min-width: 120px; transition: border-color 0.2s;
+    }
+    .after .filter-item select:focus,
+    .after .filter-item input:focus {
+      border-color: var(--primary); box-shadow: 0 0 0 2px rgba(64,158,255,0.12);
+    }
+    .after .filter-actions { margin-left: auto; display: flex; gap: 6px; }
+    .after .btn-sm {
+      height: 32px; padding: 0 12px; border-radius: var(--radius-sm);
+      border: none; font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .after .btn-sm:active { transform: scale(0.97); }
+    .after .btn-sm-primary { background: var(--primary); color: white; }
+    .after .btn-sm-outline { background: white; color: var(--text-regular); border: 1px solid var(--border-color); }
+
+    /* 表格 */
+    .after .table-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+    }
+    .after .table-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 20px; border-bottom: 1px solid #F2F3F5;
+    }
+    .after .table-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .after .table-count {
+      font-size: 11px; color: var(--text-secondary); background: #F2F3F5;
+      padding: 1px 8px; border-radius: 10px;
+    }
+    .after .data-table {
+      width: 100%; border-collapse: collapse;
+    }
+    .after .data-table thead th {
+      background: #FAFBFC; padding: 10px 16px; text-align: left;
+      font-size: 11px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 1px solid #F2F3F5;
+    }
+    .after .data-table tbody tr {
+      transition: background 0.15s; cursor: pointer;
+    }
+    .after .data-table tbody tr:hover { background: #F7F8FA; }
+    .after .data-table tbody td {
+      padding: 12px 16px; font-size: 13px; color: var(--text-regular);
+      border-bottom: 1px solid #F2F3F5;
+    }
+    .after .data-table tbody tr:last-child td { border-bottom: none; }
+
+    .after .ticket-title-cell { display: flex; flex-direction: column; gap: 2px; }
+    .after .ticket-title { font-weight: 500; color: var(--text-primary); transition: color 0.2s; }
+    .after .ticket-title:hover { color: var(--primary); }
+    .after .ticket-no {
+      font-size: 11px; color: var(--text-placeholder);
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    .after .tag {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+    }
+    .after .tag-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+    .after .tag-warning { background: #FFF7E8; color: #FF7D00; }
+    .after .tag-warning .tag-dot { background: #FF7D00; animation: pulse 2s infinite; }
+    .after .tag-primary { background: #E8F3FF; color: #1677FF; }
+    .after .tag-success { background: #E8FFEA; color: #00B42A; }
+    .after .tag-danger { background: #FFECE8; color: #F53F3F; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .after .priority-bar { width: 3px; height: 14px; border-radius: 2px; display: inline-block; }
+    .after .priority-bar.high { background: var(--danger); }
+    .after .priority-bar.medium { background: var(--warning); }
+    .after .priority-bar.low { background: var(--info); }
+
+    .after .action-group { display: flex; gap: 2px; }
+    .after .action-btn {
+      padding: 4px 8px; border-radius: 4px; border: none; font-size: 12px;
+      cursor: pointer; transition: all 0.15s; background: transparent;
+    }
+    .after .action-btn.primary { color: var(--primary); }
+    .after .action-btn.primary:hover { background: var(--primary-light); }
+    .after .action-btn.danger { color: var(--danger); }
+    .after .action-btn.danger:hover { background: #FEF0F0; }
+
+    .after .pagination {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 20px; border-top: 1px solid #F2F3F5;
+    }
+    .after .page-info { font-size: 12px; color: var(--text-secondary); }
+    .after .page-info strong { color: var(--text-primary); }
+    .after .page-controls { display: flex; gap: 3px; }
+    .after .page-btn {
+      width: 28px; height: 28px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color); background: white;
+      color: var(--text-regular); font-size: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+    }
+    .after .page-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .after .page-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .after .page-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ===================== 分隔线 ===================== */
+    .compare-divider {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 100;
+      background: white;
+      border-radius: 50%;
+      width: 48px; height: 48px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      font-size: 20px;
+      border: 2px solid #F2F3F5;
+    }
+
+    @media (max-width: 900px) {
+      .compare-page { grid-template-columns: 1fr; }
+      .compare-divider { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="compare-page">
+
+    <!-- ==================== BEFORE ==================== -->
+    <div class="panel before">
+      <div class="panel-label before">
+        <span>🔴</span>
+        <span>BEFORE — 当前样式（Element Plus 默认）</span>
+      </div>
+      <div class="panel-content">
+        <!-- 标题 -->
+        <div class="page-header">
+          <h2>我的工单</h2>
+        </div>
+
+        <!-- 筛选 -->
+        <div class="filter-card">
+          <div class="filter-row">
+            <div class="filter-item">
+              <label>状态</label>
+              <select><option>全部</option></select>
+            </div>
+            <div class="filter-item">
+              <label>优先级</label>
+              <select><option>全部</option></select>
+            </div>
+            <div class="filter-item">
+              <label>关键词</label>
+              <input type="text" placeholder="搜索工单标题" />
+            </div>
+            <div class="filter-actions">
+              <button class="btn btn-primary">搜索</button>
+              <button class="btn">重置</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 表格 -->
+        <div class="table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>工单标题</th>
+                <th>流程模版</th>
+                <th>状态</th>
+                <th>优先级</th>
+                <th>创建人</th>
+                <th>创建时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><button class="link-btn">服务器扩容申请 — 生产环境</button></td>
+                <td>IT 资源申请</td>
+                <td><span class="tag tag-warning">待处理</span></td>
+                <td><span class="tag tag-danger">高</span></td>
+                <td>张三</td>
+                <td>2026-08-05 09:30</td>
+                <td>
+                  <button class="link-btn">查看</button>
+                  <button class="link-btn danger">撤销</button>
+                </td>
+              </tr>
+              <tr>
+                <td><button class="link-btn">新员工入职权限开通</button></td>
+                <td>人事审批</td>
+                <td><span class="tag tag-primary">处理中</span></td>
+                <td><span class="tag tag-warning">中</span></td>
+                <td>李四</td>
+                <td>2026-08-04 14:20</td>
+                <td>
+                  <button class="link-btn">查看</button>
+                </td>
+              </tr>
+              <tr>
+                <td><button class="link-btn">Q3 市场推广预算审批</button></td>
+                <td>财务审批</td>
+                <td><span class="tag tag-success">已完成</span></td>
+                <td><span class="tag tag-danger">高</span></td>
+                <td>王五</td>
+                <td>2026-08-03 10:15</td>
+                <td>
+                  <button class="link-btn">查看</button>
+                </td>
+              </tr>
+              <tr>
+                <td><button class="link-btn">办公设备采购申请</button></td>
+                <td>行政采购</td>
+                <td><span class="tag tag-danger">已拒绝</span></td>
+                <td><span class="tag tag-info">低</span></td>
+                <td>赵六</td>
+                <td>2026-08-02 16:45</td>
+                <td>
+                  <button class="link-btn">查看</button>
+                </td>
+              </tr>
+              <tr>
+                <td><button class="link-btn">数据库迁移方案评审</button></td>
+                <td>技术评审</td>
+                <td><span class="tag tag-success">已完成</span></td>
+                <td><span class="tag tag-warning">中</span></td>
+                <td>张三</td>
+                <td>2026-08-01 11:00</td>
+                <td>
+                  <button class="link-btn">查看</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pagination">
+            <span style="font-size:13px; color:#909399;">共 48 条</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分隔线 -->
+    <div class="compare-divider">VS</div>
+
+    <!-- ==================== AFTER ==================== -->
+    <div class="panel after">
+      <div class="panel-label after">
+        <span>✨</span>
+        <span>AFTER — 升级后样式</span>
+      </div>
+      <div class="panel-content">
+        <!-- 标题 -->
+        <div class="page-header">
+          <div class="page-header-left">
+            <div class="page-header-icon">📋</div>
+            <div>
+              <h1>我的工单</h1>
+              <div class="page-header-desc">管理你发起和参与的所有工单</div>
+            </div>
+          </div>
+          <button class="btn-sm btn-sm-primary">+ 发起工单</button>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-top">
+              <span class="stat-label">待处理</span>
+              <div class="stat-icon blue">⏳</div>
+            </div>
+            <div class="stat-value">12</div>
+            <div class="stat-trend up">↑ +3</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top">
+              <span class="stat-label">处理中</span>
+              <div class="stat-icon orange">⚡</div>
+            </div>
+            <div class="stat-value">8</div>
+            <div class="stat-trend down">↓ -1</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top">
+              <span class="stat-label">已完成</span>
+              <div class="stat-icon green">✅</div>
+            </div>
+            <div class="stat-value">156</div>
+            <div class="stat-trend down">+24</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top">
+              <span class="stat-label">已拒绝</span>
+              <div class="stat-icon red">❌</div>
+            </div>
+            <div class="stat-value">5</div>
+            <div class="stat-trend down">↓ -2</div>
+          </div>
+        </div>
+
+        <!-- 筛选 -->
+        <div class="filter-card">
+          <div class="filter-toggle" onclick="toggleAfterFilter()">
+            <div class="filter-toggle-left">
+              <div class="filter-icon open" id="afterFilterIcon">▼</div>
+              <span>筛选条件</span>
+              <span class="filter-tag">待处理</span>
+            </div>
+            <span style="font-size:11px; color:var(--text-secondary);">展开/收起</span>
+          </div>
+          <div class="filter-body open" id="afterFilterBody">
+            <div class="filter-row">
+              <div class="filter-item">
+                <label>状态</label>
+                <select><option selected>待处理</option></select>
+              </div>
+              <div class="filter-item">
+                <label>优先级</label>
+                <select><option>全部</option></select>
+              </div>
+              <div class="filter-item">
+                <label>关键词</label>
+                <input type="text" placeholder="搜索工单标题..." />
+              </div>
+              <div class="filter-actions">
+                <button class="btn-sm btn-sm-primary">🔍 搜索</button>
+                <button class="btn-sm btn-sm-outline">重置</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 表格 -->
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">工单列表 <span class="table-count">48 条</span></div>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>工单标题</th>
+                <th>流程模版</th>
+                <th>状态</th>
+                <th>优先级</th>
+                <th>创建人</th>
+                <th>创建时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="ticket-title-cell">
+                    <span class="ticket-title">服务器扩容申请 — 生产环境</span>
+                    <span class="ticket-no">TK-2026-0805-001</span>
+                  </div>
+                </td>
+                <td>IT 资源申请</td>
+                <td><span class="tag tag-warning"><span class="tag-dot"></span>待处理</span></td>
+                <td><span class="priority-bar high"></span> <span style="color:var(--danger); font-weight:600; font-size:12px;">高</span></td>
+                <td>张三</td>
+                <td style="font-size:12px; color:var(--text-secondary);">08-05 09:30</td>
+                <td>
+                  <div class="action-group">
+                    <button class="action-btn primary">查看</button>
+                    <button class="action-btn danger">撤销</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="ticket-title-cell">
+                    <span class="ticket-title">新员工入职权限开通</span>
+                    <span class="ticket-no">TK-2026-0804-012</span>
+                  </div>
+                </td>
+                <td>人事审批</td>
+                <td><span class="tag tag-primary"><span class="tag-dot"></span>处理中</span></td>
+                <td><span class="priority-bar medium"></span> <span style="color:var(--warning); font-weight:600; font-size:12px;">中</span></td>
+                <td>李四</td>
+                <td style="font-size:12px; color:var(--text-secondary);">08-04 14:20</td>
+                <td>
+                  <div class="action-group">
+                    <button class="action-btn primary">查看</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="ticket-title-cell">
+                    <span class="ticket-title">Q3 市场推广预算审批</span>
+                    <span class="ticket-no">TK-2026-0803-008</span>
+                  </div>
+                </td>
+                <td>财务审批</td>
+                <td><span class="tag tag-success"><span class="tag-dot"></span>已完成</span></td>
+                <td><span class="priority-bar high"></span> <span style="color:var(--danger); font-weight:600; font-size:12px;">高</span></td>
+                <td>王五</td>
+                <td style="font-size:12px; color:var(--text-secondary);">08-03 10:15</td>
+                <td>
+                  <div class="action-group">
+                    <button class="action-btn primary">查看</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="ticket-title-cell">
+                    <span class="ticket-title">办公设备采购申请</span>
+                    <span class="ticket-no">TK-2026-0802-005</span>
+                  </div>
+                </td>
+                <td>行政采购</td>
+                <td><span class="tag tag-danger"><span class="tag-dot"></span>已拒绝</span></td>
+                <td><span class="priority-bar low"></span> <span style="color:var(--text-secondary); font-weight:600; font-size:12px;">低</span></td>
+                <td>赵六</td>
+                <td style="font-size:12px; color:var(--text-secondary);">08-02 16:45</td>
+                <td>
+                  <div class="action-group">
+                    <button class="action-btn primary">查看</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="ticket-title-cell">
+                    <span class="ticket-title">数据库迁移方案评审</span>
+                    <span class="ticket-no">TK-2026-0801-003</span>
+                  </div>
+                </td>
+                <td>技术评审</td>
+                <td><span class="tag tag-success"><span class="tag-dot"></span>已完成</span></td>
+                <td><span class="priority-bar medium"></span> <span style="color:var(--warning); font-weight:600; font-size:12px;">中</span></td>
+                <td>张三</td>
+                <td style="font-size:12px; color:var(--text-secondary);">08-01 11:00</td>
+                <td>
+                  <div class="action-group">
+                    <button class="action-btn primary">查看</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pagination">
+            <div class="page-info">共 <strong>48</strong> 条，每页 <strong>10</strong> 条</div>
+            <div class="page-controls">
+              <button class="page-btn disabled">‹</button>
+              <button class="page-btn active">1</button>
+              <button class="page-btn">2</button>
+              <button class="page-btn">3</button>
+              <button class="page-btn">›</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleAfterFilter() {
+      document.getElementById('afterFilterBody').classList.toggle('open');
+      document.getElementById('afterFilterIcon').classList.toggle('open');
+    }
+  </script>
+</body>
+</html>

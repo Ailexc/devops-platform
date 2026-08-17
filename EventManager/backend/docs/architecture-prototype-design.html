@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>事件管理系统 - 前端原型 & 后端架构设计</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-light: #818cf8;
+    --primary-dark: #4f46e5;
+    --surface: #ffffff;
+    --bg: #f8fafc;
+    --text: #1e293b;
+    --text-secondary: #64748b;
+    --border: #e2e8f0;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --info: #3b82f6;
+    --radius: 12px;
+    --shadow: 0 4px 24px rgba(0,0,0,.06);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  /* Nav */
+  nav {
+    position: sticky; top:0; z-index:100;
+    background: rgba(255,255,255,.85); backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+  nav .inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; gap: 32px; height: 56px;
+  }
+  nav .logo { font-weight: 700; font-size: 18px; color: var(--primary); }
+  nav .logo span { color: var(--text); }
+  nav a {
+    color: var(--text-secondary); text-decoration: none; font-size: 14px;
+    transition: color .2s;
+  }
+  nav a:hover { color: var(--primary); }
+  nav .right { margin-left: auto; display: flex; gap: 16px; align-items: center; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* Hero */
+  .hero {
+    text-align: center; padding: 48px 0 56px;
+  }
+  .hero h1 { font-size: 36px; font-weight: 800; letter-spacing: -.02em; }
+  .hero h1 span { color: var(--primary); }
+  .hero p { color: var(--text-secondary); font-size: 16px; max-width: 600px; margin: 12px auto 0; }
+  .hero .tags { margin-top: 20px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .hero .tags span {
+    padding: 4px 14px; border-radius: 20px; background: var(--primary);
+    color: #fff; font-size: 13px; font-weight: 500;
+  }
+  .hero .tags span.outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+
+  /* Section */
+  section { margin-bottom: 64px; }
+  .section-title {
+    font-size: 24px; font-weight: 700; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title .badge {
+    font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 12px;
+    background: var(--primary-light); color: #fff;
+  }
+  .section-desc { color: var(--text-secondary); font-size: 14px; margin-bottom: 24px; max-width: 800px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #f1f5f9; border-radius: 10px; padding: 4px; }
+  .tabs button {
+    flex: 1; padding: 8px 16px; border: none; border-radius: 8px;
+    background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: all .2s;
+  }
+  .tabs button.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Card Grid */
+  .grid { display: grid; gap: 20px; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border);
+    padding: 20px; transition: box-shadow .2s;
+  }
+  .card:hover { box-shadow: var(--shadow); }
+  .card .icon { font-size: 28px; margin-bottom: 8px; }
+  .card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .card p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+  /* Mockup */
+  .mockup {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; background: #fff; margin-bottom: 24px;
+  }
+  .mockup-header {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    background: #fafafa; font-size: 13px; color: var(--text-secondary);
+  }
+  .mockup-header .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .mockup-header .dot.r { background: #ff5f56; }
+  .mockup-header .dot.y { background: #ffbd2e; }
+  .mockup-header .dot.g { background: #27c93f; }
+  .mockup-body { padding: 20px; }
+
+  /* Prototype Components */
+  .proto-sidebar {
+    width: 220px; background: #fff; border-right: 1px solid var(--border);
+    padding: 16px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .proto-sidebar .item {
+    padding: 8px 12px; border-radius: 8px; font-size: 13px;
+    cursor: pointer; display: flex; align-items: center; gap: 10px;
+    color: var(--text-secondary); transition: all .15s;
+  }
+  .proto-sidebar .item:hover { background: #f1f5f9; color: var(--text); }
+  .proto-sidebar .item.active { background: var(--primary); color: #fff; }
+  .proto-sidebar .item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .proto-topbar {
+    display: flex; align-items: center; padding: 8px 20px;
+    border-bottom: 1px solid var(--border); gap: 16px;
+  }
+  .proto-topbar .search {
+    flex: 1; max-width: 360px; background: #f1f5f9; border: none;
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; color: var(--text);
+  }
+  .proto-topbar .search::placeholder { color: #94a3b8; }
+
+  .proto-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+  }
+  .proto-table th {
+    text-align: left; padding: 10px 12px; font-weight: 600;
+    color: var(--text-secondary); border-bottom: 2px solid var(--border);
+    font-size: 12px; text-transform: uppercase; letter-spacing: .03em;
+  }
+  .proto-table td {
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+  }
+  .proto-table tr:hover td { background: #f8fafc; }
+
+  .status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;
+  }
+  .status.processing { background: #dbeafe; color: #1d4ed8; }
+  .status.completed { background: #dcfce7; color: #15803d; }
+  .status.pending { background: #fef3c7; color: #b45309; }
+  .status.failed { background: #fee2e2; color: #b91c1c; }
+  .status.dlq { background: #f3e8ff; color: #7c3aed; }
+  .dot-indicator { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .dot-indicator.processing { background: #3b82f6; animation: pulse 1.4s infinite; }
+  .dot-indicator.completed { background: #22c55e; }
+  .dot-indicator.pending { background: #f59e0b; }
+  .dot-indicator.failed { background: #ef4444; }
+  .dot-indicator.dlq { background: #7c3aed; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .badge-type {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; font-family: monospace;
+    background: #f1f5f9; color: var(--text-secondary);
+  }
+  .badge-type.aws { background: #ff9900; color: #fff; }
+  .badge-type.api { background: #6366f1; color: #fff; }
+  .badge-type.internal { background: #14b8a6; color: #fff; }
+
+  /* Detail Panel Mockup */
+  .detail-panel {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .detail-panel .header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .detail-panel .header h3 { font-size: 16px; font-weight: 600; }
+  .detail-panel .body { padding: 20px; }
+  .detail-row {
+    display: flex; padding: 8px 0; border-bottom: 1px solid #f1f5f9;
+    font-size: 13px;
+  }
+  .detail-row .label { width: 140px; color: var(--text-secondary); flex-shrink: 0; }
+  .detail-row .value { flex: 1; }
+
+  .timeline { position: relative; padding-left: 28px; }
+  .timeline::before {
+    content: ''; position: absolute; left: 8px; top: 4px; bottom: 4px;
+    width: 2px; background: var(--border);
+  }
+  .timeline-item { position: relative; padding-bottom: 20px; }
+  .timeline-item::before {
+    content: ''; position: absolute; left: -24px; top: 6px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--border); border: 2px solid #fff;
+  }
+  .timeline-item.completed::before { background: var(--success); }
+  .timeline-item.current::before { background: var(--primary); box-shadow: 0 0 0 4px rgba(99,102,241,.2); }
+  .timeline-item.failed::before { background: var(--error); }
+  .timeline-item .time { font-size: 12px; color: var(--text-secondary); }
+  .timeline-item .title { font-size: 13px; font-weight: 500; }
+
+  /* Metrics */
+  .metric-card {
+    text-align: center; padding: 20px;
+  }
+  .metric-card .value { font-size: 32px; font-weight: 800; color: var(--primary); }
+  .metric-card .label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+  .metric-card .trend { font-size: 12px; margin-top: 4px; }
+  .metric-card .trend.up { color: var(--success); }
+  .metric-card .trend.down { color: var(--error); }
+
+  /* Architecture Diagram */
+  .arch-layer {
+    border: 2px solid var(--border); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 16px; position: relative;
+  }
+  .arch-layer .layer-label {
+    position: absolute; top: -10px; left: 16px;
+    background: #fff; padding: 0 8px; font-size: 12px; font-weight: 600;
+    color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em;
+  }
+  .arch-layer .arch-grid {
+    display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  .arch-box {
+    flex: 1; min-width: 100px; padding: 12px 16px;
+    border-radius: 8px; text-align: center; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--border); background: #fff;
+  }
+  .arch-box.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .arch-box.success { background: var(--success); color: #fff; border-color: var(--success); }
+  .arch-box.warning { background: #fef3c7; border-color: #fde68a; }
+  .arch-box.outline { background: transparent; }
+  .arch-box .sub { font-size: 11px; font-weight: 400; opacity: .7; margin-top: 2px; }
+
+  .arrow-down {
+    text-align: center; color: var(--border); font-size: 20px;
+    padding: 4px 0;
+  }
+
+  /* Flow */
+  .flow { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  .flow-node {
+    padding: 10px 18px; border-radius: 8px; background: #fff;
+    border: 1px solid var(--border); font-size: 13px; font-weight: 500;
+    text-align: center; min-width: 80px;
+  }
+  .flow-node.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .flow-node.success { background: var(--success); color: #fff; border-color: var(--success); }
+  .flow-node.warning { background: #fef3c7; border-color: #fde68a; }
+  .flow-node.error { background: #fee2e2; border-color: #fecaca; }
+  .flow-arrow { color: var(--border); font-size: 18px; }
+  .flow-label { font-size: 11px; color: var(--text-secondary); text-align: center; }
+
+  /* DB Schema */
+  .db-schema {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .db-table {
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .db-table .db-header {
+    background: var(--primary); color: #fff; padding: 8px 14px;
+    font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+  }
+  .db-table .db-header .pk { font-size: 10px; background: rgba(255,255,255,.2); padding: 1px 6px; border-radius: 4px; }
+  .db-table .db-row {
+    display: flex; padding: 6px 14px; font-size: 12px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .db-table .db-row:last-child { border-bottom: none; }
+  .db-table .db-row .col-name { width: 120px; font-family: monospace; font-weight: 500; }
+  .db-table .db-row .col-type { width: 100px; color: var(--text-secondary); font-family: monospace; font-size: 11px; }
+  .db-table .db-row .col-desc { flex: 1; color: var(--text-secondary); }
+  .db-table .db-row .key { color: var(--warning); font-size: 11px; }
+
+  /* API Endpoints */
+  .api-group { margin-bottom: 16px; }
+  .api-group h4 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary); }
+  .api-endpoint {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: 6px; font-size: 13px; font-family: monospace;
+    margin-bottom: 4px; background: #f8fafc;
+  }
+  .api-endpoint .method {
+    padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+  }
+  .api-endpoint .method.get { background: #22c55e; }
+  .api-endpoint .method.post { background: #3b82f6; }
+  .api-endpoint .method.put { background: #f59e0b; }
+  .api-endpoint .method.delete { background: #ef4444; }
+  .api-endpoint .path { color: var(--text); }
+  .api-endpoint .desc { font-family: initial; color: var(--text-secondary); margin-left: auto; font-size: 12px; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .db-schema { grid-template-columns: 1fr; }
+    nav .inner { gap: 12px; }
+    nav a { font-size: 12px; }
+    .proto-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+  footer {
+    text-align: center; padding: 32px 0; color: var(--text-secondary); font-size: 13px;
+  }
+
+  .highlight-box {
+    background: linear-gradient(135deg, #eef2ff, #faf5ff);
+    border: 1px solid #c7d2fe; border-radius: var(--radius);
+    padding: 20px; margin: 20px 0;
+  }
+  .highlight-box h4 { color: var(--primary-dark); margin-bottom: 8px; }
+  .highlight-box p { font-size: 14px; color: var(--text); }
+  .highlight-box ul { margin: 8px 0 0 16px; font-size: 14px; }
+  .highlight-box ul li { margin-bottom: 4px; }
+
+  .comparison-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .comparison-table th, .comparison-table td {
+    padding: 10px 14px; border: 1px solid var(--border); text-align: left;
+  }
+  .comparison-table th { background: #f8fafc; font-weight: 600; }
+  .comparison-table .good { color: var(--success); }
+  .comparison-table .bad { color: var(--error); }
+  .comparison-table .neutral { color: var(--warning); }
+
+  .tech-badge {
+    display: inline-block; padding: 2px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; font-family: monospace;
+    background: #f1f5f9; color: var(--text-secondary);
+    margin: 2px;
+  }
+  .tech-badge.python { background: #e8f5e9; color: #2e7d32; }
+  .tech-badge.django { background: #e8eaf6; color: #283593; }
+  .tech-badge.celery { background: #fff3e0; color: #e65100; }
+  .tech-badge.redis { background: #fce4ec; color: #c62828; }
+  .tech-badge.rabbitmq { background: #e0f7fa; color: #00695c; }
+  .tech-badge.kafka { background: #f3e5f5; color: #6a1b9a; }
+  .tech-badge.postgres { background: #e3f2fd; color: #0d47a1; }
+  .tech-badge.react { background: #e0f2fe; color: #0369a1; }
+  .tech-badge.prometheus { background: #fce4ec; color: #b71c1c; }
+  .tech-badge.grafana { background: #fff3e0; color: #bf360c; }
+  .tech-badge.ninja { background: #fce4ec; color: #880e4f; }
+
+  /* Roadmap */
+  .roadmap { position: relative; padding: 0; }
+  .roadmap::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 3px; background: linear-gradient(to bottom, var(--primary), var(--success), var(--warning), var(--error), var(--info));
+    border-radius: 2px; opacity: .3;
+  }
+  .phase {
+    position: relative; padding: 0 0 32px 64px;
+  }
+  .phase:last-child { padding-bottom: 0; }
+  .phase .marker {
+    position: absolute; left: 12px; top: 4px;
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #fff; z-index: 1;
+  }
+  .phase .marker.p0 { background: var(--primary); }
+  .phase .marker.p1 { background: var(--success); }
+  .phase .marker.p2 { background: var(--warning); }
+  .phase .marker.p3 { background: var(--error); }
+  .phase .marker.p4 { background: #8b5cf6; }
+  .phase .marker.p5 { background: #06b6d4; }
+  .phase .marker.p6 { background: #f43f5e; }
+  .phase .marker.p7 { background: #10b981; }
+  .phase .marker.p8 { background: #6366f1; }
+  .phase .marker.p9 { background: #14b8a6; }
+
+  .phase-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    transition: box-shadow .2s;
+  }
+  .phase-card:hover { box-shadow: var(--shadow); }
+  .phase-card .head {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+  }
+  .phase-card .head h3 { font-size: 17px; font-weight: 700; }
+  .phase-card .head .est {
+    font-size: 12px; padding: 2px 10px; border-radius: 10px;
+    background: #f1f5f9; color: var(--text-secondary); font-weight: 500;
+    margin-left: auto; flex-shrink: 0;
+  }
+  .phase-card .head .tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 6px;
+    font-weight: 600;
+  }
+  .phase-card .head .tag.frontend { background: #dbeafe; color: #1d4ed8; }
+  .phase-card .head .tag.backend { background: #dcfce7; color: #15803d; }
+  .phase-card .head .tag.infrastructure { background: #f3e8ff; color: #7c3aed; }
+  .phase-card .head .tag.fullstack { background: #fef3c7; color: #b45309; }
+  .phase-card .desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+  .phase-card .tasks { list-style: none; padding: 0; margin: 0; }
+  .phase-card .tasks li {
+    font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .phase-card .tasks li:last-child { border-bottom: none; }
+  .phase-card .tasks li .dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .phase-card .tasks li .dot.data { background: var(--primary); }
+  .phase-card .tasks li .dot.api { background: var(--success); }
+  .phase-card .tasks li .dot.mq { background: var(--warning); }
+  .phase-card .tasks li .dot.frontend { background: var(--info); }
+  .phase-card .tasks li .dot.infra { background: #8b5cf6; }
+  .phase-card .tasks li .dot.test { background: #06b6d4; }
+  .phase-card .deliverable {
+    margin-top: 12px; padding: 10px 14px; background: #f8fafc;
+    border-radius: 8px; font-size: 13px; border-left: 3px solid var(--primary);
+    font-weight: 500;
+  }
+  .phase-card .deliverable .label { color: var(--text-secondary); font-weight: 400; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <div class="logo">⚡ <span>EventFlow</span></div>
+    <a href="#frontend">前端原型</a>
+    <a href="#backend">后端架构</a>
+    <a href="#design">设计决策</a>
+    <div class="right">
+      <span style="font-size:12px;color:var(--text-secondary)">v2.1 · 架构设计</span>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+
+<!-- Hero -->
+<div class="hero">
+  <h1>事件管理系统 · <span>架构与原型设计</span></h1>
+  <p>基于 Celery + RabbitMQ + Django Ninja 的全新事件驱动架构，整合前端监控面板与后端分布式处理</p>
+  <div class="tags">
+    <span>Django Ninja</span>
+    <span>Celery</span>
+    <span>RabbitMQ</span>
+    <span>PostgreSQL</span>
+    <span class="outline">React + TypeScript</span>
+    <span class="outline">WebSocket</span>
+    <span class="outline">Prometheus + Grafana</span>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- 前端原型 -->
+<!-- ============================== -->
+<section id="frontend">
+  <div class="section-title">
+    🎨 前端原型设计 <span class="badge">Prototype</span>
+  </div>
+  <p class="section-desc">
+    以下是事件管理系统的核心 UI 原型，覆盖事件列表、详情面板、实时监控仪表盘、事件创建等主要场景。
+    使用 React + TypeScript + Tailwind CSS 实现，基于 WebSocket 实现实时更新。
+  </p>
+
+  <div class="mockup">
+    <div class="mockup-header">
+      <span class="dot r"></span>
+      <span class="dot y"></span>
+      <span class="dot g"></span>
+      <span style="margin-left:8px">Event Dashboard — 主界面原型</span>
+    </div>
+    <div class="mockup-body" style="padding:0;display:flex;min-height:480px;">
+      <!-- Sidebar -->
+      <div class="proto-sidebar">
+        <div class="item active">📊 仪表盘</div>
+        <div class="item">📋 事件列表</div>
+        <div class="item">⚙️ 事件处理</div>
+        <div class="item">🔁 重试队列</div>
+        <div class="item">💀 死信队列</div>
+        <div class="item">📈 监控告警</div>
+        <div class="item">📦 系统设置</div>
+        <div style="margin-top:auto;border-top:1px solid var(--border);padding-top:12px;">
+          <div class="item">👤 系统管理员</div>
+        </div>
+      </div>
+      <!-- Main -->
+      <div style="flex:1;display:flex;flex-direction:column;">
+        <!-- Top Bar -->
+        <div class="proto-topbar">
+          <span style="font-weight:600;font-size:15px;">事件列表</span>
+          <input class="search" placeholder="搜索事件 ID、类型、资源..." />
+          <span style="font-size:13px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+            🔄 实时
+            <span class="dot-indicator processing" style="width:8px;height:8px;"></span>
+          </span>
+          <button style="padding:6px 14px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">+ 新事件</button>
+        </div>
+        <!-- Filters -->
+        <div style="padding:8px 20px;display:flex;gap:8px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+          <span style="font-size:12px;padding:4px 12px;border-radius:6px;background:#f1f5f9;cursor:pointer;">全部 <span style="color:var(--text-secondary)">128</span></span>
+          <span style="font-size:12px;padding:4px 12px;border-radius:6px;background:#dbeafe;color:#1d4ed8;cursor:pointer;">处理中 <span style="opacity:.7">12</span></span>
+          <span style="font-size:12px;padding:4px 12px;border-radius:6px;background:#dcfce7;color:#15803d;cursor:pointer;">已完成 <span style="opacity:.7">96</span></span>
+          <span style="font-size:12px;padding:4px 12px;border-radius:6px;background:#fee2e2;color:#b91c1c;cursor:pointer;">失败 <span style="opacity:.7">8</span></span>
+          <span style="font-size:12px;padding:4px 12px;border-radius:6px;background:#f3e8ff;color:#7c3aed;cursor:pointer;">死信 <span style="opacity:.7">4</span></span>
+          <span style="margin-left:auto;font-size:12px;color:var(--text-secondary);">最近 1 小时</span>
+        </div>
+        <!-- Table -->
+        <div style="overflow-x:auto;flex:1;">
+          <table class="proto-table">
+            <thead>
+              <tr>
+                <th>事件 ID</th>
+                <th>类型</th>
+                <th>来源</th>
+                <th>资源</th>
+                <th>状态</th>
+                <th>接收时间</th>
+                <th>处理耗时</th>
+                <th>重试</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;">evt_f1a2b3c4</td>
+                <td><span class="badge-type aws">AWS:EC2</span></td>
+                <td>EventBridge</td>
+                <td style="font-family:monospace;font-size:12px;">i-0abcd1234</td>
+                <td><span class="status completed"><span class="dot-indicator completed"></span>已完成</span></td>
+                <td style="font-size:12px;color:var(--text-secondary)">14:23:01</td>
+                <td style="font-size:12px;">1.2s</td>
+                <td style="font-size:12px;">0</td>
+              </tr>
+              <tr style="background:#f8fafc;">
+                <td style="font-family:monospace;font-size:12px;">evt_d5e6f7g8</td>
+                <td><span class="badge-type aws">AWS:RDS</span></td>
+                <td>EventBridge</td>
+                <td style="font-family:monospace;font-size:12px;">db-xyz-001</td>
+                <td><span class="status processing"><span class="dot-indicator processing"></span>处理中</span></td>
+                <td style="font-size:12px;color:var(--text-secondary)">14:22:45</td>
+                <td style="font-size:12px;">23.4s</td>
+                <td style="font-size:12px;">1</td>
+              </tr>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;">evt_h9i0j1k2</td>
+                <td><span class="badge-type api">API:Webhook</span></td>
+                <td>GitHub</td>
+                <td style="font-family:monospace;font-size:12px;">repo/event-mgr</td>
+                <td><span class="status failed"><span class="dot-indicator failed"></span>失败</span></td>
+                <td style="font-size:12px;color:var(--text-secondary)">14:20:12</td>
+                <td style="font-size:12px;">5.1s</td>
+                <td style="font-size:12px;color:var(--error);font-weight:600;">3/3</td>
+              </tr>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;">evt_l3m4n5o6</td>
+                <td><span class="badge-type internal">内部:Health</span></td>
+                <td>Scheduler</td>
+                <td style="font-family:monospace;font-size:12px;">worker.01</td>
+                <td><span class="status completed"><span class="dot-indicator completed"></span>已完成</span></td>
+                <td style="font-size:12px;color:var(--text-secondary)">14:19:30</td>
+                <td style="font-size:12px;">0.3s</td>
+                <td style="font-size:12px;">0</td>
+              </tr>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;">evt_p7q8r9s0</td>
+                <td><span class="badge-type aws">AWS:S3</span></td>
+                <td>EventBridge</td>
+                <td style="font-family:monospace;font-size:12px;">bucket-events</td>
+                <td><span class="status dlq"><span class="dot-indicator dlq"></span>死信</span></td>
+                <td style="font-size:12px;color:var(--text-secondary)">14:18:00</td>
+                <td style="font-size:12px;">—</td>
+                <td style="font-size:12px;color:var(--error);font-weight:600;">5/5</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination -->
+        <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-secondary);">
+          <span>1-5 / 128 条</span>
+          <div style="display:flex;gap:4px;">
+            <span style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">‹</span>
+            <span style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--primary);color:#fff;cursor:pointer;">1</span>
+            <span style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">2</span>
+            <span style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">3</span>
+            <span style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">…</span>
+            <span style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">›</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 事件详情面板 -->
+  <div class="grid grid-2" style="margin-bottom:24px;">
+    <div class="detail-panel">
+      <div class="header">
+        <h3>📄 事件详情</h3>
+        <span style="display:flex;gap:8px;">
+          <button style="padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:12px;cursor:pointer;">🔁 重试</button>
+          <button style="padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:12px;cursor:pointer;">📋 复制</button>
+        </span>
+      </div>
+      <div class="body">
+        <div class="detail-row">
+          <span class="label">事件 ID</span>
+          <span class="value" style="font-family:monospace;font-size:12px;">evt_d5e6f7g8</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">类型</span>
+          <span class="value"><span class="badge-type aws">AWS:RDS</span> <span style="font-size:12px;color:var(--text-secondary)">RDS DB Instance Event</span></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">来源</span>
+          <span class="value">AWS EventBridge  <span style="font-size:12px;color:var(--text-secondary)">(us-east-1)</span></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">资源 ARN</span>
+          <span class="value" style="font-family:monospace;font-size:12px;word-break:break-all;">arn:aws:rds:us-east-1:123456789:db:db-xyz-001</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">状态</span>
+          <span class="value"><span class="status processing"><span class="dot-indicator processing"></span>处理中 · 第 2 次重试</span></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">接收时间</span>
+          <span class="value">2026-07-25 14:22:45 UTC</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">已耗时</span>
+          <span class="value" style="color:var(--warning);">23.4s (超时阈值: 60s)</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">处理节点</span>
+          <span class="value" style="font-family:monospace;font-size:12px;">celery-worker@ip-10-0-1-42</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">原始 Payload</span>
+          <span class="value" style="font-family:monospace;font-size:11px;background:#f1f5f9;padding:8px;border-radius:6px;white-space:pre;overflow-x:auto;max-height:80px;">{
+  "version": "0",
+  "id": "d5e6f7g8-...",
+  "source": "aws.rds",
+  "resources": ["arn:aws:rds:..."],
+  "detail": { "EventCategories": ["creation"], "SourceType": "DB_INSTANCE" }
+}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 事件时间线 -->
+    <div class="detail-panel">
+      <div class="header">
+        <h3>⏱️ 事件处理时间线</h3>
+        <span style="font-size:12px;color:var(--text-secondary);">Trace ID: <span style="font-family:monospace">tr_abc123def</span></span>
+      </div>
+      <div class="body">
+        <div class="timeline">
+          <div class="timeline-item completed">
+            <div class="time">14:22:45.100</div>
+            <div class="title">📥 接收事件 → 投递到队列</div>
+          </div>
+          <div class="timeline-item completed">
+            <div class="time">14:22:45.200</div>
+            <div class="title">🔍 路由匹配 → Handler: RDSHandler</div>
+          </div>
+          <div class="timeline-item completed">
+            <div class="time">14:22:45.350</div>
+            <div class="title">⏳ 重试 #1 — 连接超时 (2s)</div>
+          </div>
+          <div class="timeline-item completed">
+            <div class="time">14:22:50.100</div>
+            <div class="title">⏳ 重试 #2 — 速率限制等待 (4s)</div>
+          </div>
+          <div class="timeline-item current">
+            <div class="time">14:22:58.500</div>
+            <div class="title">🔄 重试 #3 — 正在处理...</div>
+          </div>
+          <div class="timeline-item" style="opacity:.4;">
+            <div class="time">待完成</div>
+            <div class="title">✅ 处理完成 / ❌ 转入死信队列</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 仪表盘指标 -->
+  <h3 style="font-size:18px;font-weight:600;margin:32px 0 16px;">📊 实时监控仪表盘</h3>
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    <div class="card metric-card">
+      <div class="value">128</div>
+      <div class="label">今日事件总数</div>
+      <div class="trend up">↑ 12.3% 较昨日</div>
+    </div>
+    <div class="card metric-card">
+      <div class="value" style="color:var(--warning);">12</div>
+      <div class="label">处理中</div>
+      <div class="trend" style="color:var(--text-secondary)">平均耗时 8.4s</div>
+    </div>
+    <div class="card metric-card">
+      <div class="value" style="color:var(--error);">8</div>
+      <div class="label">失败</div>
+      <div class="trend" style="color:var(--text-secondary)">成功率 93.8%</div>
+    </div>
+    <div class="card metric-card">
+      <div class="value" style="color:var(--success);">96</div>
+      <div class="label">已完成</div>
+      <div class="trend" style="color:var(--text-secondary)">P99 延迟 3.2s</div>
+    </div>
+  </div>
+
+  <!-- 图表 mockup -->
+  <div class="grid grid-2">
+    <div class="card">
+      <h3 style="font-size:14px;margin-bottom:12px;">事件吞吐量 (最近 1 小时)</h3>
+      <div style="height:160px;display:flex;align-items:end;gap:4px;padding:0 4px;">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="width:100%;background:var(--primary);border-radius:4px 4px 0 0;transition:height .3s;" 
+               onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"
+               style="height:60%;background:var(--primary);border-radius:4px 4px 0 0;"></div>
+          <span style="font-size:10px;color:var(--text-secondary);margin-top:4px;">14:00</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="height:45%;background:var(--primary);border-radius:4px 4px 0 0;"></div>
+          <span style="font-size:10px;color:var(--text-secondary);margin-top:4px;">14:10</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="height:80%;background:var(--primary);border-radius:4px 4px 0 0;"></div>
+          <span style="font-size:10px;color:var(--text-secondary);margin-top:4px;">14:20</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="height:55%;background:var(--primary);border-radius:4px 4px 0 0;"></div>
+          <span style="font-size:10px;color:var(--text-secondary);margin-top:4px;">14:30</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="height:70%;background:var(--primary);border-radius:4px 4px 0 0;"></div>
+          <span style="font-size:10px;color:var(--text-secondary);margin-top:4px;">14:40</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="height:40%;background:var(--primary);border-radius:4px 4px 0 0;"></div>
+          <span style="font-size:10px;color:var(--text-secondary);margin-top:4px;">14:50</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="height:65%;background:var(--primary);border-radius:4px 4px 0 0;"></div>
+          <span style="font-size:10px;color:var(--text-secondary);margin-top:4px;">15:00</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:11px;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:8px;">
+        <span>✅ 成功: 96</span>
+        <span>❌ 失败: 8</span>
+        <span>⏳ 处理中: 12</span>
+        <span>💀 死信: 4</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="font-size:14px;margin-bottom:12px;">队列深度 & Worker 状态</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+            <span>📥 主队列</span><span>23 条</span>
+          </div>
+          <div style="height:6px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
+            <div style="height:100%;width:23%;background:var(--primary);border-radius:4px;"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+            <span>🔁 重试队列</span><span style="color:var(--warning)">7 条</span>
+          </div>
+          <div style="height:6px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
+            <div style="height:100%;width:7%;background:var(--warning);border-radius:4px;"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+            <span>💀 死信队列</span><span style="color:var(--error)">4 条</span>
+          </div>
+          <div style="height:6px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
+            <div style="height:100%;width:4%;background:var(--error);border-radius:4px;"></div>
+          </div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;font-size:12px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span>🟢 Celery Worker 节点</span><span>4/4 在线</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;">
+            <span>🔄 活跃任务</span><span>12</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;">
+            <span>⏳ 排队任务</span><span>23</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 事件创建表单 -->
+  <h3 style="font-size:18px;font-weight:600;margin:32px 0 16px;">✏️ 事件创建 / 手动投递</h3>
+  <div class="detail-panel" style="max-width:600px;">
+    <div class="header">
+      <h3>手动创建事件</h3>
+      <span style="font-size:12px;color:var(--text-secondary);">用于测试或手动触发</span>
+    </div>
+    <div class="body">
+      <div class="detail-row">
+        <span class="label">事件类型</span>
+        <span class="value">
+          <select style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:100%;">
+            <option>AWS:EC2 State Change</option>
+            <option>AWS:RDS Event</option>
+            <option>AWS:S3 Notification</option>
+            <option>API:Webhook</option>
+            <option>Internal:Manual</option>
+          </select>
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="label">事件源</span>
+        <span class="value"><input placeholder="例如: aws.ec2, github.webhook" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:100%;"/></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">资源 ID</span>
+        <span class="value"><input placeholder="资源标识符" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:100%;"/></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Payload (JSON)</span>
+        <span class="value"><textarea rows="4" placeholder='{"key": "value"}' style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;width:100%;resize:vertical;"></textarea></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">优先级</span>
+        <span class="value">
+          <select style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+            <option>🔴 高 (快速队列)</option>
+            <option selected>🟡 中 (默认)</option>
+            <option>🟢 低 (慢速队列)</option>
+          </select>
+        </span>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+        <button style="padding:8px 20px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">取消</button>
+        <button style="padding:8px 20px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">📤 投递事件</button>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<hr />
+
+<!-- ============================== -->
+<!-- 后端架构 -->
+<!-- ============================== -->
+<section id="backend">
+  <div class="section-title">
+    🏗️ 后端架构设计 <span class="badge">Architecture</span>
+  </div>
+  <p class="section-desc">
+    采用分层架构，将事件接收、处理、存储分离到独立服务，通过消息队列解耦，支持水平扩展。
+    API 层使用 Django Ninja（基于 Django ORM，Pydantic Schema，原生 async 支持，自动 OpenAPI 文档）。
+  </p>
+
+  <!-- 系统架构总览 -->
+  <h3 style="font-size:18px;font-weight:600;margin-bottom:16px;">系统架构总览</h3>
+
+  <div style="padding:20px 0;">
+    <!-- API Gateway -->
+    <div class="arch-layer">
+      <div class="layer-label">🌐 API Gateway — 事件入口</div>
+      <div class="arch-grid">
+        <div class="arch-box primary">
+          Django Ninja<br>
+          <span class="sub">事件接收 / 鉴权 / 校验 / OpenAPI</span>
+        </div>
+        <div class="arch-box" style="background:#e0f2fe;border-color:#7dd3fc;">
+          Nginx<br>
+          <span class="sub">反向代理 / 限流</span>
+        </div>
+      </div>
+    </div>
+    <div class="arrow-down">⬇</div>
+
+    <!-- Broker -->
+    <div class="arch-layer">
+      <div class="layer-label">📨 消息队列层 — 缓冲与解耦</div>
+      <div class="arch-grid">
+        <div class="arch-box success">
+          RabbitMQ<br>
+          <span class="sub">主事件队列 / 死信 / 延迟</span>
+        </div>
+        <div class="arch-box warning">
+          Redis<br>
+          <span class="sub">结果缓存 / 分布式锁 / 速率限制</span>
+        </div>
+      </div>
+    </div>
+    <div class="arrow-down">⬇</div>
+
+    <!-- Worker -->
+    <div class="arch-layer">
+      <div class="layer-label">⚙️ Worker 层 — 事件处理</div>
+      <div class="arch-grid">
+        <div class="arch-box">
+          Celery Worker Pool<br>
+          <span class="sub">asyncio 并发 &nbsp;|&nbsp; 水平扩展</span>
+        </div>
+        <div class="arch-box" style="border-color:var(--primary);border-style:dashed;">
+          Event Handlers<br>
+          <span class="sub">EC2 · RDS · S3 · Webhook · 自定义</span>
+        </div>
+      </div>
+    </div>
+    <div class="arrow-down">⬇</div>
+
+    <!-- Storage -->
+    <div class="arch-layer">
+      <div class="layer-label">💾 存储层</div>
+      <div class="arch-grid">
+        <div class="arch-box">
+          PostgreSQL<br>
+          <span class="sub">事件存储 / 审计日志</span>
+        </div>
+        <div class="arch-box">
+          Event Store<br>
+          <span class="sub">Append-only 事件溯源</span>
+        </div>
+        <div class="arch-box" style="background:#fef3c7;border-color:#fde68a;">
+          ClickHouse (可选)<br>
+          <span class="sub">时序分析 / 监控指标</span>
+        </div>
+      </div>
+    </div>
+    <div class="arrow-down">⬇</div>
+
+    <!-- Observability -->
+    <div class="arch-layer">
+      <div class="layer-label">📊 可观测性</div>
+      <div class="arch-grid">
+        <div class="arch-box" style="background:#f3e8ff;border-color:#d8b4fe;">
+          Prometheus + Grafana<br>
+          <span class="sub">指标 / 仪表盘 / 告警</span>
+        </div>
+        <div class="arch-box" style="background:#e0f2fe;border-color:#7dd3fc;">
+          Jaeger / OpenTelemetry<br>
+          <span class="sub">分布式追踪</span>
+        </div>
+        <div class="arch-box" style="background:#fce7f3;border-color:#f9a8d4;">
+          Sentry<br>
+          <span class="sub">错误采集 / 异常告警</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 事件处理流程 -->
+  <h3 style="font-size:18px;font-weight:600;margin:40px 0 16px;">🔄 事件处理流程</h3>
+
+  <div class="flow" style="margin-bottom:24px;">
+    <div class="flow-node primary">Event Source</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">API Gateway<br><span class="sub" style="font-size:10px;">校验·鉴权</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node success">RabbitMQ<br><span class="sub" style="font-size:10px;">主队列</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">Celery Worker<br><span class="sub" style="font-size:10px;">异步消费</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node" style="background:#dcfce7;border-color:#86efac;">完成 ✓</div>
+  </div>
+
+  <div class="flow" style="margin-bottom:24px;gap:8px;">
+    <div class="flow-node warning" style="font-size:12px;padding:6px 12px;">❌ 处理失败</div>
+    <div class="flow-arrow" style="font-size:14px;">→</div>
+    <div class="flow-node warning" style="font-size:12px;padding:6px 12px;">🔄 重试 (指数退避)<br><span class="sub" style="font-size:10px;">最多 5 次</span></div>
+    <div class="flow-arrow" style="font-size:14px;">→</div>
+    <div class="flow-node error" style="font-size:12px;padding:6px 12px;">💀 死信队列 (DLQ)<br><span class="sub" style="font-size:10px;">人工干预 / 自动回放</span></div>
+  </div>
+
+  <!-- 处理流程详情 -->
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="icon">📥</div>
+      <h3>事件接收阶段</h3>
+      <p>API Gateway 接收事件 → 校验签名/Schema → 生成 trace_id → 投递到 RabbitMQ → 立即返回 202 Accepted。所有校验失败的事件记录到 rejected 表用于审计。</p>
+    </div>
+    <div class="card">
+      <div class="icon">🔀</div>
+      <h3>事件路由阶段</h3>
+      <p>Celery Worker 消费消息 → 根据 event_type 匹配 EventHandler 注册表 → 按优先级入处理队列。支持通配符匹配 (e.g. aws.ec2.*)。</p>
+    </div>
+    <div class="card">
+      <div class="icon">⚡</div>
+      <h3>事件处理阶段</h3>
+      <p>EventHandler 执行业务逻辑，全部使用 async/await。阻塞操作 offload 到 asyncio.to_thread()。处理结果写入 Event Store，失败自动重试。</p>
+    </div>
+    <div class="card">
+      <div class="icon">🔁</div>
+      <h3>重试 & 死信阶段</h3>
+      <p>指数退避重试 (1s → 4s → 16s → 64s → 256s)，最大 5 次。重试耗尽后自动进入死信队列，触发告警。支持手动回放死信事件。</p>
+    </div>
+  </div>
+
+  <!-- 数据库设计 -->
+  <h3 style="font-size:18px;font-weight:600;margin:40px 0 16px;">🗄️ 核心数据库 Schema</h3>
+
+  <div class="db-schema">
+    <div class="db-table">
+      <div class="db-header">📋 events <span class="pk">主表</span></div>
+      <div class="db-row"><span class="col-name">id</span><span class="col-type">UUID</span><span class="col-desc">PK, 事件唯一 ID</span></div>
+      <div class="db-row"><span class="col-name">event_type</span><span class="col-type">VARCHAR(128)</span><span class="col-desc">事件类型, e.g. aws.ec2.state-change</span></div>
+      <div class="db-row"><span class="col-name">source</span><span class="col-type">VARCHAR(64)</span><span class="col-desc">事件来源, e.g. aws, webhook</span></div>
+      <div class="db-row"><span class="col-name">detail_type</span><span class="col-type">VARCHAR(64)</span><span class="col-desc">详细分类</span></div>
+      <div class="db-row"><span class="col-name">resource_id</span><span class="col-type">VARCHAR(256)</span><span class="col-desc">关联资源 ID</span></div>
+      <div class="db-row"><span class="col-name">raw_payload</span><span class="col-type">JSONB</span><span class="col-desc">原始事件数据</span></div>
+      <div class="db-row"><span class="col-name">status</span><span class="col-type">VARCHAR(32)</span><span class="col-desc">pending|processing|completed|failed|dlq</span></div>
+      <div class="db-row"><span class="col-name">trace_id</span><span class="col-type">UUID</span><span class="col-desc">分布式追踪 ID</span></div>
+      <div class="db-row"><span class="col-name">retry_count</span><span class="col-type">INT</span><span class="col-desc">当前已重试次数</span></div>
+      <div class="db-row"><span class="col-name">max_retries</span><span class="col-type">INT</span><span class="col-desc">最大重试次数 (默认 5)</span></div>
+      <div class="db-row"><span class="col-name">received_at</span><span class="col-type">TIMESTAMPTZ</span><span class="col-desc">接收时间</span></div>
+      <div class="db-row"><span class="col-name">processed_at</span><span class="col-type">TIMESTAMPTZ</span><span class="col-desc">处理完成时间</span></div>
+      <div class="db-row"><span class="col-name">handler</span><span class="col-type">VARCHAR(128)</span><span class="col-desc">处理 Handler 名称</span></div>
+      <div class="db-row"><span class="col-name">worker_id</span><span class="col-type">VARCHAR(64)</span><span class="col-desc">处理节点 ID</span></div>
+    </div>
+    <div>
+      <div class="db-table" style="margin-bottom:12px;">
+        <div class="db-header">📝 event_logs <span class="pk">事件日志 (append-only)</span></div>
+        <div class="db-row"><span class="col-name">id</span><span class="col-type">BIGSERIAL</span><span class="col-desc">PK</span></div>
+        <div class="db-row"><span class="col-name">event_id</span><span class="col-type">UUID</span><span class="col-desc">FK → events.id</span></div>
+        <div class="db-row"><span class="col-name">action</span><span class="col-type">VARCHAR(32)</span><span class="col-desc">received|routed|retrying|completed|failed</span></div>
+        <div class="db-row"><span class="col-name">detail</span><span class="col-type">JSONB</span><span class="col-desc">详细信息</span></div>
+        <div class="db-row"><span class="col-name">created_at</span><span class="col-type">TIMESTAMPTZ</span><span class="col-desc">日志时间</span></div>
+      </div>
+      <div class="db-table">
+        <div class="db-header">⚙️ event_handlers <span class="pk">Handler 注册表</span></div>
+        <div class="db-row"><span class="col-name">id</span><span class="col-type">SERIAL</span><span class="col-desc">PK</span></div>
+        <div class="db-row"><span class="col-name">name</span><span class="col-type">VARCHAR(128)</span><span class="col-desc">Handler 名称</span></div>
+        <div class="db-row"><span class="col-name">event_type_pattern</span><span class="col-type">VARCHAR(256)</span><span class="col-desc">匹配模式, 支持通配符</span></div>
+        <div class="db-row"><span class="col-name">handler_class</span><span class="col-type">VARCHAR(256)</span><span class="col-desc">Python class path</span></div>
+        <div class="db-row"><span class="col-name">timeout</span><span class="col-type">INT</span><span class="col-desc">超时阈值 (秒)</span></div>
+        <div class="db-row"><span class="col-name">max_retries</span><span class="col-type">INT</span><span class="col-desc">最大重试次数</span></div>
+        <div class="db-row"><span class="col-name">is_active</span><span class="col-type">BOOLEAN</span><span class="col-desc">是否启用</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API 设计 -->
+  <h3 style="font-size:18px;font-weight:600;margin:40px 0 16px;">🔌 API 设计</h3>
+
+  <div class="api-group">
+    <h4>📤 事件投递</h4>
+    <div class="api-endpoint"><span class="method post">POST</span><span class="path">/api/v1/events</span><span class="desc">接收事件，返回 202 Accepted</span></div>
+    <div class="api-endpoint"><span class="method post">POST</span><span class="path">/api/v1/events/batch</span><span class="desc">批量投递事件</span></div>
+  </div>
+  <div class="api-group">
+    <h4>📋 事件查询</h4>
+    <div class="api-endpoint"><span class="method get">GET</span><span class="path">/api/v1/events</span><span class="desc">事件列表，支持 filter/search/pagination</span></div>
+    <div class="api-endpoint"><span class="method get">GET</span><span class="path">/api/v1/events/:id</span><span class="desc">事件详情</span></div>
+    <div class="api-endpoint"><span class="method get">GET</span><span class="path">/api/v1/events/:id/logs</span><span class="desc">事件处理日志</span></div>
+  </div>
+  <div class="api-group">
+    <h4>🔁 重试 & 运维</h4>
+    <div class="api-endpoint"><span class="method post">POST</span><span class="path">/api/v1/events/:id/retry</span><span class="desc">手动重试事件</span></div>
+    <div class="api-endpoint"><span class="method post">POST</span><span class="path">/api/v1/events/dlq/replay</span><span class="desc">批量回放死信事件</span></div>
+  </div>
+  <div class="api-group">
+    <h4>📊 监控 & 管理</h4>
+    <div class="api-endpoint"><span class="method get">GET</span><span class="path">/api/v1/stats</span><span class="desc">事件统计概览</span></div>
+    <div class="api-endpoint"><span class="method get">GET</span><span class="path">/api/v1/health</span><span class="desc">服务健康检查</span></div>
+    <div class="api-endpoint"><span class="method get">GET</span><span class="path">/api/v1/handlers</span><span class="desc">Handler 注册表</span></div>
+  </div>
+
+  <!-- Worker 进程模型 -->
+  <h3 style="font-size:18px;font-weight:600;margin:40px 0 16px;">⚙️ Worker 进程模型</h3>
+
+  <div class="grid grid-2">
+    <div class="card" style="border-left:3px solid var(--primary);">
+      <div class="icon">🚀</div>
+      <h3>Celery Worker (asyncio 模式)</h3>
+      <p>所有事件 Handler 统一使用 async/await 编写。Celery 5.x 原生支持 async task，底层使用 Python asyncio 事件循环，单个 Worker 可处理数千并发连接。</p>
+      <pre style="background:#f8fafc;padding:12px;border-radius:8px;font-size:12px;margin-top:8px;overflow-x:auto;">
+# 启动命令
+celery -A event_manager worker \
+  -P threads \
+  --concurrency=1000 \
+  -Q events,events:high,events:low
+      </pre>
+    </div>
+    <div class="card" style="border-left:3px solid var(--success);">
+      <div class="icon">🛡️</div>
+      <h3>阻塞操作透明 Offload</h3>
+      <p>遇到没有 async 支持的 SDK 调用、文件 IO、远程 API 请求，使用 asyncio.to_thread() 透明转移到线程池，不阻塞事件循环。</p>
+      <pre style="background:#f8fafc;padding:12px;border-radius:8px;font-size:12px;margin-top:8px;overflow-x:auto;">
+# 统一编程模型，无需手动区分快/慢
+async def handle(event):
+    # async 操作
+    result = await query_cmdb(event.id)
+    # 阻塞操作透明 offload
+    ext = await asyncio.to_thread(
+        slow_sdk_call, event.resource_id
+    )
+    return {**result, **ext}
+      </pre>
+    </div>
+  </div>
+
+  <!-- 消息队列拓扑 -->
+  <h3 style="font-size:18px;font-weight:600;margin:40px 0 16px;">📨 RabbitMQ 队列拓扑</h3>
+
+  <div class="mockup">
+    <div class="mockup-header">
+      <span class="dot r"></span>
+      <span class="dot y"></span>
+      <span class="dot g"></span>
+      <span style="margin-left:8px">RabbitMQ 管理界面 — 队列拓扑</span>
+    </div>
+    <div class="mockup-body">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;">
+        <div class="flow-node success" style="min-width:100px;">📨 events<br><span class="sub">主队列</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node warning" style="min-width:100px;">events.retry<br><span class="sub">重试队列</span><br><span style="font-size:10px;">TTL 延迟</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node error" style="min-width:100px;">events.dlq<br><span class="sub">死信队列</span></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+        <div class="flow-node" style="min-width:80px;font-size:12px;">events.high<br><span class="sub" style="font-size:10px;">高优先级</span></div>
+        <div class="flow-node" style="min-width:80px;font-size:12px;">events.normal<br><span class="sub" style="font-size:10px;">默认</span></div>
+        <div class="flow-node" style="min-width:80px;font-size:12px;">events.low<br><span class="sub" style="font-size:10px;">低优先级</span></div>
+        <div class="flow-node" style="min-width:80px;font-size:12px;">events.scheduled<br><span class="sub" style="font-size:10px;">定时/延迟</span></div>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--text-secondary);text-align:center;">
+        所有队列绑定到统一 Exchange (topic) · 死信策略: 重试耗尽后 → DLQ · 支持手动回放
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<hr />
+
+<!-- ============================== -->
+<!-- 设计决策 -->
+<!-- ============================== -->
+<section id="design">
+  <div class="section-title">
+    📐 关键设计决策 <span class="badge">ADR</span>
+  </div>
+  <p class="section-desc">架构设计中的关键决策、技术选型理由及与原始方案的对比。</p>
+
+  <div class="highlight-box">
+    <h4>🎯 核心目标</h4>
+    <p>从你原来的 django-q 单机调度 + 手动并发模型升级为 <strong>分布式、可观测、高可用</strong> 的事件处理系统，同时保持代码的 <strong>统一编程模型</strong> 和 <strong>可测试性</strong>。</p>
+    <ul>
+      <li><strong>架构归一</strong> — 统一使用 Django Ninja，不再混用 FastAPI 和 Django 两套 Web 框架</li>
+      <li><strong>前后端分离</strong> — 纯前端 UI 实现所有运维操作（列表、详情、重试、回放），不依赖 Django Admin</li>
+      <li><strong>统一异步</strong> — API 层 + Worker 层全部 async，阻塞操作 offload 到线程池</li>
+    </ul>
+  </div>
+
+  <table class="comparison-table" style="margin-bottom:24px;">
+    <thead>
+      <tr>
+        <th style="width:180px;">决策项</th>
+        <th style="width:250px;">原始方案</th>
+        <th style="width:250px;">新方案</th>
+        <th>理由</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>任务队列</strong></td>
+        <td class="bad">django-q (已停维)</td>
+        <td class="good">Celery 5.x + RabbitMQ</td>
+        <td>Celery 是 Python 生态最成熟的任务队列，支持分布式 Worker、多种 Broker、重试、监控、异步任务原生支持</td>
+      </tr>
+      <tr>
+        <td><strong>并发模型</strong></td>
+        <td class="bad">进程 + 协程 + 线程 混用</td>
+        <td class="good">统一 asyncio + ofload to_thread</td>
+        <td>开发者只需掌握 async/await 一种原语，心智模型统一，调试和异常处理更简单</td>
+      </tr>
+      <tr>
+        <td><strong>事件存储</strong></td>
+        <td class="bad">仅记录最终结果</td>
+        <td class="good">Append-only Event Store</td>
+        <td>支持时间点回放、审计溯源、调试排错；Event Sourcing 模式天然支持 CQRS</td>
+      </tr>
+      <tr>
+        <td><strong>API 响应</strong></td>
+        <td>200 OK (处理完才返回)</td>
+        <td class="good">202 Accepted (立即返回)</td>
+        <td>事件处理应该是异步的，不需要调用方等待处理完成，202 是标准做法</td>
+      </tr>
+      <tr>
+        <td><strong>重试机制</strong></td>
+        <td class="bad">仅告警，无自动重试</td>
+        <td class="good">指数退避 (1s→256s) + 最大次数</td>
+        <td>临时故障（网络抖动、限流）是常态，自动重试大幅减少人工干预</td>
+      </tr>
+      <tr>
+        <td><strong>死信处理</strong></td>
+        <td class="bad">无</td>
+        <td class="good">DLQ + 告警 + 手动回放</td>
+        <td>重试耗尽的事件不应丢弃，DLQ 提供兜底，支持人工介入</td>
+      </tr>
+      <tr>
+        <td><strong>幂等性</strong></td>
+        <td class="bad">未提及</td>
+        <td class="good">事件 ID 去重 + 分布式锁</td>
+        <td>消息队列的"至少一次投递"特性要求幂等性，避免重复处理导致的数据不一致</td>
+      </tr>
+      <tr>
+        <td><strong>可观测性</strong></td>
+        <td>基础日志</td>
+        <td class="good">Metrics + Tracing + Alerting</td>
+        <td>生产系统必须具备：Prometheus 指标、分布式追踪、结构化日志、告警规则</td>
+      </tr>
+      <tr>
+        <td><strong>部署方式</strong></td>
+        <td>单体 Django 进程</td>
+        <td class="good">Web / Worker / Beat 分离部署</td>
+        <td>独立扩缩容、故障隔离、资源按需分配</td>
+      </tr>
+      <tr>
+        <td><strong>Handler 注册</strong></td>
+        <td>硬编码路由</td>
+        <td class="good">声明式 Pattern 匹配注册表</td>
+        <td>新增事件类型只需注册新 Handler，无需修改路由逻辑，支持通配符匹配</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 技术栈 -->
+  <h3 style="font-size:18px;font-weight:600;margin:40px 0 16px;">📦 推荐技术栈</h3>
+
+  <div class="grid grid-3">
+    <div class="card">
+      <div class="icon">🐍</div>
+      <h3>后端框架</h3>
+      <p>
+        <span class="tech-badge python">Python 3.12+</span>
+        <span class="tech-badge django">Django 5.x</span>
+        <span class="tech-badge ninja">Django Ninja</span>
+      </p>
+      <p style="font-size:12px;color:var(--text-secondary);">Django ORM + Ninja API = 一套框架解决数据层与 API 层，天然 async 支持</p>
+    </div>
+    <div class="card">
+      <div class="icon">📨</div>
+      <h3>消息 & 任务</h3>
+      <p>
+        <span class="tech-badge celery">Celery 5.x</span>
+        <span class="tech-badge rabbitmq">RabbitMQ</span>
+        <span class="tech-badge redis">Redis</span>
+      </p>
+      <p style="font-size:12px;color:var(--text-secondary);">RabbitMQ 做可靠的持久化消息，Redis 做缓存和分布式锁</p>
+    </div>
+    <div class="card">
+      <div class="icon">🗄️</div>
+      <h3>数据存储</h3>
+      <p>
+        <span class="tech-badge postgres">PostgreSQL 16</span>
+        <span class="tech-badge">ClickHouse</span>
+      </p>
+      <p style="font-size:12px;color:var(--text-secondary);">PG 做主存储，ClickHouse 可选用于监控时序分析</p>
+    </div>
+    <div class="card">
+      <div class="icon">📊</div>
+      <h3>可观测性</h3>
+      <p>
+        <span class="tech-badge prometheus">Prometheus</span>
+        <span class="tech-badge grafana">Grafana</span>
+        <span class="tech-badge">OpenTelemetry</span>
+        <span class="tech-badge">Sentry</span>
+      </p>
+    </div>
+    <div class="card">
+      <div class="icon">⚛️</div>
+      <h3>前端</h3>
+      <p>
+        <span class="tech-badge react">React 18</span>
+        <span class="tech-badge">TypeScript</span>
+        <span class="tech-badge">Tailwind CSS</span>
+        <span class="tech-badge">Vite</span>
+      </p>
+    </div>
+    <div class="card">
+      <div class="icon">🐳</div>
+      <h3>部署</h3>
+      <p>
+        <span class="tech-badge">Docker</span>
+        <span class="tech-badge">docker-compose</span>
+        <span class="tech-badge">GitHub Actions</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- 目录结构推荐 -->
+  <h3 style="font-size:18px;font-weight:600;margin:40px 0 16px;">📁 推荐项目目录结构</h3>
+
+  <div style="background:#1e293b;color:#e2e8f0;border-radius:var(--radius);padding:20px;font-family:monospace;font-size:13px;line-height:1.8;overflow-x:auto;">
+<pre style="margin:0;">
+event_manager/
+├── api/                          # API 层 (Django Ninja)
+│   ├── __init__.py
+│   ├── router.py                 # NinjaRouter 主路由
+│   ├── v1/
+│   │   ├── __init__.py
+│   │   ├── events.py             # 事件 CRUD 接口
+│   │   ├── stats.py              # 统计接口
+│   │   ├── health.py             # 健康检查
+│   │   └── handlers.py           # Handler 管理接口
+│   └── schemas/                  # Pydantic / Ninja Schema
+│       ├── __init__.py
+│       ├── event.py
+│       └── stats.py
+│
+├── event_manager/                # Django 项目配置
+│   ├── __init__.py
+│   ├── settings.py
+│   ├── urls.py                   # 挂载 Ninja API
+│   ├── wsgi.py
+│   └── asgi.py
+│
+├── apps/                         # Django Apps
+│   └── event_store/
+│       ├── __init__.py
+│       ├── models.py             # Django ORM models
+│       ├── migrations/
+│       ├── repositories.py       # 数据访问层
+│       # 无 Django Admin — 所有操作通过前端 UI 完成
+│
+├── core/                         # 核心领域层
+│   ├── __init__.py
+│   ├── event.py                  # Event 领域模型
+│   ├── handler.py                # EventHandler 基类
+│   ├── router.py                 # 事件路由匹配
+│   └── exceptions.py             # 领域异常
+│
+├── handlers/                     # 事件处理器（像你原来的 resource）
+│   ├── __init__.py
+│   ├── base.py                   # 抽象基类
+│   ├── registry.py               # Handler 注册表
+│   ├── aws/
+│   │   ├── ec2_handler.py
+│   │   ├── rds_handler.py
+│   │   └── s3_handler.py
+│   ├── webhook/
+│   │   └── github_handler.py
+│   └── internal/
+│       ├── health_handler.py
+│       └── manual_handler.py
+│
+├── workers/                      # Worker 进程配置
+│   ├── __init__.py
+│   ├── celery_app.py             # Celery 实例
+│   ├── config.py                 # Worker 配置
+│   └── signals.py                # Worker 生命周期钩子
+│
+├── monitoring/                   # 监控
+│   ├── __init__.py
+│   ├── metrics.py                # Prometheus 指标
+│   └── alerts.py                 # 告警规则
+│
+├── common/                       # 公共模块
+│   ├── __init__.py
+│   ├── idempotency.py            # 幂等性保障
+│   ├── retry.py                  # 重试策略
+│   └── tracing.py                # 分布式追踪
+│
+├── tests/                        # 测试
+│   ├── unit/
+│   ├── integration/
+│   └── fixtures/
+│
+├── docker/                       # Docker 配置
+│   ├── Dockerfile.api
+│   ├── Dockerfile.worker
+│   └── docker-compose.yml
+│
+├── frontend/                     # 前端 (React)
+│   ├── src/
+│   │   ├── pages/
+│   │   ├── components/
+│   │   └── hooks/
+│   └── package.json
+│
+├── docs/
+│   └── architecture.md
+├── pyproject.toml
+└── README.md
+</pre>
+  </div>
+
+</section>
+
+<hr />
+
+<!-- ============================== -->
+<!-- 开发计划 -->
+<!-- ============================== -->
+<section id="plan">
+  <div class="section-title">
+    📋 开发计划 <span class="badge">Roadmap</span>
+  </div>
+  <p class="section-desc">
+    Demo 范围 P0-P6，分 6 个阶段迭代交付。优先保障核心链路（接收 → 存储 → 处理），再补齐前端体验。
+    P7 可观测性 / P8 生产部署 / P9 Handler 集成 按需后续补充。
+  </p>
+
+  <div style="display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;">
+    <span style="font-size:12px;padding:4px 12px;border-radius:6px;background:#f1f5f9;">
+      🗓️ Demo 工期: <strong>5-6 周</strong> (单人)
+    </span>
+    <span style="font-size:12px;padding:4px 12px;border-radius:6px;background:#f1f5f9;">
+      📦 Demo 范围: <strong>P0 ~ P6</strong> (共 6 个阶段)
+    </span>
+    <span style="font-size:12px;padding:4px 12px;border-radius:6px;background:#f1f5f9;">
+      🎯 里程碑: P2 完成即具备核心事件处理能力
+    </span>
+    <span style="font-size:12px;padding:4px 12px;border-radius:6px;background:#fef3c7;color:#b45309;font-weight:600;">
+      ⏳ 当前: P0 进行中
+    </span>
+  </div>
+
+  <div class="roadmap">
+
+    <!-- Phase 0 -->
+    <div class="phase">
+      <div class="marker p0">0</div>
+      <div class="phase-card">
+        <div class="head">
+          <h3>🔧 项目脚手架</h3>
+          <span class="tag infrastructure">infrastructure</span>
+          <span class="est">3 天</span>
+        </div>
+        <div class="desc">搭建项目骨架，确定工具链和配置规范，确保所有成员环境一致。</div>
+        <ul class="tasks">
+          <li><span class="dot data"></span>初始化 Django 5.x 项目 + Django Ninja</li>
+          <li><span class="dot data"></span>配置 PostgreSQL + Redis 开发环境 (docker-compose)</li>
+          <li><span class="dot data"></span>Celery 5.x 集成 + RabbitMQ 配置</li>
+          <li><span class="dot data"></span>pyproject.toml (依赖管理, Ruff/Black, mypy)</li>
+          <li><span class="dot test"></span>Makefile / Taskfile 开发命令集 (dev/test/lint/migrate)</li>
+          <li><span class="dot infra"></span>React + TypeScript + Vite + Tailwind 前端脚手架</li>
+        </ul>
+        <div class="deliverable">
+          <span class="label">🎁 可交付:</span>
+          能本地启动 Django dev server + Celery worker + 前端 dev server，访问 /api/docs 看到 Swagger
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 1 -->
+    <div class="phase">
+      <div class="marker p1">1</div>
+      <div class="phase-card">
+        <div class="head">
+          <h3>🗄️ 事件模型 & 基础 API</h3>
+          <span class="tag backend">backend</span>
+          <span class="est">5 天</span>
+        </div>
+        <div class="desc">定义核心数据模型、数据库迁移、事件 CRUD API。这是整个系统的数据基础。</div>
+        <ul class="tasks">
+          <li><span class="dot data"></span>设计并实现 <code>Event</code> Model (含 JSONB、索引、状态枚举)</li>
+          <li><span class="dot data"></span>设计并实现 <code>EventLog</code> Model (append-only 日志)</li>
+          <li><span class="dot data"></span>设计并实现 <code>EventHandlerConfig</code> Model (Handler 注册表)</li>
+          <li><span class="dot api"></span>实现 <code>POST /api/v1/events</code> — 接收事件，返回 202</li>
+          <li><span class="dot api"></span>实现 <code>GET /api/v1/events</code> — 列表查询 (filter/search/paginate)</li>
+          <li><span class="dot api"></span>实现 <code>GET /api/v1/events/:id</code> — 事件详情 + 日志链路</li>
+          <li><span class="dot api"></span>实现 <code>GET /api/v1/events/:id/logs</code> — 事件时间线</li>
+          <li><span class="dot test"></span>Django Ninja Schema 定义 + 请求校验</li>
+          <li><span class="dot test"></span>单元测试 + API 集成测试</li>
+        </ul>
+        <div class="deliverable">
+          <span class="label">🎁 可交付:</span>
+          能通过 API 创建和查询事件，Swagger 文档可用，数据持久化到 PostgreSQL
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="phase">
+      <div class="marker p2">2</div>
+      <div class="phase-card">
+        <div class="head">
+          <h3>⚡ 事件处理管道</h3>
+          <span class="tag backend">backend</span>
+          <span class="est">7 天</span>
+        </div>
+        <div class="desc">搭建核心处理管道：API 接收 → RabbitMQ → Celery 消费 → 存储结果。这是系统的心脏。</div>
+        <ul class="tasks">
+          <li><span class="dot mq"></span>Celery Task 定义: <code>process_event</code> (接收 event_id, 幂等保障)</li>
+          <li><span class="dot mq"></span>API 接收事件后自动投递到 Celery (delay)</li>
+          <li><span class="dot mq"></span>实现 <code>EventHandler</code> 抽象基类 + <code>handle()</code> 接口</li>
+          <li><span class="dot mq"></span>实现 <code>EventHandlerRegistry</code> (基于 event_type 模式匹配)</li>
+          <li><span class="dot api"></span>实现 <code>GET /api/v1/handlers</code> — 列出已注册 Handler</li>
+          <li><span class="dot data"></span>处理开始/成功/失败时写入 EventLog</li>
+          <li><span class="dot api"></span>实现 <code>POST /api/v1/events/batch</code> — 批量投递</li>
+          <li><span class="dot test"></span>集成测试: API → MQ → Worker → DB 全链路</li>
+        </ul>
+        <div class="deliverable">
+          <span class="label">🎁 里程碑 🎯 可交付:</span>
+          事件从 API 进入后自动经 Celery 处理，结果写入 DB，API 可查询处理状态和日志。具备核心事件处理能力。
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="phase">
+      <div class="marker p3">3</div>
+      <div class="phase-card">
+        <div class="head">
+          <h3>🔁 可靠性工程</h3>
+          <span class="tag backend">backend</span>
+          <span class="est">5 天</span>
+        </div>
+        <div class="desc">引入重试、死信、幂等性、超时控制，确保系统在故障场景下的行为可预测。</div>
+        <ul class="tasks">
+          <li><span class="dot mq"></span>Celery 自动重试: 指数退避 (1s→4s→16s→64s→256s), max_retries=5</li>
+          <li><span class="dot mq"></span>RabbitMQ 死信队列 (DLQ) 配置 — 重试耗尽后自动转入</li>
+          <li><span class="dot api"></span>实现 <code>POST /api/v1/events/:id/retry</code> — 手动重试</li>
+          <li><span class="dot api"></span>实现 <code>POST /api/v1/events/dlq/replay</code> — 批量回放死信</li>
+          <li><span class="dot data"></span>幂等性保障: 基于 event_id 去重 (DB unique + Redis 分布式锁)</li>
+          <li><span class="dot data"></span>Handler 级别超时控制 (Celery task time_limit + soft_time_limit)</li>
+          <li><span class="dot mq"></span>事件处理结果回调 / 通知钩子 (Webhook / 日志)</li>
+          <li><span class="dot test"></span>故障注入测试: 模拟超时、异常、重试耗尽场景</li>
+        </ul>
+        <div class="deliverable">
+          <span class="label">🎁 可交付:</span>
+          系统能自动处理临时故障，重试耗尽后进入 DLQ，支持手动重试和批量回放
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="phase">
+      <div class="marker p4">4</div>
+      <div class="phase-card">
+        <div class="head">
+          <h3>🎨 前端 — 事件列表 & 详情</h3>
+          <span class="tag frontend">frontend</span>
+          <span class="est">7 天</span>
+        </div>
+        <div class="desc">实现事件管理核心页面：事件列表、详情面板、处理时间线。</div>
+        <ul class="tasks">
+          <li><span class="dot frontend"></span>项目路由布局: Sidebar + Topbar + Content 框架</li>
+          <li><span class="dot frontend"></span>事件列表页: 表格 + 状态过滤器 + 搜索 + 分页</li>
+          <li><span class="dot frontend"></span>事件详情页: 元信息 + 原始 Payload 展示</li>
+          <li><span class="dot frontend"></span>处理时间线组件: 基于 EventLog 渲染时间线</li>
+          <li><span class="dot frontend"></span>API 对接: React Query / SWR 管理请求状态</li>
+          <li><span class="dot frontend"></span>Loading / Empty / Error 状态覆盖</li>
+          <li><span class="dot frontend"></span>响应式适配 (桌面为主 + 平板可用)</li>
+        </ul>
+        <div class="deliverable">
+          <span class="label">🎁 可交付:</span>
+          可在前端浏览事件列表、查看详情、查看处理时间线，替代直接调用 API
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div class="phase">
+      <div class="marker p5">5</div>
+      <div class="phase-card">
+        <div class="head">
+          <h3>📊 前端 — 监控仪表盘</h3>
+          <span class="tag fullstack">fullstack</span>
+          <span class="est">6 天</span>
+        </div>
+        <div class="desc">实现实时监控面板，包含指标卡、吞吐量图表、队列状态、Worker 监控。</div>
+        <ul class="tasks">
+          <li><span class="dot api"></span>后端: <code>GET /api/v1/stats</code> — 聚合统计接口 (今日总数/成功率/队列深度/P99)</li>
+          <li><span class="dot mq"></span>后端: Celery inspect API — Worker 状态、活跃任务、队列长度</li>
+          <li><span class="dot frontend"></span>仪表盘页面: 指标卡片行 (4 个 KPI)</li>
+          <li><span class="dot frontend"></span>吞吐量趋势图 (Chart.js / lightweight-charts)</li>
+          <li><span class="dot frontend"></span>队列深度 & Worker 状态面板</li>
+          <li><span class="dot frontend"></span>WebSocket 实时推送 (Django Channels / Server-Sent Events)</li>
+          <li><span class="dot frontend"></span>自动刷新 + 手动刷新按钮</li>
+        </ul>
+        <div class="deliverable">
+          <span class="label">🎁 可交付:</span>
+          仪表盘页面实时展示系统运行状态，替代 RabbitMQ 管理界面的日常监控需求
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 6 -->
+    <div class="phase">
+      <div class="marker p6">6</div>
+      <div class="phase-card">
+        <div class="head">
+          <h3>🛠️ 前端 — 运维操作</h3>
+          <span class="tag fullstack">fullstack</span>
+          <span class="est">4 天</span>
+        </div>
+        <div class="desc">实现事件手动创建、重试、死信回放等运维功能，完全替代 Django Admin。</div>
+        <ul class="tasks">
+          <li><span class="dot frontend"></span>事件创建表单: 类型选择 / JSON 编辑器 / 优先级</li>
+          <li><span class="dot frontend"></span>事件详情页操作按钮: 🔁 重试 / 📋 复制 / 🗑️ 删除</li>
+          <li><span class="dot frontend"></span>死信队列页面: 列表 + 全选/批量回放 + 单条回放</li>
+          <li><span class="dot frontend"></span>重试历史页面: 查看事件的重试次数和每次详情</li>
+          <li><span class="dot frontend"></span>操作确认对话框 / Toast 通知反馈</li>
+          <li><span class="dot test"></span>E2E 测试: Playwright 覆盖主要操作流程</li>
+        </ul>
+        <div class="deliverable">
+          <span class="label">🎁 可交付:</span>
+          所有事件运维操作均可通过前端 UI 完成，无需命令行或 Admin 后台
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 依赖关系图 -->
+  <div style="margin-top:40px;">
+    <h3 style="font-size:18px;font-weight:600;margin-bottom:16px;">🔗 Demo 阶段依赖关系</h3>
+    <div class="flow" style="gap:6px;">
+      <div class="flow-node" style="font-size:12px;padding:6px 12px;background:var(--primary);color:#fff;">P0 脚手架</div>
+      <div class="flow-arrow" style="font-size:14px;">→</div>
+      <div class="flow-node" style="font-size:12px;padding:6px 12px;background:var(--success);color:#fff;">P1 数据模型</div>
+      <div class="flow-arrow" style="font-size:14px;">→</div>
+      <div class="flow-node" style="font-size:12px;padding:6px 12px;background:var(--warning);color:#fff;">P2 处理管道 🎯</div>
+      <div class="flow-arrow" style="font-size:14px;">→</div>
+      <div class="flow-node" style="font-size:12px;padding:6px 12px;background:var(--error);color:#fff;">P3 可靠性</div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:12px;margin-top:8px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span>P4 前端列表</span>
+        <span style="font-size:14px;">→</span>
+        <span>P5 仪表盘</span>
+        <span style="font-size:14px;">→</span>
+        <span>P6 运维操作</span>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:12px;margin-top:8px;">
+      <span style="padding:4px 16px;border-radius:6px;background:#fef3c7;color:#b45309;font-size:13px;">📌 P3 完成后进入前端开发，P7-P9 为 Demo 范围外</span>
+    </div>
+    <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--text-secondary);">
+      P0-P3 为后端核心，P4-P6 为前端 Demo 界面
+    </div>
+  </div>
+
+</section>
+
+<hr />
+
+<!-- Footer -->
+<footer>
+  <p>Event Management System · 架构与原型设计 <strong>v2.2-demo</strong></p>
+  <p style="margin-top:4px;">Demo 范围: P0 ~ P6 · 2026-07-25</p>
+</footer>
+
+</div>
+
+</body>
+</html>

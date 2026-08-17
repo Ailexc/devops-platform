@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="事件管理系统项目架构文档 —— 真实工作经验复现 Demo，用于面试讲解。阐述真实系统与 Demo 系统的差异、演进史、设计思路、技术选型与系统能力。">
+<title>事件管理系统 - 项目架构文档（真实经验复现 · 面试讲解）</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-light: #818cf8;
+    --primary-dark: #4f46e5;
+    --surface: #ffffff;
+    --bg: #f8fafc;
+    --text: #1e293b;
+    --text-secondary: #64748b;
+    --border: #e2e8f0;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --info: #3b82f6;
+    --radius: 12px;
+    --shadow: 0 4px 24px rgba(0,0,0,.06);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  /* ── Nav ── */
+  nav {
+    position: sticky; top:0; z-index:100;
+    background: rgba(255,255,255,.9); backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+  nav .inner {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; align-items: center; gap: 28px; height: 56px;
+  }
+  nav .logo { font-weight: 700; font-size: 17px; color: var(--primary); }
+  nav .logo span { color: var(--text); }
+  nav a {
+    color: var(--text-secondary); text-decoration: none; font-size: 14px;
+    transition: color .2s;
+  }
+  nav a:hover { color: var(--primary); }
+  nav .right { margin-left: auto; font-size: 12px; color: var(--text-secondary); }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ── Hero ── */
+  .hero { text-align:center; padding: 40px 0 44px; }
+  .hero h1 { font-size: 32px; font-weight: 800; letter-spacing:-.02em; }
+  .hero h1 span { color: var(--primary); }
+  .hero .sub { color: var(--text-secondary); font-size: 15px; max-width: 720px; margin: 14px auto 0; }
+  .hero .tags { margin-top: 20px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
+  .hero .tags span {
+    padding: 4px 14px; border-radius: 20px; background: var(--primary);
+    color:#fff; font-size:12px; font-weight:500;
+  }
+  .hero .tags span.outline { background:transparent; border:1px solid var(--border); color:var(--text-secondary); }
+
+  /* ── Section ── */
+  section { margin-bottom: 56px; }
+  .section-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; display:flex; align-items:center; gap:10px; }
+  .section-title .badge {
+    font-size: 11px; font-weight:600; padding:2px 10px; border-radius:12px;
+    background:var(--primary-light); color:#fff; letter-spacing:.5px;
+  }
+  .section-desc { color:var(--text-secondary); font-size:14px; margin-bottom: 20px; max-width: 860px; }
+  h3.block { font-size:16px; font-weight:600; margin:28px 0 12px; color:var(--text); }
+  h3.block:first-of-type { margin-top: 8px; }
+
+  /* ── Cards ── */
+  .grid { display:grid; gap:16px; }
+  .grid-2 { grid-template-columns:1fr 1fr; }
+  .grid-3 { grid-template-columns:1fr 1fr 1fr; }
+  .grid-4 { grid-template-columns:1fr 1fr 1fr 1fr; }
+  @media (max-width: 900px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } }
+  .card {
+    background:var(--surface); border-radius:var(--radius); border:1px solid var(--border);
+    padding:18px; transition: box-shadow .2s;
+  }
+  .card:hover { box-shadow: var(--shadow); }
+  .card .icon { font-size:24px; margin-bottom:6px; }
+  .card h4 { font-size:14px; font-weight:600; margin-bottom:4px; }
+  .card p { font-size:13px; color:var(--text-secondary); line-height:1.6; }
+  .card .num { font-size:30px; font-weight:800; color:var(--primary); }
+  .card .num small { font-size:13px; color:var(--text-secondary); font-weight:500; }
+
+  /* ── Highlight box ── */
+  .highlight-box {
+    background:linear-gradient(135deg,#eef2ff,#f8fafc);
+    border:1px solid #c7d2fe; border-radius:var(--radius);
+    padding:20px 24px; margin-bottom:20px;
+  }
+  .highlight-box h4 { font-size:15px; font-weight:700; margin-bottom:8px; color:var(--primary-dark); }
+  .highlight-box p, .highlight-box li { font-size:14px; color:var(--text); }
+  .highlight-box ul { margin:8px 0 0 18px; }
+  .highlight-box li { margin-bottom:4px; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x:auto; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; min-width:640px; }
+  th {
+    text-align:left; padding:12px 16px; font-weight:600;
+    background:#f8fafc; color:var(--text); border-bottom:2px solid var(--border);
+    white-space:nowrap;
+  }
+  td { padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:top; color:var(--text); }
+  tr:last-child td { border-bottom:none; }
+  td .muted { color:var(--text-secondary); font-size:12.5px; }
+  td code, .mono { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12.5px; background:#f1f5f9; padding:1px 6px; border-radius:5px; }
+
+  /* ── Flow ── */
+  .flow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:16px; }
+  .flow-node {
+    background:var(--surface); border:1.5px solid var(--border); border-radius:10px;
+    padding:10px 14px; font-size:13px; font-weight:600; text-align:center;
+  }
+  .flow-node .sub { display:block; font-size:11px; font-weight:400; color:var(--text-secondary); margin-top:2px; }
+  .flow-node.primary { background:#eef2ff; border-color:var(--primary-light); color:var(--primary-dark); }
+  .flow-node.success { background:#f0fdf4; border-color:#86efac; color:#166534; }
+  .flow-node.warning { background:#fffbeb; border-color:#fde68a; color:#92400e; }
+  .flow-node.error { background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
+  .flow-node.info { background:#eff6ff; border-color:#93c5fd; color:#1e40af; }
+  .flow-arrow { color:var(--text-secondary); font-size:16px; }
+
+  /* ── Timeline (演进史) ── */
+  .timeline { position:relative; padding-left:28px; }
+  .timeline::before {
+    content:''; position:absolute; left:8px; top:6px; bottom:6px;
+    width:2px; background:var(--border);
+  }
+  .tl-item { position:relative; margin-bottom:24px; }
+  .tl-item::before {
+    content:''; position:absolute; left:-26px; top:6px; width:12px; height:12px;
+    border-radius:50%; background:var(--surface); border:3px solid var(--primary);
+  }
+  .tl-item.v1::before { border-color:#94a3b8; }
+  .tl-item.v2::before { border-color:var(--warning); }
+  .tl-item.v3::before { border-color:var(--success); }
+  .tl-item .tag {
+    display:inline-block; font-size:12px; font-weight:700; padding:2px 10px; border-radius:12px;
+    margin-bottom:6px;
+  }
+  .tl-item .tag.v1 { background:#f1f5f9; color:#475569; }
+  .tl-item .tag.v2 { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
+  .tl-item .tag.v3 { background:#f0fdf4; color:#166534; border:1px solid #86efac; }
+  .tl-item h4 { font-size:15px; font-weight:700; margin-bottom:6px; }
+  .tl-item p, .tl-item li { font-size:13.5px; color:var(--text-secondary); }
+  .tl-item ul { margin:6px 0 0 18px; }
+
+  /* ── Arch layers ── */
+  .arch-layer { margin-bottom: 6px; }
+  .layer-label { font-size:12px; font-weight:700; color:var(--text-secondary); letter-spacing:.5px; margin:14px 0 8px; }
+  .arch-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+  .arch-box {
+    background:var(--surface); border:1.5px solid var(--border); border-radius:10px;
+    padding:12px 14px; font-size:13px; font-weight:600; text-align:center;
+  }
+  .arch-box .sub { display:block; font-size:11px; font-weight:400; color:var(--text-secondary); margin-top:3px; line-height:1.5; }
+  .arch-box.primary { background:#eef2ff; border-color:var(--primary-light); color:var(--primary-dark); }
+  .arch-box.success { background:#f0fdf4; border-color:#86efac; color:#166534; }
+  .arch-box.warning { background:#fffbeb; border-color:#fde68a; color:#92400e; }
+  .arch-box.info { background:#eff6ff; border-color:#93c5fd; color:#1e40af; }
+  .arrow-down { text-align:center; color:var(--text-secondary); font-size:14px; line-height:1; padding:2px 0; }
+
+  /* ── 代码块 ── */
+  pre {
+    background:#0f172a; color:#e2e8f0; padding:16px 20px; border-radius:10px;
+    font-size:12.5px; overflow-x:auto; line-height:1.6; margin:12px 0;
+    font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  pre .c { color:#64748b; }
+  pre .k { color:#93c5fd; }
+  pre .s { color:#86efac; }
+
+  /* ── 注 ── */
+  .note {
+    background:#fffbeb; border:1px solid #fde68a; border-radius:10px;
+    padding:12px 16px; font-size:13px; color:#92400e; margin:14px 0;
+  }
+  .note.success { background:#f0fdf4; border-color:#86efac; color:#166534; }
+  .note.info { background:#eff6ff; border-color:#93c5fd; color:#1e40af; }
+
+  footer {
+    border-top:1px solid var(--border); padding:24px; text-align:center;
+    color:var(--text-secondary); font-size:13px;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <div class="logo">⚡ EventFlow <span>· 架构文档</span></div>
+    <a href="#intro">背景说明</a>
+    <a href="#position">系统定位</a>
+    <a href="#metrics">量化数据</a>
+    <a href="#evolution">演进史</a>
+    <a href="#demo">Demo 设计</a>
+    <a href="#compare">差异对照</a>
+    <a href="#capability">能力总结</a>
+    <div class="right">真实经验复现 · 面试讲解</div>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- ═══════════ Hero ═══════════ -->
+  <div class="hero">
+    <h1>事件管理系统 · <span>项目架构文档</span></h1>
+    <p class="sub">
+      本 Demo 是对本人真实工作中开发的事件管理系统的<strong>复现与浓缩</strong>，
+      用于面试讲解。文档重点说明：<strong>真实系统与 Demo 系统的差异</strong>、真实系统的实现与演进、
+      Demo 系统的实现、设计思路、技术选型与系统能力。
+    </p>
+    <div class="tags">
+      <span>承接 AWS 事件</span>
+      <span>保障 CMDB 数据及时可靠</span>
+      <span>高并发 · 高性能</span>
+      <span class="outline">稳定 · 可回溯</span>
+    </div>
+  </div>
+
+  <!-- ═══════════ 1. 背景说明 ═══════════ -->
+  <section id="intro">
+    <div class="section-title">📖 文档说明 <span class="badge">About</span></div>
+    <p class="section-desc">为什么会有这份文档，以及 Demo 系统与真实系统的关系。</p>
+
+    <div class="highlight-box">
+      <h4>🎯 文档定位</h4>
+      <p>
+        本 Demo 系统用于<strong>复现真实工作中开发的事件管理系统</strong>，作为面试讲解材料。
+        由于本地环境<strong>无法模拟 AWS CMDB、多账号、多区域、真实事件流</strong>等生产因素，
+        因此 Demo 重点实现当前项目的<strong>核心能力</strong>（事件接收、异步处理、路由分发、重试、
+        死信、监控统计、可观测等），并内置<strong>可运行的 Demo 任务</strong>来演示系统的完整能力。
+      </p>
+    </div>
+
+    <div class="grid grid-3">
+      <div class="card">
+        <div class="icon">🏭</div>
+        <h4>真实系统（生产环境）</h4>
+        <p>承载 AWS EventBridge 事件，驱动 CMDB 数据同步，支撑下游 6+ 系统。经历过峰值流量、大量阻塞与三次架构演进。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🧪</div>
+        <h4>Demo 系统（当前项目）</h4>
+        <p>复现真实系统的核心架构与能力，用可控的 Demo 任务（快任务/慢任务）演示高并发、异步处理、进度上报、结果产物等全流程。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🧭</div>
+        <h4>讲解价值</h4>
+        <p>通过「真实实现 → 演进历程 → Demo 落地」三层视角，展示问题分析、架构设计、技术选型与工程实践能力。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 2. 系统定位 ═══════════ -->
+  <section id="position">
+    <div class="section-title">🎯 系统定位与核心目标 <span class="badge">Positioning</span></div>
+    <p class="section-desc">系统存在的根本原因：<strong>承接 AWS 事件，驱动 CMDB 数据保持及时与可靠</strong>。</p>
+
+    <div class="flow" style="margin-bottom:20px;">
+      <div class="flow-node warning">AWS 资源<br><span class="sub">EC2 / RDS / S3 / 网络...</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node warning">AWS EventBridge<br><span class="sub">资源状态变更事件</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node info">Lambda 触发器<br><span class="sub">过滤 · 转发</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node primary">事件管理系统<br><span class="sub">本系统 · 快速响应</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node success">CMDB 数据<br><span class="sub">及时 · 可靠</span></div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="icon">⚡</div>
+        <h4>大量并发 · 快速执行</h4>
+        <p>
+          事件到达具有<strong>突发性</strong>（实例批量启停、故障演练、扩缩容等场景瞬间涌入大量事件），
+          系统必须能<strong>快速接收、快速入队、异步处理</strong>，绝不能阻塞上游 Lambda / EventBridge，
+          也不能让事件积压导致 CMDB 数据滞后。
+        </p>
+      </div>
+      <div class="card">
+        <div class="icon">🛡️</div>
+        <h4>稳定性 · 可靠性</h4>
+        <p>
+          CMDB 是下游系统的数据底座，事件丢失或重复会直接污染数据。系统必须做到<strong>至少一次投递、
+          幂等处理、失败自动重试、重试耗尽进死信（可人工回放）</strong>，保证「事件不漏、数据不错」。
+        </p>
+      </div>
+      <div class="card">
+        <div class="icon">🔍</div>
+        <h4>可回溯 · 可观测</h4>
+        <p>
+          每个事件都有完整生命周期：<strong>接收 → 入队 → 路由 → 处理 → 完成/失败</strong>，
+          全链路 append-only 日志 + trace_id 追踪；配套统计面板、队列深度、Worker 状态、失败告警，
+          出现问题时能快速定位、复盘与回放。
+        </p>
+      </div>
+      <div class="card">
+        <div class="icon">🧩</div>
+        <h4>可扩展 · 易维护</h4>
+        <p>
+          事件类型按 <code>Handler 注册表</code> 模式组织，新增事件类型只需新增 Handler 类并注册，
+          无需改动核心链路；Worker 支持水平扩展，队列解耦，可按流量弹性伸缩。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 3. 量化数据 ═══════════ -->
+  <section id="metrics">
+    <div class="section-title">📊 真实场景量化数据 <span class="badge">Scale</span></div>
+    <p class="section-desc">
+      真实工作中，系统承接的规模与经历的压力，是架构持续演进的根本驱动力。
+    </p>
+
+    <div class="grid grid-4" style="margin-bottom:16px;">
+      <div class="card" style="text-align:center;">
+        <div class="num">20+</div>
+        <p style="margin-top:4px;">接入 AWS 账号</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="num">3+</div>
+        <p style="margin-top:4px;">每个账号的区域数</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="num">50+</div>
+        <p style="margin-top:4px;">每区域承接的事件类型/资源数</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="num">6+</div>
+        <p style="margin-top:4px;">下游依赖系统（仅知）</p>
+      </div>
+    </div>
+
+    <div class="highlight-box">
+      <h4>🌊 峰值与阻塞经历</h4>
+      <p>
+        系统经历过<strong>峰值流量、大量事件阻塞、系统架构升级</strong>等一系列操作后，才最终保障了
+        CMDB 数据的即时与可靠。演进过程中的每一次问题（django-q 性能瓶颈、线程不可靠、队列积压、
+        监控缺失等），都直接推动了架构向 <strong>Celery + 可观测 + 定时同步</strong> 方向重构。
+      </p>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>维度</th><th>指标</th><th>对系统的要求</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>接入规模</td><td>20+ 账号 × 3+ 区域 × 50+ 资源/事件</td><td>多租户事件隔离、按账号/区域分发</td></tr>
+          <tr><td>事件突发性</td><td>批量启停/故障演练时短时大量涌入</td><td>快速响应、异步解耦、不阻塞上游</td></tr>
+          <tr><td>数据一致性</td><td>CMDB 必须即时反映真实资源状态</td><td>至少一次投递 + 幂等 + 重试 + 死信回放</td></tr>
+          <tr><td>可观测性</td><td>问题必须快速定位与复盘</td><td>全链路日志、统计面板、队列监控、告警</td></tr>
+          <tr><td>下游依赖</td><td>6+ 系统基于 CMDB 数据</td><td>数据可靠是硬底线，任何丢失都不可接受</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════ 4. 演进史 ═══════════ -->
+  <section id="evolution">
+    <div class="section-title">🕰️ 真实系统演进史 <span class="badge">Evolution</span></div>
+    <p class="section-desc">从 v1 到 v3，三段演进对应三种不同的架构思路与工程取舍。</p>
+
+    <div class="timeline">
+
+      <div class="tl-item v1">
+        <span class="tag v1">V1 · django-q 时代（非本人实现）</span>
+        <h4>简单粗暴，但性能有限</h4>
+        <p>
+          初版使用 <strong>django-q</strong> 作为任务 Worker。django-q 基于数据库轮询分发任务，
+          实现简单、上手快，但存在明显天花板：
+        </p>
+        <ul>
+          <li>数据库轮询模型，任务吞吐受限，高并发下成为瓶颈；</li>
+          <li>对长时间任务、突发流量缺乏弹性，容易积压；</li>
+          <li>监控、重试、死信等能力薄弱，问题难以回溯。</li>
+        </ul>
+        <p style="margin-top:6px;">这一版本并非本人实现，但为其后的重构提供了「为什么要改」的完整背景。</p>
+      </div>
+
+      <div class="tl-item v2">
+        <span class="tag v2">V2 · 线程 + 执行历史（本人接手，工期紧张）</span>
+        <h4>简单改造，后发现线程不可靠</h4>
+        <p>
+          接手后工期紧张，采用了<strong>轻量改造</strong>：将任务改为<strong>线程执行</strong>，
+          同时补充了<strong>执行历史记录</strong>与<strong>日志记录</strong>，让系统「看得见」。
+        </p>
+        <ul>
+          <li>✅ 执行历史 + 日志：每个任务的处理过程、结果可查，具备初步可回溯能力；</li>
+          <li>⚠️ 线程模型不可靠：进程重启线程即丢失、无法跨进程调度、无分布式语义；</li>
+          <li>⚠️ 无法水平扩展：单机线程池受限于进程资源，峰值流量依然扛不住；</li>
+          <li>⚠️ 缺少消息确认与重投递，事件可能丢失，可靠性无法保障。</li>
+        </ul>
+        <p style="margin-top:6px;">
+          这一阶段的收获：<strong>「记录 + 日志」的思路是对的</strong>，它让后续重构有了可验证的基线；
+          但<strong>线程调度方案是错的</strong>，它无法支撑可靠性目标。
+        </p>
+      </div>
+
+      <div class="tl-item v3">
+        <span class="tag v3">V3 · Celery + 可观测（本人主导重构）</span>
+        <h4>真正的可靠性保障，支撑下游 6+ 系统</h4>
+        <p>
+          开始<strong>主导重构</strong>，引入 <strong>Celery</strong> 作为核心 Worker，
+          并系统性补齐<strong>监控与可观测</strong>能力，从架构上真正保障数据可靠性：
+        </p>
+        <ul>
+          <li>🚀 <strong>Celery 分布式任务</strong>：消息队列（RabbitMQ）解耦，Worker 可水平扩展，具备消息确认与重投递；</li>
+          <li>🔄 <strong>可靠投递</strong>：至少一次投递 + 幂等处理 + 指数退避重试 + 死信队列（人工回放）；</li>
+          <li>📈 <strong>监控可观测</strong>：队列深度、Worker 状态、处理耗时、成功率、失败告警，问题可第一时间发现；</li>
+          <li>🔍 <strong>全链路可回溯</strong>：事件时间线、trace_id、执行历史、日志，支撑问题复盘与审计；</li>
+          <li>⏰ <strong>定时数据同步</strong>：配合定时同步系统做数据补偿兜底，事件驱动 + 定时对账双保险；</li>
+          <li>🧩 <strong>支撑下游</strong>：凭借稳定可靠的数据底座，支撑下游 <strong>6+ 系统应用</strong>。</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="note success" style="margin-top:8px;">
+      ✅ <strong>演进主线：</strong>「能跑」（django-q）→「看得见」（线程+历史+日志）→「靠得住」（Celery+可观测+同步兜底）。
+      每一阶段的问题都真实存在，也因此有了明确的演进方向。
+    </div>
+  </section>
+
+  <!-- ═══════════ 5. Demo 系统设计 ═══════════ -->
+  <section id="demo">
+    <div class="section-title">🏗️ Demo 系统设计（当前项目） <span class="badge">Demo</span></div>
+    <p class="section-desc">
+      Demo 复现了真实系统 v3 的核心架构：<strong>快速接收 + 消息队列解耦 + Celery 异步处理 + 全链路可观测</strong>。
+      以下是当前项目的落地实现。
+    </p>
+
+    <h3 class="block">5.1 技术选型</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>层级</th><th>技术</th><th>选型理由</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>前端</td><td>React + Vite + Tailwind + TanStack Query</td>
+            <td>纯前端 SPA，前后端分离；TanStack Query 管理服务端状态与轮询刷新</td>
+          </tr>
+          <tr>
+            <td>API 层</td><td>Django + Django Ninja</td>
+            <td>与 ORM 同生态；Pydantic 做 Schema 校验；自动 OpenAPI 文档；支持同步/异步视图</td>
+          </tr>
+          <tr>
+            <td>任务 Worker</td><td>Celery（eventlet 高并发 pool）</td>
+            <td>分布式任务框架，消息确认/重试/结果后端完备；eventlet 单进程支撑高并发</td>
+          </tr>
+          <tr>
+            <td>消息队列</td><td>RabbitMQ</td>
+            <td>可靠投递（acks、持久化、死信），承载事件缓冲与解耦</td>
+          </tr>
+          <tr>
+            <td>结果/缓存</td><td>Redis</td>
+            <td>任务结果后端、进度上报、缓存、分布式锁（幂等标记）</td>
+          </tr>
+          <tr>
+            <td>存储</td><td>PostgreSQL（本地回退 SQLite）</td>
+            <td>事件主表 + append-only 日志表 + Handler 注册表；JSONB 存原始数据</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="block">5.2 总体架构</h3>
+    <div>
+      <div class="arch-layer">
+        <div class="layer-label">🌐 接入层 — 事件入口</div>
+        <div class="arch-grid">
+          <div class="arch-box primary">Django Ninja API<br><span class="sub">接收事件 / 校验 / 快速返回 202</span></div>
+          <div class="arch-box primary">Nginx 反代<br><span class="sub">前端静态 / API 代理</span></div>
+        </div>
+      </div>
+      <div class="arrow-down">⬇</div>
+      <div class="arch-layer">
+        <div class="layer-label">📨 消息队列层 — 缓冲与解耦</div>
+        <div class="arch-grid">
+          <div class="arch-box warning">RabbitMQ<br><span class="sub">主事件队列 / 消息确认</span></div>
+          <div class="arch-box info">Redis<br><span class="sub">结果后端 / 进度上报 / 锁</span></div>
+        </div>
+      </div>
+      <div class="arrow-down">⬇</div>
+      <div class="arch-layer">
+        <div class="layer-label">⚙️ Worker 层 — 事件处理</div>
+        <div class="arch-grid">
+          <div class="arch-box success">Celery Worker<br><span class="sub">eventlet 并发池 · 水平扩展</span></div>
+          <div class="arch-box success">Event Handlers<br><span class="sub">aws.* · internal.* · webhook.* · demo.*</span></div>
+        </div>
+      </div>
+      <div class="arrow-down">⬇</div>
+      <div class="arch-layer">
+        <div class="layer-label">💾 存储与可观测层</div>
+        <div class="arch-grid">
+          <div class="arch-box">PostgreSQL<br><span class="sub">events / event_logs / handlers</span></div>
+          <div class="arch-box">Event Store<br><span class="sub">append-only 时间线</span></div>
+          <div class="arch-box">统计面板<br><span class="sub">吞吐 / 队列 / Worker / 失败</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="block">5.3 事件处理流程（核心链路）</h3>
+    <div class="flow" style="margin-bottom:12px;">
+      <div class="flow-node primary">接收<br><span class="sub">POST /events</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node warning">入队<br><span class="sub">RabbitMQ</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">路由<br><span class="sub">Handler 注册表</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node success">处理<br><span class="sub">async Handler</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node success">完成<br><span class="sub">结果 + 时间线</span></div>
+    </div>
+    <div class="flow">
+      <div class="flow-node error">失败</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node warning">指数退避重试<br><span class="sub">最多 5 次</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node error">死信队列 DLQ<br><span class="sub">人工回放 / 重试</span></div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="icon">📥</div>
+        <h4>接收与入队</h4>
+        <p>API 接收事件 → 校验 Schema → 生成 trace_id → <strong>投递 RabbitMQ 后立即返回 202</strong>，上游零阻塞。落库事件 + 记录「接收」日志。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔀</div>
+        <h4>路由分发</h4>
+        <p>Worker 消费消息，根据 <code>event_type</code> 匹配 Handler 注册表（支持通配符 <code>aws.ec2.*</code>），路由到对应处理器。</p>
+      </div>
+      <div class="card">
+        <div class="icon">⚡</div>
+        <h4>异步处理</h4>
+        <p>Handler 统一 async 编程模型，处理结果写回事件 + append-only 时间线；耗时、Worker、队列均记录。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔁</div>
+        <h4>重试与死信</h4>
+        <p>失败自动重试（指数退避）；重试耗尽进死信队列，支持 <strong>手动重试 / 批量回放</strong>，事件绝不静默丢失。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🛡️</div>
+        <h4>幂等保障</h4>
+        <p>基于事件 ID + 数据库行锁（<code>select_for_update</code>）做去重，重复投递只处理一次，保证 CMDB 数据不错。</p>
+      </div>
+      <div class="card">
+        <div class="icon">📊</div>
+        <h4>统计与监控</h4>
+        <p>仪表盘：总数/各状态分布/成功率/平均耗时；队列深度；Worker 在线状态；近期失败 Top，可观测性强。</p>
+      </div>
+    </div>
+
+    <h3 class="block">5.4 核心数据模型</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>表</th><th>关键字段</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>events</code></td>
+            <td>id(UUID) · event_type · source · resource_id · raw_payload(JSONB) · status · trace_id · retry_count/max_retries · handler · worker_id · received_at/processed_at</td>
+            <td>事件主表，状态机 pending→processing→completed/failed/dlq</td>
+          </tr>
+          <tr>
+            <td><code>event_logs</code></td>
+            <td>action · detail(JSONB) · created_at</td>
+            <td>append-only 生命周期时间线，支撑「可回溯」</td>
+          </tr>
+          <tr>
+            <td><code>event_handlers</code></td>
+            <td>name · event_type_pattern · handler_class · timeout · max_retries · is_active</td>
+            <td>Handler 注册表，新增事件类型零侵入</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════ 6. Demo 演示真实能力 ═══════════ -->
+  <section id="demo-capability">
+    <div class="section-title">🧪 Demo 如何演示真实能力 <span class="badge">Demo Tasks</span></div>
+    <p class="section-desc">
+      由于本地无法模拟真实 AWS 事件流，Demo 内置<strong>可运行的测试任务</strong>，用真实可执行的
+      Celery 任务复现「高并发下发 → 异步处理 → 进度上报 → 结果产物」的完整链路。
+    </p>
+
+    <div class="grid grid-2">
+      <div class="card" style="border-left:3px solid var(--primary);">
+        <div class="icon">⚡</div>
+        <h4>快任务 — API 数据爬取（模拟事件风暴）</h4>
+        <p>
+          触发 N 个并发 Celery 任务，每个任务真实调用外部公开 API 抓取数据、统计词频，
+          将结果<strong>写入产物文件</strong>并创建对应事件。演示：<strong>并发下发、并行处理、
+          产物落盘、事件关联批次</strong>。
+        </p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--warning);">
+        <div class="icon">🐢</div>
+        <h4>慢任务 — 报告生成（模拟长耗时处理）</h4>
+        <p>
+          模拟多步骤分析流程（读取→清洗→统计→生成），实时上报<strong>步骤进度与耗时</strong>，
+          最终产出报告文件。演示：<strong>长任务进度追踪、结果回传、耗时指标</strong>。
+        </p>
+      </div>
+    </div>
+
+    <div class="highlight-box" style="margin-top:16px;">
+      <h4>🔗 Demo 与真实能力的一一对应</h4>
+      <table style="margin-top:8px;">
+        <thead>
+          <tr><th style="width:200px;">Demo 演示点</th><th>对应真实系统能力</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>触发任务生成 <code>batch_id</code></td><td>一次批量操作（如实例批量启停）产生一批事件，可按批次检索</td></tr>
+          <tr><td>N 个任务并发执行</td><td>高并发事件风暴下的并行处理能力</td></tr>
+          <tr><td>进度上报 / 耗时展示</td><td>长任务可观测，处理过程透明</td></tr>
+          <tr><td>结果写入产物文件并预览</td><td>处理结果落盘、可审计、可下载</td></tr>
+          <tr><td>批次 → 事件列表跳转</td><td>按批次/账号/区域维度检索与回溯</td></tr>
+          <tr><td>事件详情时间线</td><td>全链路 append-only 日志，问题复盘</td></tr>
+          <tr><td>手动重试 / 死信回放</td><td>数据可靠性兜底，事件不丢失</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════ 7. 差异对照 ═══════════ -->
+  <section id="compare">
+    <div class="section-title">⚖️ 真实系统 vs Demo 系统 <span class="badge">Compare</span></div>
+    <p class="section-desc">明确说明差异，是本 Demo 作为面试讲解材料的关键——既展示了真实经验，也诚实交代了 Demo 的边界。</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th style="width:150px;">维度</th><th>真实系统（生产）</th><th>Demo 系统（当前项目）</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>事件来源</strong></td>
+            <td>AWS EventBridge → Lambda → API，真实云资源状态事件</td>
+            <td>API 手动投递 / 批量投递 / 测试任务自动生成事件</td>
+          </tr>
+          <tr>
+            <td><strong>处理对象</strong></td>
+            <td>真实调用 AWS SDK 查询资源，写回 CMDB（自研 ORM）</td>
+            <td>模拟 Handler（echo/aws 骨架）+ 真实外部 API 抓取（Demo 任务）</td>
+          </tr>
+          <tr>
+            <td><strong>数据存储</strong></td>
+            <td>CMDB（自研 CmdbQuerySet）+ 事件存储，多账号多区域</td>
+            <td>PostgreSQL 单库，事件 + 日志 + Handler 注册表</td>
+          </tr>
+          <tr>
+            <td><strong>任务调度</strong></td>
+            <td>Celery + 定时数据同步（事件驱动 + 定时对账双保险）</td>
+            <td>Celery + RabbitMQ + Redis（核心 Worker 链路完整）</td>
+          </tr>
+          <tr>
+            <td><strong>并发模型</strong></td>
+            <td>高并发 Worker 池 + 协程/线程 offload，水平扩展</td>
+            <td>eventlet 高并发池 + async Handler，支持水平扩展</td>
+          </tr>
+          <tr>
+            <td><strong>可靠性</strong></td>
+            <td>消息确认 + 幂等 + 指数退避重试 + 死信回放 + 定时对账</td>
+            <td>幂等标记 + 自动重试 + 死信 + 手动回放（核心机制齐全）</td>
+          </tr>
+          <tr>
+            <td><strong>可观测</strong></td>
+            <td>Prometheus/Grafana + 追踪 + 告警 + 指标大盘</td>
+            <td>统计面板（吞吐/队列/Worker/失败）+ 全链路时间线</td>
+          </tr>
+          <tr>
+            <td><strong>规模</strong></td>
+            <td>20+ 账号 × 3+ 区域 × 50+ 事件，峰值流量验证</td>
+            <td>单机演示，通过 Demo 任务模拟并发与长耗时场景</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note info" style="margin-top:16px;">
+      💡 <strong>设计取舍：</strong>Demo 忠实复现真实系统的<strong>架构骨架与核心机制</strong>
+      （快速响应、异步解耦、可靠投递、可回溯、可观测），对<strong>无法本地模拟的部分</strong>
+      （AWS SDK、CMDB、多账号多区域）以「模拟 Handler + 可运行 Demo 任务」等价演示，诚实而完整。
+    </div>
+  </section>
+
+  <!-- ═══════════ 8. 能力总结 ═══════════ -->
+  <section id="capability">
+    <div class="section-title">🏆 系统能力总结 <span class="badge">Capability</span></div>
+    <p class="section-desc">围绕「承接 AWS 事件、保障 CMDB 数据及时可靠」这一核心目标，系统沉淀的核心能力。</p>
+
+    <div class="grid grid-4">
+      <div class="card">
+        <div class="icon">⚡</div>
+        <h4>高性能</h4>
+        <p>快速接收即返回、消息队列解耦、Worker 并行消费，突发流量不阻塞上游。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🛡️</div>
+        <h4>高可靠</h4>
+        <p>至少一次投递 + 幂等 + 重试 + 死信回放 + 定时同步兜底，数据不丢不错。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔍</div>
+        <h4>可回溯</h4>
+        <p>事件全生命周期时间线、trace_id、执行历史、产物落盘，问题可复盘审计。</p>
+      </div>
+      <div class="card">
+        <div class="icon">📈</div>
+        <h4>可观测</h4>
+        <p>统计大盘、队列深度、Worker 状态、失败告警，问题第一时间发现。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🧩</div>
+        <h4>可扩展</h4>
+        <p>Handler 注册表零侵入扩展事件类型；Worker 水平扩展应对流量增长。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔗</div>
+        <h4>生态支撑</h4>
+        <p>稳定可靠的数据底座，支撑下游 6+ 系统应用，成为基础设施的一环。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔄</div>
+        <h4>演进能力</h4>
+        <p>从 django-q → 线程 → Celery 的三段演进，验证了架构随规模与可靠性要求持续升级的方法论。</p>
+      </div>
+      <div class="card">
+        <div class="icon">🎓</div>
+        <h4>讲解价值</h4>
+        <p>真实问题驱动、演进路径清晰、Demo 可运行可演示，完整呈现工程能力与思考深度。</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  EventFlow 事件管理系统 · 项目架构文档（真实经验复现 · 面试讲解用） · 2026
+</footer>
+
+</body>
+</html>

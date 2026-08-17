@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>系统架构总览</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.75; color: #1f2937; max-width: 860px; margin: 0 auto; padding: 32px 24px; background: #fff; }
+  @media (prefers-color-scheme: dark) { body { color: #d1d5db; background: #0f172a; } }
+  h1 { font-size: 26px; border-bottom: 2px solid #2f6fed; padding-bottom: 10px; }
+  h2 { font-size: 19px; color: #2f6fed; margin-top: 30px; border-left: 4px solid #2f6fed; padding-left: 10px; }
+  h3 { font-size: 15px; }
+  code { background: #eef2ff; color: #4338ca; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  pre { background: #1e293b; color: #e2e8f0; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; }
+  th { background: #eef2ff; }
+  @media (prefers-color-scheme: dark) { th { background: #1e293b; } th, td { border-color: #374151; } }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-right: 6px; }
+  .tag.blue { background: #dbeafe; color: #1d4ed8; }
+  .tag.green { background: #dcfce7; color: #15803d; }
+  .tag.purple { background: #ede9fe; color: #6d28d9; }
+  .callout { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  @media (prefers-color-scheme: dark) { .callout { background: #172554; border-color: #1e40af; } }
+  .box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+  @media (prefers-color-scheme: dark) { .box { background: #111827; border-color: #1f2937; } }
+</style>
+</head>
+<body>
+<h1>🏗️ 系统架构总览</h1>
+<p><span class="tag blue">架构设计</span><span class="tag green">复盘总结</span></p>
+<p class="callout">本文是 Permission Center（去中心化 IAM 演示系统）的架构复盘。系统承担「还原工作场景 + 扩展学习 + 演示能力」三重价值，因此在设计上刻意将权限领域的核心概念（PEP / PDP / PAP / PIP）显性化为可观测的组件。</p>
+
+<h2>1. 设计理念：去中心化 IAM</h2>
+<p>传统 IAM 以「中心」为视角（管理全量用户与应用）。本系统采用<strong>去中心化 / 以「我」为中心</strong>的视角：每个用户看到的是自己拥有的权限，每个应用 Owner 管理自己的应用与能力。权限不再是集中下发的「黑盒」，而是<strong>可声明、可申请、可审批、可追溯</strong>的闭环。</p>
+<div class="box">
+<b>六大设计理念</b>：① 组即角色（删除独立 Role 表）；② 授权即审批（SoD 职责分离）；③ 双引擎鉴权（Casbin + OpenFGA）；④ 能力包（声明式权限）；⑤ 策略分发（Agent + Bundle）；⑥ 全链路可观测（TraceID）。
+</div>
+
+<h2>2. 四平面架构（PEP / PDP / PAP / PIP）</h2>
+<table>
+<tr><th>平面</th><th>职责</th><th>本系统实现</th></tr>
+<tr><td><b>PEP</b> 策略执行点</td><td>拦截请求、解析主体、转发鉴权</td><td>Traefik 网关 forwardAuth → <code>/v1/gateway/check</code></td></tr>
+<tr><td><b>PDP</b> 策略决策点</td><td>计算最终授权决策</td><td>iam-server：Casbin（动作级）+ OpenFGA（数据级）双引擎</td></tr>
+<tr><td><b>PAP</b> 策略管理点</td><td>策略的创建、更新、发布</td><td>管理面 API：审批即策略，授权全闭环</td></tr>
+<tr><td><b>PIP</b> 策略信息点</td><td>提供主体/资源等上下文信息</td><td>身份解析（用户/组/组织链路）+ 资源模型</td></tr>
+</table>
+
+<h2>3. 组件拓扑</h2>
+<pre>
+                      ┌─────────────────────────────────────────────┐
+  用户浏览器 ──────▶   │  iam-frontend (Vue3 + Element Plus + nginx) │
+                      └─────────────────────────────────────────────┘
+                                    │ HTTPS
+                                    ▼
+                      ┌─────────────────────────────────────────────┐
+  下游调用方 ──────▶  │  Traefik 网关（PEP）                        │
+                      │  forwardAuth → /v1/gateway/check            │
+                      └─────────────────────────────────────────────┘
+                                    │
+                ┌───────────────────┼──────────────────────┐
+                ▼                   ▼                       ▼
+   ┌──────────────────┐  ┌──────────────────┐   ┌──────────────────┐
+   │ iam-server (PDP) │  │  mock-cmdb       │   │  mock-identity   │
+   │ 管理面+鉴权面    │  │  CMDB 数据源     │   │  身份源          │
+   └──────────────────┘  └──────────────────┘   └──────────────────┘
+        │  │   │
+        ▼  ▼   ▼
+  ┌──────┐ ┌──────┐ ┌───────────┐ ┌────────────┐ ┌──────────────┐
+  │Postgres│ │Redis│ │ OpenFGA   │ │ iam-agent  │ │  (策略分发)  │
+  └──────┘ └──────┘ └───────────┘ └────────────┘ └──────────────┘
+</pre>
+<table>
+<tr><th>组件</th><th>技术</th><th>职责</th></tr>
+<tr><td>iam-server</td><td>Go + Gin</td><td>管理 API、鉴权 API（PDP）、OAuth、bundle 分发、网关回调</td></tr>
+<tr><td>iam-frontend</td><td>Vue3 + Vite + Element Plus</td><td>权限中心控制台</td></tr>
+<tr><td>PostgreSQL</td><td>GORM</td><td>用户/组/应用/能力/策略/决策日志 持久化</td></tr>
+<tr><td>Redis</td><td>go-redis</td><td>决策缓存 <code>authz:dec:*</code>、策略快照 <code>authz:pset:*</code>、事件流</td></tr>
+<tr><td>OpenFGA</td><td>Zanzibar 模型</td><td>实例级授权关系（数据面）</td></tr>
+<tr><td>mock-cmdb / mock-identity</td><td>Go</td><td>CMDB 资源数据源、身份源（可同步）</td></tr>
+<tr><td>iam-agent</td><td>Go</td><td>策略分发 Agent，本地缓存执行</td></tr>
+<tr><td>Traefik</td><td>动态配置</td><td>网关 PEP：请求转发 + 鉴权回调</td></tr>
+</table>
+
+<h2>4. 全链路数据流</h2>
+<h3>4.1 运行时鉴权（数据面）</h3>
+<pre>
+请求(GET /api/v1/hosts, X-User: bob)
+   │  Traefik 拦截 → forwardAuth 回调
+   ▼
+PEP 解析：请求 → action 映射（host:list）→ 注入 X-PEP-Token
+   ▼
+PDP：1) 决策缓存命中？ → 直接返回
+     2) Casbin 动作级：bob ∈ 研发一部 → host:list ✓
+     3) OpenFGA 数据级：bob can_read host-01 → 过滤数据范围
+   ▼
+决策：200 OK（返回有权限的数据） / 403 Forbidden
+</pre>
+<h3>4.2 授权闭环（管理面）</h3>
+<pre>
+声明能力 → 配置预设（接口+数据范围） → 上架市场
+   → 用户申请（选主体+数据范围） → 多级审批（SoD）
+   → 审批通过瞬间：Casbin 策略 + OpenFGA 关系元组 自动生成
+   → 策略分发到 Agent → 网关实时生效
+</pre>
+
+<h2>5. 关键设计取舍</h2>
+<div class="box"><b>为什么用双引擎？</b>Casbin 擅长规则驱动的 RBAC 动作级判断；OpenFGA 擅长大规模关系化的数据级授权（谁能访问哪个实例）。两者各司其职，动作级短路、数据级兜底。</div>
+<div class="box"><b>为什么用 Redis 决策缓存？</b>鉴权是高频热路径。决策缓存（TTL 内命中直接放行）大幅降低 PDP 计算与 DB 压力；策略发布时按 app 全量失效，保证一致性与时效。</div>
+<div class="box"><b>为什么审批即策略？</b>策略不手动创建，而是由上架预设 / 用户申请自动触发。审批通过瞬间生成策略，从源头保证「策略 = 授权的物化」，杜绝旁路授权。</div>
+
+<h2>6. 复盘小结</h2>
+<ul>
+<li>四平面划分让鉴权职责清晰，也便于讲解与扩展。</li>
+<li>去中心化视角让每个角色（Owner / 申请人 / 审批人 / 管理员）都有明确的工作台。</li>
+<li>双引擎 + 缓存 + Agent 分发构成「性能 / 一致性 / 可用性」三角的平衡。</li>
+</ul>
+</body>
+</html>

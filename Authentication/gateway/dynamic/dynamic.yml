@@ -1,0 +1,62 @@
+# Traefik 动态配置：统一网关 forwardAuth
+# 说明：
+#   - 业务 API（/api/*）统一经网关 forwardAuth 鉴权
+#     · verify 校验 Authorization: Bearer <JWT> 或 query ?token=
+#     · 200 → 放行 + 注入 X-Auth-* 头给下游；401 → 拦截
+#   - SPA 首页（/）免鉴权，供页面加载并读取 SSO token（真实场景亦如此：
+#     前端先拿 token，再携 Authorization 头调用受保护 API）
+http:
+  middlewares:
+    auth-forward:
+      forwardAuth:
+        address: "http://auth-backend:8000/api/auth/verify"
+        trustForwardHeader: true
+        # verify 响应头 → 下游业务系统请求头
+        authResponseHeaders:
+          - "X-Auth-User"
+          - "X-Auth-Username"
+          - "X-Auth-Name"
+          - "X-Auth-Source"
+
+  routers:
+    # 受保护的业务 API：统一网关 forwardAuth 鉴权
+    mock-app-api:
+      rule: "PathPrefix(`/api/`)"
+      entryPoints: ["web"]
+      service: mock-app-service
+      middlewares:
+        - auth-forward
+      priority: 10
+
+    # SPA 首页：免鉴权（加载页面，前端读取 SSO token 后携 header 调 API）
+    mock-app-home:
+      rule: "PathPrefix(`/`)"
+      entryPoints: ["web"]
+      service: mock-app-service
+      priority: 1
+
+    # ---- 试点应用 pilot-app（独立入口 :8004）----
+    pilot-app-api:
+      rule: "PathPrefix(`/api/`)"
+      entryPoints: ["pilot"]
+      service: pilot-app-service
+      middlewares:
+        - auth-forward
+      priority: 10
+
+    pilot-app-home:
+      rule: "PathPrefix(`/`)"
+      entryPoints: ["pilot"]
+      service: pilot-app-service
+      priority: 1
+
+  services:
+    mock-app-service:
+      loadBalancer:
+        servers:
+          - url: "http://mock-app:8081"
+
+    pilot-app-service:
+      loadBalancer:
+        servers:
+          - url: "http://pilot-app:8004"

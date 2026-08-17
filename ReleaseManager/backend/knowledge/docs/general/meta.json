@@ -1,0 +1,12 @@
+{
+  "name": "通用架构",
+  "description": "微服务设计、DDD 领域驱动、系统设计面试题汇总",
+  "icon": "🏗️",
+  "sort": 3,
+  "articles": {
+    "spug-architecture": { "title": "系统架构详解", "description": "真实 Spug CI/CD 架构与 Demo 系统对比、完整发布链路、关键设计差异、组件映射关系", "tags": ["架构", "Spug", "Demo", "对比"], "updated": "2026-08-01" },
+    "orbstack-architecture": { "title": "OrbStack 部署架构总结", "description": "Docker Compose + OrbStack K8s 混合架构、发布链路、组件职责、域名规划", "tags": ["架构", "OrbStack", "Docker", "K8s"], "updated": "2026-08-01" },
+    "microservices": { "title": "微服务架构设计原则", "description": "服务拆分、通信、治理、可观测性", "tags": ["架构", "微服务"], "updated": "2026-07-24" },
+    "ddd": { "title": "领域驱动设计入门", "description": "实体、值对象、聚合、领域事件", "tags": ["DDD", "设计"], "updated": "2026-07-23" }
+  }
+}

@@ -1,0 +1,48 @@
+# ──────────────────────────────────────────────────────────────────
+# Celery Beat — 定时任务调度器
+# 作用: 按 Cron 表达式自动触发周期性同步任务
+# ──────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-beat
+  namespace: cmdb
+  labels:
+    app: cmdb
+    component: celery-beat
+spec:
+  replicas: 1              # Beat 只能运行一个副本，避免重复调度
+  selector:
+    matchLabels:
+      app: cmdb
+      component: celery-beat
+  template:
+    metadata:
+      labels:
+        app: cmdb
+        component: celery-beat
+    spec:
+      containers:
+        - name: beat
+          image: cmdb-backend:latest
+          command:
+            - celery
+            - -A
+            - config
+            - beat
+            - -l
+            - info
+            - --scheduler
+            - django_celery_beat.schedulers:DatabaseScheduler
+          envFrom:
+            - configMapRef:
+                name: cmdb-config
+            - secretRef:
+                name: cmdb-secret
+          resources:
+            requests:
+              cpu: "0.1"
+              memory: "128Mi"
+            limits:
+              cpu: "0.3"
+              memory: "256Mi"

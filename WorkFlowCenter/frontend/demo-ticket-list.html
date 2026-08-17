@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>工单列表升级 Demo</title>
+  <style>
+    /* ===================== 设计系统变量 ===================== */
+    :root {
+      --primary: #409EFF;
+      --primary-light: #ECF5FF;
+      --primary-dark: #337ECC;
+      --success: #67C23A;
+      --warning: #E6A23C;
+      --danger: #F56C6C;
+      --info: #909399;
+      --text-primary: #1D2129;
+      --text-regular: #4E5969;
+      --text-secondary: #86909C;
+      --text-placeholder: #C9CDD4;
+      --bg-page: #F7F8FA;
+      --bg-card: #FFFFFF;
+      --border-color: #E5E6EB;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg-page);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    /* ===================== 页面容器 ===================== */
+    .page { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    /* ===================== 对比标签 ===================== */
+    .compare-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .compare-label.before {
+      background: #FEF0F0;
+      color: var(--danger);
+      border: 1px solid #FDE2E2;
+    }
+    .compare-label.after {
+      background: #F0F9EB;
+      color: var(--success);
+      border: 1px solid #E1F3D8;
+    }
+
+    /* ===================== 页面标题区 ===================== */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .page-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .page-header-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--primary), #66B1FF);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 20px;
+    }
+    .page-header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .page-header-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* ===================== 统计卡片 ===================== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: default;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      border-radius: 4px 0 0 4px;
+    }
+    .stat-card:nth-child(1)::before { background: var(--primary); }
+    .stat-card:nth-child(2)::before { background: var(--warning); }
+    .stat-card:nth-child(3)::before { background: var(--success); }
+    .stat-card:nth-child(4)::before { background: var(--danger); }
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-lg);
+    }
+    .stat-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .stat-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .stat-icon.blue { background: #E8F3FF; color: var(--primary); }
+    .stat-icon.orange { background: #FFF7E8; color: var(--warning); }
+    .stat-icon.green { background: #E8FFEA; color: var(--success); }
+    .stat-icon.red { background: #FFECE8; color: var(--danger); }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+    .stat-trend {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      margin-top: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .stat-trend.up { color: var(--danger); background: #FEF0F0; }
+    .stat-trend.down { color: var(--success); background: #F0F9EB; }
+
+    /* ===================== 筛选卡片 ===================== */
+    .filter-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+      margin-bottom: 20px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    .filter-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+    }
+    .filter-toggle:hover {
+      background: #FAFBFC;
+    }
+    .filter-toggle-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .filter-toggle-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: transform 0.3s;
+    }
+    .filter-toggle-icon.open { transform: rotate(180deg); }
+    .filter-active-tags {
+      display: flex;
+      gap: 8px;
+    }
+    .filter-active-tag {
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-weight: 500;
+    }
+    .filter-body {
+      padding: 0 24px;
+      max-height: 0;
+      overflow: hidden;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .filter-body.open {
+      padding: 0 24px 20px;
+      max-height: 200px;
+    }
+    .filter-row {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .filter-item label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      font-weight: 500;
+    }
+    .filter-item select,
+    .filter-item input {
+      height: 36px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 0 12px;
+      font-size: 13px;
+      color: var(--text-primary);
+      background: white;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      min-width: 140px;
+    }
+    .filter-item select:focus,
+    .filter-item input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.15);
+    }
+    .filter-actions {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    /* ===================== 按钮 ===================== */
+    .btn {
+      height: 36px;
+      padding: 0 16px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
+    }
+    .btn-primary:hover {
+      background: #66B1FF;
+      box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+    }
+    .btn-outline {
+      background: white;
+      color: var(--text-regular);
+      border: 1px solid var(--border-color);
+    }
+    .btn-outline:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-light);
+    }
+    .btn-text {
+      background: transparent;
+      color: var(--primary);
+      padding: 0 8px;
+    }
+    .btn-text:hover { background: var(--primary-light); }
+    .btn-danger-text {
+      background: transparent;
+      color: var(--danger);
+      padding: 0 8px;
+    }
+    .btn-danger-text:hover { background: #FEF0F0; }
+
+    /* ===================== 数据表格卡片 ===================== */
+    .table-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+    .table-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid #F2F3F5;
+    }
+    .table-card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .table-count {
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: #F2F3F5;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+
+    /* ===================== 表格 ===================== */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .data-table thead th {
+      background: #FAFBFC;
+      padding: 12px 20px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #F2F3F5;
+      white-space: nowrap;
+    }
+    .data-table tbody tr {
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+    .data-table tbody tr:hover {
+      background: #F7F8FA;
+    }
+    .data-table tbody td {
+      padding: 14px 20px;
+      font-size: 14px;
+      color: var(--text-regular);
+      border-bottom: 1px solid #F2F3F5;
+      vertical-align: middle;
+    }
+    .data-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* 表格内的标题链接 */
+    .ticket-title {
+      color: var(--text-primary);
+      font-weight: 500;
+      transition: color 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ticket-title:hover { color: var(--primary); }
+    .ticket-no {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    /* ===================== 标签 ===================== */
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .tag-primary { background: #E8F3FF; color: #1677FF; }
+    .tag-success { background: #E8FFEA; color: #00B42A; }
+    .tag-warning { background: #FFF7E8; color: #FF7D00; }
+    .tag-danger { background: #FFECE8; color: #F53F3F; }
+    .tag-info { background: #F2F3F5; color: var(--text-secondary); }
+    .tag-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .tag-danger .tag-dot { background: #F53F3F; animation: pulse 2s infinite; }
+    .tag-warning .tag-dot { background: #FF7D00; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* 优先级标记 */
+    .priority-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .priority-bar {
+      width: 3px;
+      height: 16px;
+      border-radius: 2px;
+    }
+    .priority-bar.high { background: var(--danger); }
+    .priority-bar.medium { background: var(--warning); }
+    .priority-bar.low { background: var(--info); }
+
+    /* 操作列 */
+    .action-group {
+      display: flex;
+      gap: 4px;
+    }
+    .action-divider {
+      width: 1px;
+      height: 16px;
+      background: var(--border-color);
+      margin: 0 4px;
+      align-self: center;
+    }
+
+    /* ===================== 分页 ===================== */
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-top: 1px solid #F2F3F5;
+    }
+    .pagination-info {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .pagination-info strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    .pagination-controls {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .page-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: white;
+      color: var(--text-regular);
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .page-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .page-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+    .page-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ===================== 空状态 ===================== */
+    .empty-state {
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--text-secondary);
+    }
+    .empty-icon {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 24px;
+      background: #F7F8FA;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+    }
+    .empty-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .empty-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    /* ===================== 响应式 ===================== */
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .filter-row { flex-direction: column; align-items: stretch; }
+      .filter-actions { margin-left: 0; }
+      .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    }
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ===================== 分隔线 ===================== */
+    .divider {
+      border: none;
+      border-top: 1px solid #F2F3F5;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- ========== 工单列表 ========== -->
+    <div class="compare-label after">
+      <span>✨</span>
+      <span>升级后 Demo — 工单列表</span>
+    </div>
+
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-header-icon">📋</div>
+        <div>
+          <h1>我的工单</h1>
+          <div class="page-header-desc">管理你发起和参与的所有工单</div>
+        </div>
+      </div>
+      <button class="btn btn-primary">+ 发起工单</button>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">待处理</span>
+          <div class="stat-icon blue">⏳</div>
+        </div>
+        <div class="stat-value">12</div>
+        <div class="stat-trend up">↑ 较昨日 +3</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">处理中</span>
+          <div class="stat-icon orange">⚡</div>
+        </div>
+        <div class="stat-value">8</div>
+        <div class="stat-trend down">↓ 较昨日 -1</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">已完成</span>
+          <div class="stat-icon green">✅</div>
+        </div>
+        <div class="stat-value">156</div>
+        <div class="stat-trend down">本月 +24</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">已拒绝</span>
+          <div class="stat-icon red">❌</div>
+        </div>
+        <div class="stat-value">5</div>
+        <div class="stat-trend down">↓ 较上月 -2</div>
+      </div>
+    </div>
+
+    <!-- 可折叠筛选区 -->
+    <div class="filter-card">
+      <div class="filter-toggle" onclick="toggleFilter()">
+        <div class="filter-toggle-left">
+          <div class="filter-toggle-icon" id="filterIcon">▼</div>
+          <span>筛选条件</span>
+          <div class="filter-active-tags">
+            <span class="filter-active-tag">待处理</span>
+          </div>
+        </div>
+        <span style="font-size:12px; color: var(--text-secondary);">点击展开 / 收起</span>
+      </div>
+      <div class="filter-body" id="filterBody">
+        <div class="filter-row">
+          <div class="filter-item">
+            <label>状态</label>
+            <select>
+              <option>全部状态</option>
+              <option selected>待处理</option>
+              <option>处理中</option>
+              <option>已完成</option>
+              <option>已拒绝</option>
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>优先级</label>
+            <select>
+              <option>全部</option>
+              <option>高</option>
+              <option>中</option>
+              <option>低</option>
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>关键词</label>
+            <input type="text" placeholder="搜索工单标题..." />
+          </div>
+          <div class="filter-actions">
+            <button class="btn btn-primary">🔍 搜索</button>
+            <button class="btn btn-outline">重置</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-card">
+      <div class="table-card-header">
+        <div class="table-card-title">
+          工单列表
+          <span class="table-count">48 条</span>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-outline">📥 导出</button>
+          <button class="btn btn-outline">🔄 刷新</button>
+        </div>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>工单标题</th>
+            <th>流程模版</th>
+            <th>状态</th>
+            <th>优先级</th>
+            <th>创建人</th>
+            <th>创建时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="ticket-title">
+                <span>服务器扩容申请 — 生产环境</span>
+              </div>
+              <div class="ticket-no">TK-2026-0805-001</div>
+            </td>
+            <td>IT 资源申请</td>
+            <td><span class="tag tag-warning"><span class="tag-dot"></span>待处理</span></td>
+            <td>
+              <span class="priority-indicator">
+                <span class="priority-bar high"></span>
+                <span style="color:var(--danger); font-weight:600;">高</span>
+              </span>
+            </td>
+            <td>张三</td>
+            <td style="color:var(--text-secondary); font-size:13px;">2026-08-05 09:30</td>
+            <td>
+              <div class="action-group">
+                <button class="btn btn-text">查看</button>
+                <div class="action-divider"></div>
+                <button class="btn btn-danger-text">撤销</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="ticket-title">
+                <span>新员工入职权限开通</span>
+              </div>
+              <div class="ticket-no">TK-2026-0804-012</div>
+            </td>
+            <td>人事审批</td>
+            <td><span class="tag tag-primary"><span class="tag-dot"></span>处理中</span></td>
+            <td>
+              <span class="priority-indicator">
+                <span class="priority-bar medium"></span>
+                <span style="color:var(--warning); font-weight:600;">中</span>
+              </span>
+            </td>
+            <td>李四</td>
+            <td style="color:var(--text-secondary); font-size:13px;">2026-08-04 14:20</td>
+            <td>
+              <div class="action-group">
+                <button class="btn btn-text">查看</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="ticket-title">
+                <span>Q3 市场推广预算审批</span>
+              </div>
+              <div class="ticket-no">TK-2026-0803-008</div>
+            </td>
+            <td>财务审批</td>
+            <td><span class="tag tag-success"><span class="tag-dot"></span>已完成</span></td>
+            <td>
+              <span class="priority-indicator">
+                <span class="priority-bar high"></span>
+                <span style="color:var(--danger); font-weight:600;">高</span>
+              </span>
+            </td>
+            <td>王五</td>
+            <td style="color:var(--text-secondary); font-size:13px;">2026-08-03 10:15</td>
+            <td>
+              <div class="action-group">
+                <button class="btn btn-text">查看</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="ticket-title">
+                <span>办公设备采购申请</span>
+              </div>
+              <div class="ticket-no">TK-2026-0802-005</div>
+            </td>
+            <td>行政采购</td>
+            <td><span class="tag tag-danger"><span class="tag-dot"></span>已拒绝</span></td>
+            <td>
+              <span class="priority-indicator">
+                <span class="priority-bar low"></span>
+                <span style="color:var(--text-secondary); font-weight:600;">低</span>
+              </span>
+            </td>
+            <td>赵六</td>
+            <td style="color:var(--text-secondary); font-size:13px;">2026-08-02 16:45</td>
+            <td>
+              <div class="action-group">
+                <button class="btn btn-text">查看</button>
+                <div class="action-divider"></div>
+                <button class="btn btn-text" style="color:var(--text-secondary);">重新发起</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="ticket-title">
+                <span>数据库迁移方案评审</span>
+              </div>
+              <div class="ticket-no">TK-2026-0801-003</div>
+            </td>
+            <td>技术评审</td>
+            <td><span class="tag tag-success"><span class="tag-dot"></span>已完成</span></td>
+            <td>
+              <span class="priority-indicator">
+                <span class="priority-bar medium"></span>
+                <span style="color:var(--warning); font-weight:600;">中</span>
+              </span>
+            </td>
+            <td>张三</td>
+            <td style="color:var(--text-secondary); font-size:13px;">2026-08-01 11:00</td>
+            <td>
+              <div class="action-group">
+                <button class="btn btn-text">查看</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="pagination">
+        <div class="pagination-info">
+          共 <strong>48</strong> 条记录，每页 <strong>10</strong> 条
+        </div>
+        <div class="pagination-controls">
+          <button class="page-btn disabled">‹</button>
+          <button class="page-btn active">1</button>
+          <button class="page-btn">2</button>
+          <button class="page-btn">3</button>
+          <button class="page-btn">4</button>
+          <button class="page-btn">5</button>
+          <button class="page-btn">›</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function toggleFilter() {
+      const body = document.getElementById('filterBody');
+      const icon = document.getElementById('filterIcon');
+      body.classList.toggle('open');
+      icon.classList.toggle('open');
+    }
+    // 默认展开
+    document.addEventListener('DOMContentLoaded', () => {
+      toggleFilter();
+    });
+  </script>
+</body>
+</html>

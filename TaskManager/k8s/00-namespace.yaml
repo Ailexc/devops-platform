@@ -1,0 +1,10 @@
+# ──────────────────────────────────────────────────────────────────
+# Namespace: 将所有 CMDB 相关资源隔离到独立命名空间
+# ──────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cmdb
+  labels:
+    app: cmdb
+    env: production
