@@ -176,6 +176,19 @@ body {
     transform 0.2s ease,
     box-shadow 0.2s ease;
 }
+/* 应用卡片整块为真实链接：移动端点击走原生导航，不受 window.open popup 拦截影响 */
+.app-card-link {
+  display: block;
+  margin: -24px;
+  padding: 24px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+.app-card-link:hover,
+.app-card-link:visited {
+  color: inherit;
+}
 .app-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 28px rgba(16, 24, 40, 0.14);
