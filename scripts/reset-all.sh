@@ -63,13 +63,16 @@ ensure_up() {
 # 等待容器内初始化完成（容器 command 自带 migrate/seed，runserver/gunicorn 起来即代表完成）
 # 仅看等待开始之后的新日志（--since），避免读到历史日志导致误判。
 # 用法：wait_container_ready <容器名> <就绪关键字> <超时秒(默认120)>
+# 注意：仅适合日志实时刷出的进程（如 gunicorn 的 stderr）。Django runserver 在 Docker
+#   非 TTY 下 stdout 块缓冲，就绪日志不刷出 → 请改用 wait_http_ready（HTTP 探活）。
 wait_container_ready() {
   local name="$1" kw="${2:-Starting development server}" tries="${3:-120}" since i
   # docker 日志时间戳为 UTC；--since 需显式 Z 后缀，否则按本地时区解释导致过滤掉全部日志
   since="$(date -u +%Y-%m-%dT%H:%M:%S)Z"
   for i in $(seq 1 "$tries"); do
     # 2>&1：有些框架（如 gunicorn）就绪日志写在 stderr，仅看 stdout 会漏判
-    if docker logs --since "$since" "$name" 2>&1 | grep -q "$kw"; then
+    # -E：关键字可能含 | 表示多个候选（如 "Booting worker|Listening at"）
+    if docker logs --since "$since" "$name" 2>&1 | grep -qE "$kw"; then
       ok "  ✓ ${name} 已就绪（migrate/seed 完成）"
       return 0
     fi
@@ -83,6 +86,36 @@ wait_container_ready() {
   return 1
 }
 
+# HTTP 探活等待——最可靠的"容器已就绪"判定，不依赖日志（规避 runserver stdout 缓冲）。
+# 容器内 python 探测（容器必有 python）：任何 HTTP 响应（含 404/4xx/5xx）= 应用在处理请求 = 就绪；
+#   连接拒绝/超时 = 未就绪。禁用代理避免受 HTTP_PROXY 干扰。
+# 用法：wait_http_ready <容器名> <URL> <超时秒(默认120)>
+wait_http_ready() {
+  local name="$1" url="$2" tries="${3:-120}" i
+  for i in $(seq 1 "$tries"); do
+    if docker exec "$name" python -c '
+import sys, urllib.request
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+try:
+    opener.open(sys.argv[1], timeout=2)
+except urllib.error.HTTPError:
+    pass  # 有 HTTP 响应（4xx/5xx 也算就绪）
+except Exception:
+    sys.exit(1)
+' "$url" 2>/dev/null; then
+      ok "  ✓ ${name} 已就绪（HTTP ${url} 可响应）"
+      return 0
+    fi
+    if ! docker ps --format '{{.Names}}' | grep -q "^${name}$"; then
+      err "  ✗ ${name} 容器未在运行"; return 1
+    fi
+    sleep 1
+  done
+  err "  ✗ ${name} 未在 ${tries}s 内就绪（HTTP ${url} 无响应）"
+  docker logs --tail 20 "$name" 2>&1
+  return 1
+}
+
 reset_project() {
   local db
   db="$(project_db "$1")"
@@ -92,16 +125,33 @@ reset_project() {
       ( cd Authentication && ./reset.sh )
       ;;
     cloud)
-      ( cd CloudManager && ./reset_db.sh --yes )
+      # backend entrypoint.sh 自带 migrate + 全套种子（seed_data/mock/rules/
+      # multicloud/metrics/knowledge），DB 刚重建 → 必须 --force-recreate 按新
+      # schema 重启容器，等它就绪即完成数据重建。
+      # 注意：不可再 exec 重复 migrate/seed —— schema 刚清空时并发会触发
+      #   pg_class_relname_nsp_index / pg_type_typname_nsp_index 唯一约束竞态。
+      #   仅补生成成本优化报告（[8/8]，entrypoint 未覆盖）。
+      ensure_up cloud backend --force-recreate
+      wait_container_ready cloud_manager_backend "Booting worker|Listening at|Application startup complete" 240
+      ( cd CloudManager && docker compose -f docker-compose.prod.yml exec -T backend python manage.py shell -c "from cost.engine import run_all; r = run_all(trigger='manual', operator='seed'); print('  ✓ 优化报告已生成: ' + r.report_no)" )
       ;;
     event)
       ( cd EventManager && ./scripts/init-all.sh -c -t 1000 )
       ;;
     iam)
-      ( cd PermissionCenter && make seed-reset )
+      # make seed-reset 内部是 docker compose run --rm（无 TTY 环境会挂起）。
+      # 直接等价命令并加 -T 且 stdin </dev/null（幂等，--reset 清空后按最新 seed 重建）
+      ensure_up iam iam-server
+      ( cd PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm iam-server iam-server seed --reset < /dev/null )
       ;;
     release)
-      ( cd ReleaseManager && ./scripts/reset-all.sh -y )
+      # release reset-all.sh 默认会重新构建镜像；快速模式（NO_BUILD=1）下传
+      # --no-build 复用现有镜像（默认 -y 跳过确认）
+      if [ "${NO_BUILD:-0}" = "1" ]; then
+        ( cd ReleaseManager && ./scripts/reset-all.sh -y --no-build )
+      else
+        ( cd ReleaseManager && ./scripts/reset-all.sh -y )
+      fi
       ;;
     cmdb)
       # backend 容器 command 自带 migrate + seed_demo_data（幂等），拉起即完成重置。
@@ -109,14 +159,16 @@ reset_project() {
       # 注意：不可再 exec 重复 migrate —— schema 刚清空时并发 migrate 会触发
       #   pg_type_typname_nsp_index 唯一约束冲突。只需等待容器就绪。
       ensure_up cmdb backend --force-recreate
-      wait_container_ready cmdb-task-backend "Starting development server" 180
+      # runserver 日志可能被 stdout 缓冲吞掉 → 用 HTTP 探活而非日志关键字
+      wait_http_ready cmdb-task-backend http://127.0.0.1:8000/ 180
       ;;
     workflow)
       # api 容器 command 自带 migrate --noinput（幂等），先 --force-recreate 拉起
       # （DB 刚重建，旧容器必须重启）并等它就绪，再 exec reset_demo（migrate+flush+
       # loaddata+seed，幂等）——避免并发 migrate 冲突
       ensure_up workflow api --force-recreate
-      wait_container_ready workflow-api "Starting development server" 180
+      # runserver 日志可能被 stdout 缓冲吞掉 → 用 HTTP 探活而非日志关键字
+      wait_http_ready workflow-api http://127.0.0.1:8000/ 180
       ( cd WorkFlowCenter && docker compose exec -T api python manage.py reset_demo )
       ;;
     *) err "未知项目 '$1'（可用: auth/cloud/event/iam/release/cmdb/workflow）"; exit 1 ;;
@@ -162,13 +214,16 @@ else
   echo ""
   echo "  阶段二：重建 sidecar 迁移（openfga / cmdb-go）"
   # OpenFGA：distroless 镜像需单独 migrate（幂等），须先于 iam 种子（建 store）
-  ( cd PermissionCenter && docker compose -f deploy/docker-compose.yml run --rm openfga migrate >/dev/null 2>&1 ) \
+  # 关键：docker compose run 在无 TTY 环境（nohup / 后台 / 管道）必须 run -T 且 stdin </dev/null，
+  #   否则进程虽完成 migrate 却因等待 tty 输入挂起（SIGTTIN），导致 reset 卡死。
+  # 日志写到 /tmp/reset-sidecar.log 便于排查（不吞 stderr）。
+  ( cd PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm openfga migrate < /dev/null > /tmp/reset-sidecar.log 2>&1 ) \
     && echo "  ✓ openfga migrate 完成" \
-    || { err "openfga migrate 失败"; exit 1; }
+    || { err "openfga migrate 失败（详见 /tmp/reset-sidecar.log）"; exit 1; }
   # cmdb-go：旧容器用旧 hostname，需按当前 compose 重建（--seed 自动迁移+播种）
-  ( cd TaskManager && docker compose up -d --force-recreate go_backend >/dev/null 2>&1 ) \
+  ( cd TaskManager && docker compose up -d --force-recreate go_backend >> /tmp/reset-sidecar.log 2>&1 ) \
     && echo "  ✓ cmdb-go 已按当前配置重建" \
-    || { err "cmdb-go 重建失败"; exit 1; }
+    || { err "cmdb-go 重建失败（详见 /tmp/reset-sidecar.log）"; exit 1; }
   echo ""
   echo "  阶段三：逐项目重置（收编既有 reset）"
   for p in auth cloud event iam release cmdb workflow; do

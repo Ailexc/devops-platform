@@ -15,6 +15,8 @@ services:
              python manage.py runserver 0.0.0.0:8000"
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.dev
+      # Django runserver 在 Docker 非 TTY 下 stdout 块缓冲，就绪日志不实时刷出 → 强制无缓冲
+      - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_workflow
       - REDIS_URL=redis://devops-redis:6379/6
       - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-key-change-in-production}
