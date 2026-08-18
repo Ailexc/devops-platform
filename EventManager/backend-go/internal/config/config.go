@@ -26,6 +26,10 @@ type Config struct {
 	OutputDir string
 	DocsDir   string
 	Debug     bool
+
+	// Seed（启动幂等种子）
+	SeedTotal int  // 空库首灌的演示事件条数，默认 1000
+	SeedForce bool // 是否强制清空重灌（默认 false，仅清库场景使用）
 }
 
 var AppConfig *Config
@@ -42,6 +46,8 @@ func Load() *Config {
 		OutputDir:          getEnv("OUTPUT_DIR", "../output"),
 		DocsDir:            getEnv("DOCS_DIR", "../docs"),
 		Debug:              getEnvBool("DEBUG", false),
+		SeedTotal:          getEnvInt("SEED_TOTAL", 1000),
+		SeedForce:          getEnvBool("SEED_FORCE", false),
 	}
 
 	AppConfig = cfg

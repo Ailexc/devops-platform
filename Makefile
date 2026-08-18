@@ -25,7 +25,7 @@ PROJECT_DIRS := $(AUTH_DIR) $(CLOUD_DIR) $(EVENT_DIR) $(IAM_DIR) $(RELEASE_DIR) 
 # 统一 PostgreSQL 的业务库（一实例多库）
 DBS := devops_auth devops_cloud devops_event devops_iam devops_release devops_cmdb devops_workflow
 
-.PHONY: help bootstrap status build up start down seed reset ps logs portal backup gateway-up gateway-down gateway-ps
+.PHONY: help bootstrap status build up start down seed reset demo-reset ps logs portal backup gateway-up gateway-down gateway-ps
 
 help: ## 显示帮助
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -57,6 +57,9 @@ seed: ## 初始化数据（make seed P=auth 单项目；不带 P 则全部）
 
 reset: ## 数据重置（make reset P=auth 单项目；不带 P 则全量重置回出厂态）
 	@bash scripts/reset-all.sh "$(P)"
+
+demo-reset: ## 一键恢复到干净出厂态（演示专用：DB 硬重建 + Redis 清空 + 全部重建启动 + 冒烟）
+	@bash scripts/demo-reset.sh
 
 backup: ## 统一数据备份（切换到 backups/<时间戳>/）
 	@bash scripts/backup.sh

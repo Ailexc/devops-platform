@@ -143,6 +143,10 @@ init_python() {
         # 确保 Python 基础服务正在运行（PostgreSQL/Redis 已统一接入 devops-infra）
         info "启动 Python 基础服务..."
         docker compose up -d rabbitmq
+
+        # 先拉起 api 容器，避免 exec 依赖"容器已在运行"（健壮性）
+        info "确保 api 容器运行（供 exec 执行 migrate/seed）..."
+        docker compose up -d api
         
         # 等待服务就绪
         info "等待服务就绪..."
@@ -189,13 +193,15 @@ init_go() {
     if [[ "$MODE" == "docker" ]]; then
         info "使用 Docker 模式初始化 Go 栈..."
         
-        # 设置环境变量
+        # 幂等种子随 go-api 启动时自动执行（空库首灌 / 非空跳过）
+        # 需要强制重灌时设置 SEED_FORCE=true（与 make go-seed 等价）
+        if [[ "$CLEAR_EXISTING" == "true" || "$CLEAR_EXISTING" == "1" ]]; then
+            export SEED_FORCE=true
+        fi
         export SEED_TOTAL=$TOTAL_EVENTS
-        export SEED_CLEAR=$CLEAR_EXISTING
-        
-        # 运行 Go 种子数据（会自动处理迁移）
-        info "生成 $TOTAL_EVENTS 条模拟事件数据..."
-        docker compose up go-seed
+
+        info "启动 go-api/go-worker（启动时自动执行迁移 + 幂等种子，共 $TOTAL_EVENTS 条）..."
+        docker compose up -d go-api go-worker
         
     else
         info "使用本地模式初始化 Go 栈..."

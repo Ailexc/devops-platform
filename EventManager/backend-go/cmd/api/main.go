@@ -15,6 +15,7 @@ import (
 	"event-flow/internal/eventhandler"
 	"event-flow/internal/model"
 	"event-flow/internal/repository"
+	"event-flow/internal/seed"
 	"event-flow/internal/tasklab"
 	"event-flow/internal/worker"
 )
@@ -44,6 +45,12 @@ func main() {
 		log.Fatalf("Failed to auto-migrate: %v", err)
 	}
 	log.Println("Database migration complete")
+
+	// ── 启动幂等种子（替换原独立 go-seed 容器）──────────────
+	//   - 空库自动灌入演示数据；非空跳过；SEED_FORCE=true 强制重灌
+	if err := seed.EnsureDemoData(db, cfg.SeedTotal, cfg.SeedForce); err != nil {
+		log.Fatalf("Failed to seed demo data: %v", err)
+	}
 
 	// ── Connect to Redis for asynq ──────────────────────────────
 	redisAddr := strings.TrimPrefix(cfg.RedisURL, "redis://")

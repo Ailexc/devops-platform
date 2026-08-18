@@ -85,22 +85,6 @@ services:
       - go-output:/output
     restart: unless-stopped
 
-  go-seed:
-    build:
-      context: ./backend-go
-      dockerfile: Dockerfile
-    container_name: cmdb-event-go-seed
-    command: seed
-    env_file: .env
-    environment:
-      DATABASE_URL: postgres://${GO_POSTGRES_USER:-eventuser}:${GO_POSTGRES_PASSWORD:-eventpass}@cmdb-event-go-postgres:5432/${GO_POSTGRES_DB:-eventdb_go}
-      SEED_TOTAL: "1000"
-      SEED_CLEAR: "true"
-    depends_on:
-      go-postgres:
-        condition: service_healthy
-    restart: "no"
-
   go-frontend:
     build:
       context: .

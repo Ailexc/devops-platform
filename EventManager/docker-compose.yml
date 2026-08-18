@@ -87,6 +87,8 @@ services:
       OUTPUT_DIR: /output
       DOCS_DIR: /app/docs
       DEBUG: "false"
+      SEED_TOTAL: ${SEED_TOTAL:-1000}
+      SEED_FORCE: ${SEED_FORCE:-false}
     expose:
       - "8000"
     volumes:
@@ -115,24 +117,6 @@ services:
     volumes:
       - go-output:/output
     restart: unless-stopped
-    networks:
-      - default
-      - devops-net
-
-  # ─── Go Seed 数据初始化 ──────────────────────────
-
-  go-seed:
-    build:
-      context: ./backend-go
-      dockerfile: Dockerfile
-    container_name: cmdb-event-go-seed
-    command: seed
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://devops:devops@devops-postgres:5432/devops_event_go
-      SEED_TOTAL: "1000"
-      SEED_CLEAR: "true"
-    restart: "no"
     networks:
       - default
       - devops-net

@@ -119,7 +119,7 @@ seed-all:     ## 初始化两个栈（各1000条数据，Docker模式）
 	docker compose up -d postgres redis rabbitmq
 	$(MAKE) migrate
 	cd backend && ../.venv/bin/python manage.py seed_data --total 1000
-	docker compose up go-seed
+	$(MAKE) go-seed
 
 # ═══════════════════════════════════════════════════════
 # Go 后端
@@ -140,8 +140,9 @@ go-dev-api:    ## 本地启动 Go API 服务
 go-dev-worker: ## 本地启动 Go Worker
 	cd backend-go && go run ./cmd/worker
 
-go-seed:       ## 运行 Go 种子数据
-	docker compose up go-seed
+go-seed:       ## 灌入/重灌 Go 栈演示数据（幂等种子随 go-api 启动执行；加 SEED_FORCE=true 强制重灌）
+	SEED_FORCE=true docker compose up -d --force-recreate go-api
+	$(MAKE) up-go
 
 go-build:      ## 构建 Go 二进制文件
 	cd backend-go && go build -o bin/api ./cmd/api && go build -o bin/worker ./cmd/worker
