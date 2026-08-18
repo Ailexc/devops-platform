@@ -160,14 +160,15 @@ init_python() {
         info "等待 api 容器就绪（容器内自动 migrate/collectstatic）..."
         local ready=0
         for i in $(seq 1 120); do
-            if docker logs cmdb-event-api 2>/dev/null | grep -qE "Booting worker|Listening at|Application startup complete"; then
+            # gunicorn 启动日志写在 stderr，必须 2>&1 才能匹配到就绪关键字
+            if docker logs cmdb-event-api 2>&1 | grep -qE "Booting worker|Listening at|Application startup complete"; then
                 ready=1; break
             fi
             sleep 1
         done
         if [[ "$ready" != "1" ]]; then
             error "api 容器未在 120s 内就绪"
-            docker logs cmdb-event-api 2>/dev/null | tail -20
+            docker logs cmdb-event-api 2>&1 | tail -20
             return 1
         fi
         

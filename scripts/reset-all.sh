@@ -63,9 +63,11 @@ ensure_up() {
 # 用法：wait_container_ready <容器名> <就绪关键字> <超时秒(默认120)>
 wait_container_ready() {
   local name="$1" kw="${2:-Starting development server}" tries="${3:-120}" since i
-  since=$(date -u +%Y-%m-%dT%H:%M:%S)
+  # docker 日志时间戳为 UTC；--since 需显式 Z 后缀，否则按本地时区解释导致过滤掉全部日志
+  since="$(date -u +%Y-%m-%dT%H:%M:%S)Z"
   for i in $(seq 1 "$tries"); do
-    if docker logs --since "$since" "$name" 2>/dev/null | grep -q "$kw"; then
+    # 2>&1：有些框架（如 gunicorn）就绪日志写在 stderr，仅看 stdout 会漏判
+    if docker logs --since "$since" "$name" 2>&1 | grep -q "$kw"; then
       ok "  ✓ ${name} 已就绪（migrate/seed 完成）"
       return 0
     fi
@@ -75,7 +77,7 @@ wait_container_ready() {
     sleep 1
   done
   err "  ✗ ${name} 未在 ${tries}s 内就绪（等待关键字 '$kw'）"
-  docker logs --since "$since" "$name" 2>/dev/null | tail -20
+  docker logs --since "$since" "$name" 2>&1 | tail -20
   return 1
 }
 
