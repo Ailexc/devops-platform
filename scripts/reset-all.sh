@@ -47,21 +47,25 @@ drop_schema() {
 }
 
 # 确保某项目的核心业务容器在运行（供 exec 使用；容器已停也先拉起）
+# 用法：ensure_up <name> [services] [额外 compose 参数...]
+#   例：ensure_up cmdb backend --force-recreate
 ensure_up() {
-  local name="$1" services="${2:-}"
+  local name="$1" services="${2:-}" extra="${*:3}"
   local dir opts
   dir="$(project_dir "$name")"
   opts="$(project_compose_opts "$name")"
   log "确保 ${name} 容器运行（${dir}）..."
-  ( cd "$dir" && docker compose ${opts} up -d --build ${services} )
+  ( cd "$dir" && docker compose ${opts} up -d --build ${services} ${extra} )
 }
 
 # 等待容器内初始化完成（容器 command 自带 migrate/seed，runserver/gunicorn 起来即代表完成）
+# 仅看等待开始之后的新日志（--since），避免读到历史日志导致误判。
 # 用法：wait_container_ready <容器名> <就绪关键字> <超时秒(默认120)>
 wait_container_ready() {
-  local name="$1" kw="${2:-Starting development server}" tries="${3:-120}" i
+  local name="$1" kw="${2:-Starting development server}" tries="${3:-120}" since i
+  since=$(date -u +%Y-%m-%dT%H:%M:%S)
   for i in $(seq 1 "$tries"); do
-    if docker logs "$name" 2>/dev/null | grep -q "$kw"; then
+    if docker logs --since "$since" "$name" 2>/dev/null | grep -q "$kw"; then
       ok "  ✓ ${name} 已就绪（migrate/seed 完成）"
       return 0
     fi
@@ -71,7 +75,7 @@ wait_container_ready() {
     sleep 1
   done
   err "  ✗ ${name} 未在 ${tries}s 内就绪（等待关键字 '$kw'）"
-  docker logs "$name" 2>/dev/null | tail -20
+  docker logs --since "$since" "$name" 2>/dev/null | tail -20
   return 1
 }
 
@@ -97,15 +101,17 @@ reset_project() {
       ;;
     cmdb)
       # backend 容器 command 自带 migrate + seed_demo_data（幂等），拉起即完成重置。
+      # DB 刚重建 → 必须 --force-recreate 强制旧容器重启（否则旧进程仍连旧 schema）。
       # 注意：不可再 exec 重复 migrate —— schema 刚清空时并发 migrate 会触发
       #   pg_type_typname_nsp_index 唯一约束冲突。只需等待容器就绪。
-      ensure_up cmdb backend
+      ensure_up cmdb backend --force-recreate
       wait_container_ready cmdb-task-backend "Starting development server" 180
       ;;
     workflow)
-      # api 容器 command 自带 migrate --noinput（幂等），先拉起并等它就绪，
-      # 再 exec reset_demo（migrate+flush+loaddata+seed，幂等）——避免并发 migrate 冲突
-      ensure_up workflow api
+      # api 容器 command 自带 migrate --noinput（幂等），先 --force-recreate 拉起
+      # （DB 刚重建，旧容器必须重启）并等它就绪，再 exec reset_demo（migrate+flush+
+      # loaddata+seed，幂等）——避免并发 migrate 冲突
+      ensure_up workflow api --force-recreate
       wait_container_ready workflow-api "Starting development server" 180
       ( cd WorkFlowCenter && docker compose exec -T api python manage.py reset_demo )
       ;;

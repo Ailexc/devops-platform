@@ -152,8 +152,9 @@ init_python() {
         # 先拉起 api 容器，避免 exec 依赖"容器已在运行"（健壮性）
         # 注意：api 容器 command 自带 migrate（幂等），此处不可再 exec 重复 migrate，
         #   schema 刚清空时并发 migrate 会触发 pg_type_typname_nsp_index 唯一约束冲突。
+        #   DB 刚重建 → 必须 --force-recreate 强制旧容器重启（否则旧进程仍连旧 schema）。
         info "确保 api 容器运行（供 exec 执行 seed）..."
-        docker compose up -d api
+        docker compose up -d --force-recreate api
         
         # 等待容器内 migrate 完成（gunicorn 起来 = 迁移+collectstatic 完成）
         info "等待 api 容器就绪（容器内自动 migrate/collectstatic）..."
