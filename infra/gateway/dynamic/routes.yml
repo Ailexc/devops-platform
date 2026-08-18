@@ -1,6 +1,8 @@
 # ============================================================
 # 统一网关动态路由：Host 规则 → 各系统 frontend（devops-net 服务名）
 # 各目标容器必须已加入 devops-net 网络
+# 方案 B：另加多端口纯 IP 路由，每个 entryPoint 对应一个系统，
+#         面试官无需 hosts 映射，http://112.124.69.224:<port> 直达
 # ============================================================
 http:
   routers:
@@ -38,6 +40,37 @@ http:
       rule: "Host(`workflow.devops.orb.local`)"
       entryPoints: ["web"]
       service: workflow
+
+    # ===== 方案 B：多端口纯 IP 路由（对外预览，免 hosts 映射）=====
+    cmdb-ip:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-cmdb"]
+      service: cmdb
+
+    cloud-ip:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-cloud"]
+      service: cloud
+
+    workflow-ip:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-workflow"]
+      service: workflow
+
+    event-ip:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-event"]
+      service: event
+
+    release-ip:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-release"]
+      service: release
+
+    iam-ip:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-iam"]
+      service: iam
 
     # 认证 API 直连（调试/演示用）
     api-auth:

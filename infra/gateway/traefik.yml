@@ -1,7 +1,21 @@
 # Traefik 静态配置（统一网关）
+# 多端口入口（方案 B）：每个系统一个独立端口，纯 IP 直达，免客户端 hosts 映射
+#   8088 = 门户；8089 = 任务；8090 = 多云；8091 = 流程；8092 = 事件；8093 = 发布；8094 = 权限
 entryPoints:
   web:
     address: ":80"
+  web-cmdb:
+    address: ":8089"
+  web-cloud:
+    address: ":8090"
+  web-workflow:
+    address: ":8091"
+  web-event:
+    address: ":8092"
+  web-release:
+    address: ":8093"
+  web-iam:
+    address: ":8094"
 
 providers:
   file:

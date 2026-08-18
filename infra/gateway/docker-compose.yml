@@ -23,6 +23,13 @@ services:
       - --configFile=/etc/traefik/traefik.yml
     ports:
       - "8088:80"        # 统一入口（宿主 8088，避免与各项目 8080/80 冲突）
+      # 方案 B：多端口入口，纯 IP 直达各系统（宿主端口 = entryPoint 端口）
+      - "8089:8089"      # 任务管理 TaskManager
+      - "8090:8090"      # 多云管理 CloudManager
+      - "8091:8091"      # 流程中心 WorkFlowCenter
+      - "8092:8092"      # 事件管理 EventManager
+      - "8093:8093"      # 发布管理 ReleaseManager
+      - "8094:8094"      # 权限中心 PermissionCenter
     volumes:
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
       - ./dynamic:/etc/traefik/dynamic:ro
