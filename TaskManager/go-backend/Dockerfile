@@ -1,5 +1,8 @@
 FROM golang:1.24-alpine AS builder
 
+# 中国 ECS：proxy.golang.org 不可达，使用 goproxy.cn
+ENV GOPROXY=https://goproxy.cn,direct
+
 WORKDIR /app
 
 # Allow Go to auto-download the required toolchain (go.mod requires 1.24)

@@ -1,5 +1,7 @@
 # Build stage
 FROM golang:1.26-alpine AS builder
+# 中国 ECS：proxy.golang.org 不可达，使用 goproxy.cn
+ENV GOPROXY=https://goproxy.cn,direct
 RUN apk add --no-cache git
 WORKDIR /src
 COPY go.mod go.sum ./

@@ -3,9 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 安装依赖
+# 安装依赖（中国 ECS：使用 npmmirror 镜像）
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --registry=https://registry.npmmirror.com
 
 # 复制源码并构建（跳过 tsc 类型检查，Vite 自行处理转译）
 COPY . .

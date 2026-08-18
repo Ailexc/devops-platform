@@ -7,9 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Python 依赖
+# Python 依赖（中国 ECS：使用阿里云镜像）
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
 # 项目代码（含 backend/docs/，即镜像内 /app/docs，供 /api/v1/docs 接口展示）
 COPY backend/ .

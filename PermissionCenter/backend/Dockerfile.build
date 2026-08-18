@@ -3,6 +3,8 @@
 # 用法：docker build -f backend/Dockerfile.build --build-arg GOARCH=amd64 -t iam-backend backend
 ARG GOARCH=arm64
 FROM golang:1.26-alpine AS builder
+# 中国 ECS：proxy.golang.org 不可达，使用 goproxy.cn
+ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
