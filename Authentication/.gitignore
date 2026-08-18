@@ -3,7 +3,7 @@ __pycache__/
 *.pyc
 .venv/
 *.db
-data/
+/data/   # 仅根级数据目录；不排除 frontend/src/data/ 源码
 
 # Node
 node_modules/
