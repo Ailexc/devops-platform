@@ -1,0 +1,34 @@
+
+<h2>一、权限设计思路：去中心化 IAM</h2>
+<p>本项目不自建权限系统，而是接入 <b>统一权限中心（Permission Center）</b>：</p>
+<ul>
+  <li><b>注册制</b>：应用注册后发布"能力包"（菜单 / 操作 / 数据范围）。</li>
+  <li><b>申请授权</b>：用户按需申请能力包，审批通过后获得对应权限。</li>
+</ul>
+<table>
+  <thead><tr><th>能力包</th><th>数据范围</th><th>可执行操作</th></tr></thead>
+  <tbody>
+    <tr><td>全量管理员</td><td>全部</td><td>读 + 写 + 审批</td></tr>
+    <tr><td>部门负责人</td><td>本部门</td><td>读 + 申请</td></tr>
+    <tr><td>只读用户</td><td>本部门</td><td>只读</td></tr>
+  </tbody>
+</table>
+
+<h2>二、数据权限：后端强制过滤</h2>
+<p>Demo 做了简化：由后端按当前用户强制过滤数据范围，而非仅前端隐藏。</p>
+<ul>
+  <li><b>超级管理员（admin）</b> → 数据范围：全部。</li>
+  <li><b>普通员工（readonly）</b> → 数据范围：本部门（user.department）。</li>
+</ul>
+<pre>def _scoped_items(request):
+    if request.user.is_superuser:
+        return CostItem.objects.all()
+    return CostItem.objects.filter(department=request.user.department)</pre>
+<p>应用在成本账单、优化建议、分摊、报告等所有接口，越权维度值自动清空。</p>
+
+<h2>三、为什么后端强制？</h2>
+<ul>
+  <li>前端控制可被绕过（改请求参数即可越权）。</li>
+  <li>后端过滤是唯一可信边界，符合安全最佳实践。</li>
+  <li>为对接真实权限中心预留：审批通过的能力包 → 数据范围映射。</li>
+</ul>

@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>可配置优化规则引擎 v4 - Demo</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1f2937}
+    .top-bar{height:48px;background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);display:flex;align-items:center;padding:0 24px;color:white;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+    .top-bar .logo{font-size:15px;font-weight:700}
+    .top-bar .divider{width:1px;height:20px;background:rgba(255,255,255,.2)}
+    .top-bar .breadcrumb{font-size:13px;opacity:.85}
+    .layout{display:flex;min-height:calc(100vh - 48px)}
+    .sidebar{width:220px;background:#001529;padding:16px 0;flex-shrink:0}
+    .sidebar .menu-group{margin-bottom:8px}
+    .sidebar .menu-label{padding:8px 20px 4px;font-size:11px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:1px}
+    .sidebar .menu-item{padding:10px 20px 10px 24px;color:rgba(255,255,255,.65);font-size:14px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px}
+    .sidebar .menu-item:hover{color:white;background:rgba(255,255,255,.06)}
+    .sidebar .menu-item.active{color:white;background:#1677ff;border-right:3px solid #4096ff}
+    .main-content{flex:1;padding:24px;overflow-y:auto}
+    .page-header{margin-bottom:24px}
+    .page-header h1{font-size:22px;font-weight:600;margin-bottom:6px}
+    .page-header p{color:#6b7280;font-size:14px}
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    .stat-card{background:white;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #f0f0f0}
+    .stat-card .stat-label{font-size:13px;color:#6b7280;margin-bottom:8px}
+    .stat-card .stat-value{font-size:28px;font-weight:700}
+    .stat-card .stat-sub{font-size:12px;color:#9ca3af;margin-top:4px}
+    .tab-bar{display:flex;gap:0;margin-bottom:24px;background:white;border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);width:fit-content}
+    .tab-btn{padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;transition:all .2s;color:#6b7280;font-weight:500;border:none;background:none}
+    .tab-btn:hover{color:#1f2937}
+    .tab-btn.active{background:#1677ff;color:white;box-shadow:0 2px 4px rgba(22,119,255,.3)}
+    .card{background:white;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #f0f0f0;margin-bottom:16px}
+    .card-header{padding:16px 20px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}
+    .card-header h3{font-size:15px;font-weight:600}
+    .card-body{padding:20px}
+    .btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;border:none;display:inline-flex;align-items:center;gap:6px}
+    .btn-primary{background:#1677ff;color:white}
+    .btn-primary:hover{background:#4096ff}
+    .btn-success{background:#52c41a;color:white}
+    .btn-success:hover{background:#73d13d}
+    .btn-default{background:white;color:#374151;border:1px solid #d1d5db}
+    .btn-default:hover{border-color:#1677ff;color:#1677ff}
+    .btn-sm{padding:5px 12px;font-size:12px}
+    .btn-group{display:flex;gap:8px}
+    .rule-tag{padding:3px 10px;border-radius:6px;font-size:12px;font-weight:500;display:inline-block}
+    .rule-tag.high{background:#fef2f2;color:#dc2626}
+    .rule-tag.medium{background:#fff7ed;color:#d97706}
+    .rule-tag.low{background:#f0fdf4;color:#16a34a}
+    .rule-tag.enabled{background:#f0fdf4;color:#059669}
+    .rule-tag.disabled{background:#f3f4f6;color:#6b7280}
+    .toggle{width:44px;height:24px;border-radius:12px;cursor:pointer;transition:background .2s;position:relative}
+    .toggle.on{background:#1677ff}
+    .toggle.off{background:#d1d5db}
+    .toggle::after{content:'';position:absolute;width:20px;height:20px;border-radius:50%;background:white;top:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+    .toggle.on::after{left:22px}
+    .toggle.off::after{left:2px}
+    .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s}
+    .modal{background:white;border-radius:16px;width:720px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);animation:slideUp .25s ease-out}
+    .modal-lg{width:900px}
+    .modal-header{padding:20px 24px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}
+    .modal-header h2{font-size:18px;font-weight:600}
+    .modal-close{width:32px;height:32px;border-radius:8px;border:none;background:none;cursor:pointer;font-size:18px;color:#9ca3af;display:flex;align-items:center;justify-content:center}
+    .modal-close:hover{background:#f3f4f6;color:#374151}
+    .modal-body{padding:24px}
+    .modal-footer{padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px}
+    .form-group{margin-bottom:20px}
+    .form-label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
+    .form-hint{font-size:12px;color:#9ca3af;margin-top:4px}
+    .form-input{width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;transition:border-color .2s}
+    .form-input:focus{border-color:#1677ff;box-shadow:0 0 0 3px rgba(22,119,255,.1)}
+    .form-select{width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;background:white;cursor:pointer}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .json-editor{background:#1e1e2e;border-radius:10px;padding:16px;font-family:'SF Mono','Fira Code',Consolas,monospace;font-size:13px;line-height:1.6;color:#cdd6f4;min-height:120px}
+    .json-editor textarea{width:100%;min-height:100px;background:transparent;border:none;color:#cdd6f4;font-family:inherit;font-size:inherit;line-height:inherit;resize:vertical;outline:none}
+    .section-title{font-size:13px;font-weight:600;color:#1e40af;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #dbeafe;display:flex;align-items:center;gap:8px}
+    .template-preview{background:#f8fafc;border:1px dashed #d1d5db;border-radius:8px;padding:12px 16px;margin-top:8px}
+    .template-preview .preview-label{font-size:11px;color:#9ca3af;margin-bottom:4px}
+    .template-preview .preview-text{font-size:13px;color:#374151}
+    .template-preview .placeholder{color:#1677ff;font-weight:500}
+    .empty-state{text-align:center;padding:60px 20px;color:#9ca3af}
+    .empty-state .empty-icon{font-size:48px;margin-bottom:16px;opacity:.5}
+    .empty-state p{font-size:14px}
+    .exec-log{display:flex;flex-direction:column;gap:8px}
+    .exec-log-item{display:flex;align-items:center;padding:10px 14px;background:#f8fafc;border-radius:8px;gap:12px}
+    .exec-log-item .log-status{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#22c55e}
+    .exec-log-item .log-name{flex:1;font-size:13px}
+    .exec-log-item .log-result{font-size:12px;color:#6b7280}
+    .result-card{background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%);border:1px solid #bbf7d0;border-radius:12px;padding:20px;margin-top:16px}
+    .result-card h4{color:#166534;font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .result-items{display:flex;flex-direction:column;gap:8px}
+    .result-item{display:flex;align-items:center;gap:10px;font-size:13px;color:#166534}
+    .result-item .check{color:#22c55e;font-weight:bold}
+    .tip-banner{background:linear-gradient(135deg,#eff6ff 0%,#e0e7ff 100%);border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px}
+    .tip-banner .tip-icon{font-size:20px;flex-shrink:0}
+    .tip-banner .tip-content{flex:1}
+    .tip-banner .tip-title{font-size:13px;font-weight:600;color:#1e40af;margin-bottom:3px}
+    .tip-banner .tip-text{font-size:12px;color:#3b82f6;line-height:1.5}
+    /* 云分组标题 */
+    .cloud-group{margin-bottom:20px}
+    .cloud-group-header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#f8fafc;border-radius:10px;margin-bottom:8px;cursor:pointer;transition:background .15s}
+    .cloud-group-header:hover{background:#f1f5f9}
+    .cloud-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+    .cloud-icon.aliyun{background:#fff7ed;color:#ea580c}
+    .cloud-icon.aws{background:#fef3c7;color:#d97706}
+    .cloud-icon.tencent{background:#dbeafe;color:#2563eb}
+    .cloud-icon.all{background:#ede9fe;color:#7c3aed}
+    .cloud-group-title{flex:1;font-size:14px;font-weight:600}
+    .cloud-group-count{font-size:12px;color:#9ca3af}
+    .rule-row{display:flex;align-items:center;padding:12px 16px 12px 24px;border-bottom:1px solid #f5f5f5;transition:background .15s}
+    .rule-row:last-child{border-bottom:none}
+    .rule-row:hover{background:#fafbfc}
+    .rule-row .rule-info{flex:1;min-width:0}
+    .rule-row .rule-name{font-size:13px;font-weight:600;margin-bottom:2px}
+    .rule-row .rule-desc{font-size:12px;color:#9ca3af}
+    .scope-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+    .scope-tag{padding:1px 6px;border-radius:3px;font-size:10px;font-family:monospace}
+    .scope-tag.account{background:#ede9fe;color:#5b21b6}
+    .scope-tag.region{background:#dbeafe;color:#1e40af}
+    .scope-tag.resource{background:#d1fae5;color:#065f46}
+    .rule-row .rule-meta{display:flex;align-items:center;gap:10px;margin-left:12px;flex-shrink:0}
+    /* 报告层级树 */
+    .report-tree{margin-top:12px}
+    .tree-level{margin-left:0}
+    .tree-level .tree-level{margin-left:20px}
+    .tree-node{border-left:2px solid #e5e7eb;padding-left:16px;margin-bottom:4px}
+    .tree-node.cloud-node{border-left-color:#1677ff;margin-bottom:12px}
+    .tree-node.account-node{border-left-color:#8b5cf6}
+    .tree-node.region-node{border-left-color:#f59e0b}
+    .tree-node.type-node{border-left-color:#10b981}
+    .tree-label{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:13px;cursor:pointer;transition:background .15s}
+    .tree-label:hover{background:#f3f4f6}
+    .tree-label .tree-icon{font-size:14px}
+    .tree-label .tree-name{font-weight:600;flex:1}
+    .tree-label .tree-count{font-size:11px;color:#9ca3af;background:#f3f4f6;padding:2px 8px;border-radius:4px}
+    .tree-label .tree-saving{font-size:12px;color:#059669;font-weight:600}
+    .resource-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f9fafb;border-radius:6px;margin-bottom:4px;font-size:12px;margin-left:8px}
+    .resource-item .res-name{font-weight:500;color:#374151}
+    .resource-item .res-id{font-size:10px;color:#9ca3af;font-family:monospace;margin-left:8px}
+    .resource-item .res-saving{color:#059669;font-weight:600}
+    .resource-item .res-spec{font-size:10px;color:#9ca3af;margin-left:8px}
+    /* 报告列表 */
+    .report-card{border:1px solid #e5e7eb;border-radius:12px;margin-bottom:12px;overflow:hidden;transition:box-shadow .2s}
+    .report-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
+    .report-header{padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:background .15s}
+    .report-header:hover{background:#fafbfc}
+    .report-header .arrow{font-size:14px;transition:transform .2s;color:#9ca3af}
+    .report-header .report-title{flex:1}
+    .report-header .report-title h4{font-size:14px;font-weight:600;margin-bottom:2px}
+    .report-header .report-title .report-meta{font-size:12px;color:#9ca3af}
+    .report-header .report-stats{display:flex;gap:16px}
+    .report-header .report-stats .stat{text-align:center}
+    .report-header .report-stats .stat .val{font-size:16px;font-weight:700}
+    .report-header .report-stats .stat .lbl{font-size:10px;color:#9ca3af}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="top-bar">
+    <span class="logo">☁️ Cloud Manager</span>
+    <span class="divider"></span>
+    <span class="breadcrumb">财务管理 / 成本管理 / 优化建议</span>
+  </div>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="menu-group"><div class="menu-label">概览</div><div class="menu-item"><span>📊</span> 工作台</div></div>
+      <div class="menu-group"><div class="menu-label">资源管理</div><div class="menu-item"><span>🖥️</span> 资源管理</div></div>
+      <div class="menu-group"><div class="menu-label">业务中心</div><div class="menu-item"><span>📱</span> 应用中心</div></div>
+      <div class="menu-group"><div class="menu-label">运维中心</div><div class="menu-item"><span>📋</span> 工单中心</div></div>
+      <div class="menu-group"><div class="menu-label">财务管理</div><div class="menu-item"><span>💰</span> 成本趋势</div><div class="menu-item active"><span>💡</span> 优化建议</div></div>
+    </div>
+    <div class="main-content">
+      <div class="page-header"><h1>💡 智能优化建议</h1><p>基于可配置规则引擎，自动识别多云资源优化机会，助力降本增效</p></div>
+      <div class="tip-banner">
+        <span class="tip-icon">🏗️</span>
+        <div class="tip-content"><div class="tip-title">平台能力：可配置规则引擎 · 多云统一检测</div>
+          <div class="tip-text">支持多云同时检测（AWS / 阿里云 / 腾讯云），引擎自动匹配各云资源，按云厂商 → 账号 → 区域 → 资源类型层级生成结构化报告。</div></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">启用规则数</div><div class="stat-value" style="color:#7c3aed">{{ enabledRules.length }}</div><div class="stat-sub">共 {{ rules.length }} 条规则</div></div>
+        <div class="stat-card"><div class="stat-label">待处理建议</div><div class="stat-value" style="color:#d97706">{{ pendingSuggestions.length }}</div><div class="stat-sub">需要关注的优化项</div></div>
+        <div class="stat-card"><div class="stat-label">预估月节省</div><div class="stat-value" style="color:#059669">¥{{ totalSaving.toLocaleString() }}</div><div class="stat-sub">优化后预计节省</div></div>
+        <div class="stat-card"><div class="stat-label">分析报告</div><div class="stat-value" style="color:#6b7280">{{ reportHistory.length }}</div><div class="stat-sub">已生成报告数</div></div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn" :class="{active:activeTab==='rules'}" @click="activeTab='rules'">⚙️ 规则配置</button>
+        <button class="tab-btn" :class="{active:activeTab==='suggestions'}" @click="activeTab='suggestions'">📋 优化建议</button>
+        <button class="tab-btn" :class="{active:activeTab==='reports'}" @click="activeTab='reports'">📊 分析报告</button>
+      </div>
+
+      <!-- ========== 规则配置（按云分组） ========== -->
+      <div v-show="activeTab==='rules'">
+        <div class="card">
+          <div class="card-header"><h3>优化规则列表</h3><button class="btn btn-primary" @click="openCreateModal">+ 新建规则</button></div>
+          <div class="card-body" style="padding:12px">
+            <div v-for="(group, cloud) in rulesByCloud" :key="cloud" class="cloud-group">
+              <div class="cloud-group-header" @click="group._open = !group._open">
+                <div class="cloud-icon" :class="cloudClass(cloud)">{{ cloudIcon(cloud) }}</div>
+                <div class="cloud-group-title">{{ cloud }}</div>
+                <div class="cloud-group-count">{{ group.rules.length }} 条规则</div>
+                <span style="font-size:12px;color:#9ca3af;transition:transform .2s" :style="{transform:'rotate('+(group._open?90:0)+'deg)'}">▶</span>
+              </div>
+              <div v-if="group._open">
+                <div v-for="rule in group.rules" :key="rule.id" class="rule-row">
+                  <div style="font-size:16px;margin-right:12px">{{ typeIcons[rule.type] }}</div>
+                  <div class="rule-info">
+                    <div class="rule-name">{{ rule.name }}</div>
+                    <div class="rule-desc">{{ rule.description }}</div>
+                    <div class="scope-tags">
+                      <span v-if="rule.scope.account" class="scope-tag account">🔑 {{ rule.scope.account }}</span>
+                      <span v-if="rule.scope.region" class="scope-tag region">📍 {{ rule.scope.region }}</span>
+                      <span v-if="rule.scope.resourceType" class="scope-tag resource">📦 {{ resourceTypeLabel(rule.scope.resourceType) }}</span>
+                      <span v-if="!rule.scope.account && !rule.scope.region && !rule.scope.resourceType" class="scope-tag" style="background:#f3f4f6;color:#6b7280">全部资源</span>
+                    </div>
+                  </div>
+                  <div class="rule-meta">
+                    <span class="rule-tag" :class="rule.severity">{{ sevLabel(rule.severity) }}</span>
+                    <span class="rule-tag" :class="rule.enabled?'enabled':'disabled'">{{ rule.enabled?'已启用':'已禁用' }}</span>
+                    <div class="toggle" :class="rule.enabled?'on':'off'" @click="rule.enabled=!rule.enabled"></div>
+                    <button class="btn btn-default btn-sm" @click="openEditModal(rule)">编辑</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== 优化建议 ========== -->
+      <div v-show="activeTab==='suggestions'">
+        <div class="card">
+          <div class="card-header"><h3>优化建议列表（多云统一检测）</h3>
+            <button class="btn btn-success" @click="runEngine" :disabled="running">{{ running?'⏳ 多云分析中...':'🚀 执行全量检测' }}</button></div>
+          <div v-if="executing" class="card-body">
+            <div class="exec-log">
+              <div v-for="(log,i) in execLogs" :key="i" class="exec-log-item">
+                <div class="log-status"></div><span class="log-name">{{ log.cloud }} · {{ log.name }}</span>
+                <span class="log-result">匹配 {{ log.matched }} → 生成 {{ log.created }} 条建议</span>
+              </div>
+            </div>
+            <div class="result-card" v-if="execDone">
+              <h4>✅ 多云全量检测完成</h4>
+              <div class="result-items">
+                <div class="result-item"><span class="check">✓</span> 扫描 {{ enabledRules.length }} 条规则，覆盖 {{ Object.keys(cloudSummary).length }} 个云厂商</div>
+                <div class="result-item"><span class="check">✓</span> 共匹配 {{ totalMatched }} 个资源，生成 {{ totalCreated }} 条建议</div>
+                <div class="result-item"><span class="check">✓</span> 预估月节省 ¥{{ totalSaving.toLocaleString() }}</div>
+                <div class="result-item" style="margin-top:8px"><button class="btn btn-primary btn-sm" @click="activeTab='reports'">📄 查看分析报告</button></div>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="suggestions.length===0" class="card-body">
+            <div class="empty-state"><div class="empty-icon">📋</div><p>暂无优化建议，点击上方按钮执行多云全量检测</p></div>
+          </div>
+          <table v-else class="suggestion-table" style="width:100%;border-collapse:collapse">
+            <thead><tr style="text-align:left;padding:12px 16px;background:#f8fafc;font-size:12px;font-weight:600;color:#6b7280;border-bottom:1px solid #e5e7eb">
+              <th style="padding:12px 16px">云</th><th style="padding:12px 16px">优先级</th><th style="padding:12px 16px">建议内容</th><th style="padding:12px 16px">关联资源</th><th style="padding:12px 16px">预估月节省</th><th style="padding:12px 16px">状态</th><th style="padding:12px 16px">操作</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="s in suggestions" :key="s.id" style="border-bottom:1px solid #f3f4f6;font-size:13px">
+                <td style="padding:12px 16px"><span class="cloud-icon" :class="cloudClass(s.cloud)" style="width:24px;height:24px;font-size:12px">{{ cloudIcon(s.cloud) }}</span></td>
+                <td style="padding:12px 16px"><span class="rule-tag" :class="s.severity">{{ sevLabel(s.severity) }}</span></td>
+                <td style="padding:12px 16px"><div style="font-weight:500">{{ s.title }}</div><div style="font-size:11px;color:#9ca3af;margin-top:2px">{{ s.description }}</div></td>
+                <td style="padding:12px 16px"><div style="font-weight:500;color:#1f2937">{{ s.resourceName }}</div><div style="font-size:10px;color:#9ca3af;font-family:monospace">{{ s.resourceId }}</div></td>
+                <td style="padding:12px 16px" v-if="s.saving>0"><span style="color:#059669;font-weight:600">¥{{ s.saving.toLocaleString() }}/月</span></td>
+                <td v-else style="padding:12px 16px;color:#9ca3af">-</td>
+                <td style="padding:12px 16px"><span class="rule-tag" :class="s.resolved?'enabled':'disabled'">{{ s.resolved?'已处理':'待处理' }}</span></td>
+                <td style="padding:12px 16px"><button v-if="!s.resolved" class="btn btn-default btn-sm" @click="s.resolved=true">标记处理</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ========== 分析报告（层级树） ========== -->
+      <div v-show="activeTab==='reports'">
+        <div v-if="reportHistory.length===0" class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">📊</div><p>暂无分析报告，请先执行多云全量检测</p></div></div></div>
+        <div v-else>
+          <div v-for="(report,ri) in reportHistory" :key="ri" class="report-card">
+            <div class="report-header" @click="report._expanded=!report._expanded">
+              <span class="arrow" :style="{transform:'rotate('+(report._expanded?90:0)+'deg)'}">▶</span>
+              <div class="report-title">
+                <h4>📄 {{ report.title }}</h4>
+                <div class="report-meta">{{ report.time }} · {{ report.cloudCount }} 个云厂商 · {{ report.totalMatched }} 个资源</div>
+              </div>
+              <div class="report-stats">
+                <div class="stat"><div class="val" style="color:#7c3aed">{{ report.totalRules }}</div><div class="lbl">规则</div></div>
+                <div class="stat"><div class="val" style="color:#d97706">{{ report.totalMatched }}</div><div class="lbl">资源</div></div>
+                <div class="stat"><div class="val" style="color:#059669">¥{{ report.totalSaving.toLocaleString() }}</div><div class="lbl">月节省</div></div>
+              </div>
+              <button class="btn btn-primary btn-sm" @click.stop="exportReport(report)">📥 导出</button>
+            </div>
+            <div v-if="report._expanded" style="padding:16px 18px;border-top:1px solid #f0f0f0">
+              <div class="report-tree">
+                <div v-for="(cloudNode,ci) in report.tree" :key="ci" class="tree-node cloud-node">
+                  <div class="tree-label" @click="cloudNode._open=!cloudNode._open">
+                    <span class="tree-icon" :class="'cloud-icon '+cloudClass(cloudNode.cloud)" style="width:24px;height:24px;font-size:12px">{{ cloudIcon(cloudNode.cloud) }}</span>
+                    <span class="tree-name">{{ cloudNode.cloud }}</span>
+                    <span class="tree-count">{{ cloudNode.matched }} 项</span>
+                    <span class="tree-saving">¥{{ cloudNode.saving.toLocaleString() }}/月</span>
+                    <span style="font-size:11px;color:#9ca3af;transition:transform .2s" :style="{transform:'rotate('+(cloudNode._open?90:0)+'deg)'}">▶</span>
+                  </div>
+                  <div v-if="cloudNode._open" class="tree-level">
+                    <div v-for="(accNode,ai) in cloudNode.accounts" :key="ai" class="tree-node account-node">
+                      <div class="tree-label" @click="accNode._open=!accNode._open">
+                        <span class="tree-icon">🔑</span>
+                        <span class="tree-name">{{ accNode.account }}</span>
+                        <span class="tree-count">{{ accNode.matched }} 项</span>
+                        <span class="tree-saving">¥{{ accNode.saving.toLocaleString() }}/月</span>
+                        <span style="font-size:11px;color:#9ca3af;transition:transform .2s" :style="{transform:'rotate('+(accNode._open?90:0)+'deg)'}">▶</span>
+                      </div>
+                      <div v-if="accNode._open" class="tree-level">
+                        <div v-for="(regNode,ri2) in accNode.regions" :key="ri2" class="tree-node region-node">
+                          <div class="tree-label" @click="regNode._open=!regNode._open">
+                            <span class="tree-icon">📍</span>
+                            <span class="tree-name">{{ regNode.region }}</span>
+                            <span class="tree-count">{{ regNode.matched }} 项</span>
+                            <span class="tree-saving">¥{{ regNode.saving.toLocaleString() }}/月</span>
+                            <span style="font-size:11px;color:#9ca3af;transition:transform .2s" :style="{transform:'rotate('+(regNode._open?90:0)+'deg)'}">▶</span>
+                          </div>
+                          <div v-if="regNode._open" class="tree-level">
+                            <div v-for="(typeNode,ti) in regNode.types" :key="ti" class="tree-node type-node">
+                              <div class="tree-label" @click="typeNode._open=!typeNode._open">
+                                <span class="tree-icon">📦</span>
+                                <span class="tree-name">{{ typeNode.typeName }}</span>
+                                <span class="tree-count">{{ typeNode.matched }} 项</span>
+                                <span class="tree-saving">¥{{ typeNode.saving.toLocaleString() }}/月</span>
+                                <span style="font-size:11px;color:#9ca3af;transition:transform .2s" :style="{transform:'rotate('+(typeNode._open?90:0)+'deg)'}">▶</span>
+                              </div>
+                              <div v-if="typeNode._open" class="tree-level">
+                                <div v-for="(item,ii) in typeNode.items" :key="ii" class="resource-item">
+                                  <span><span class="res-name">{{ item.name }}</span><span class="res-id">{{ item.id }}</span><span class="res-spec">{{ item.spec }}</span></span>
+                                  <span class="res-saving" v-if="item.saving>0">¥{{ item.saving.toLocaleString() }}/月</span>
+                                  <span v-else style="color:#9ca3af">-</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新建/编辑规则弹窗 -->
+  <div class="modal-overlay" v-if="showModal" @click.self="closeModal">
+    <div class="modal">
+      <div class="modal-header"><h2>{{ editingRule?'编辑规则':'新建优化规则' }}</h2><button class="modal-close" @click="closeModal">✕</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">规则名称</label><input class="form-input" v-model="form.name" placeholder="如：闲置主机检测"></div>
+        <div class="section-title">🎯 检测范围</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">云厂商</label>
+            <select class="form-select" v-model="form.scope.cloud"><option value="">全部云厂商</option><option value="阿里云">阿里云</option><option value="AWS">AWS</option><option value="腾讯云">腾讯云</option></select></div>
+          <div class="form-group"><label class="form-label">云账号</label>
+            <select class="form-select" v-model="form.scope.account"><option value="">全部账号</option><option value="主账号-001">主账号-001</option><option value="财务账号-002">财务账号-002</option><option value="测试账号-003">测试账号-003</option></select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">区域</label>
+            <select class="form-select" v-model="form.scope.region"><option value="">全部区域</option><option value="cn-hangzhou">华东1(杭州)</option><option value="cn-beijing">华北2(北京)</option><option value="cn-shanghai">华东2(上海)</option><option value="us-east-1">美东1(弗吉尼亚)</option><option value="ap-southeast-1">东南亚(新加坡)</option></select></div>
+          <div class="form-group"><label class="form-label">资源类型</label>
+            <select class="form-select" v-model="form.scope.resourceType" @change="onResourceTypeChange"><option value="">全部资源类型</option><option value="instance">云主机</option><option value="database">数据库</option><option value="cache">缓存</option><option value="disk">云硬盘</option><option value="load_balancer">负载均衡</option><option value="object_storage">对象存储</option></select></div>
+        </div>
+        <div class="section-title" style="margin-top:20px">🔍 检测逻辑</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">规则类型</label>
+            <select class="form-select" v-model="form.type" @change="onTypeChange"><option value="idle">闲置资源检测</option><option value="downsize">规格降配建议</option><option value="unused">未使用资源</option><option value="budget">预算超支告警</option><option value="trend">费用趋势异常</option></select></div>
+          <div class="form-group"><label class="form-label">建议优先级</label>
+            <select class="form-select" v-model="form.severity"><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></div>
+        </div>
+        <div class="form-group"><label class="form-label">规则描述</label><input class="form-input" v-model="form.description" placeholder="简要说明"></div>
+        <div class="form-group"><label class="form-label">检测条件（JSON）</label>
+          <div class="json-editor"><textarea v-model="form.conditions" spellcheck="false"></textarea></div>
+          <div class="form-hint">声明式条件配置，引擎根据此 JSON 匹配资源</div></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">建议标题模板</label>
+            <input class="form-input" v-model="form.titleTemplate" placeholder="{resource_name} 建议处理">
+            <div class="template-preview"><div class="preview-label">预览</div><div class="preview-text" v-html="previewTitle"></div></div></div>
+          <div class="form-group"><label class="form-label">预估节省</label>
+            <select class="form-select" v-model="form.savingType"><option value="fixed">固定金额</option><option value="spec_ratio">按规格比例</option><option value="none">不估算</option></select>
+            <div v-if="form.savingType==='fixed'" style="margin-top:8px"><input class="form-input" type="number" v-model.number="form.savingAmount" placeholder="元/月"></div>
+            <div v-if="form.savingType==='spec_ratio'" style="margin-top:8px"><input class="form-input" type="number" v-model.number="form.savingPercent" placeholder="%" max="100" min="1"></div></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-default" @click="closeModal">取消</button><button class="btn btn-primary" @click="saveRule">{{ editingRule?'保存修改':'创建规则' }}</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const{createApp,ref,computed,reactive}=Vue
+createApp({
+  setup(){
+    const activeTab=ref('rules'),showModal=ref(false),editingRule=ref(null),running=ref(false),executing=ref(false),execDone=ref(false)
+    const typeIcons={idle:'🔴',downsize:'🟠',unused:'🔵',budget:'🟣',trend:'🟢'}
+    const typeLabels={idle:'闲置资源',downsize:'建议降配',unused:'未使用',budget:'预算告警',trend:'趋势异常'}
+    const sevLabels={high:'高',medium:'中',low:'低'}
+    const cloudIcons={all:'🌐',aws:'🟧',aliyun:'🟠',tencent:'🔵'}
+    const cloudClasses={all:'all',aws:'aws',aliyun:'aliyun',tencent:'tencent'}
+    function cloudIcon(c){return cloudIcons[c]||'☁️'}
+    function cloudClass(c){return cloudClasses[c]||'all'}
+    function sevLabel(s){return sevLabels[s]||s}
+    const resourceTypeLabels={instance:'云主机',database:'数据库',cache:'缓存',disk:'云硬盘',load_balancer:'负载均衡',object_storage:'对象存储'}
+    function resourceTypeLabel(t){return resourceTypeLabels[t]||t}
+
+    const rules=reactive([
+      {id:1,name:'闲置主机检测',type:'idle',severity:'high',enabled:true,description:'检测已停止超过 7 天的云主机',scope:{cloud:'阿里云',account:'',region:'cn-hangzhou',resourceType:'instance'},conditions:'{"resource_type":"instance","status":"stopped","min_stopped_days":7}',titleTemplate:'闲置主机 {resource_name} 建议下架',savingType:'spec_ratio',savingPercent:100},
+      {id:2,name:'低利用率降配',type:'downsize',severity:'medium',enabled:true,description:'CPU 平均利用率 < 5% 的主机建议降配',scope:{cloud:'阿里云',account:'主账号-001',region:'',resourceType:'instance'},conditions:'{"resource_type":"instance","status":"running","metrics":{"avg_cpu_7d":{"lt":5}}}',titleTemplate:'主机 {resource_name} 利用率过低',savingType:'spec_ratio',savingPercent:40},
+      {id:3,name:'未挂载云硬盘',type:'unused',severity:'low',enabled:true,description:'available 超过 30 天的云硬盘',scope:{cloud:'阿里云',account:'',region:'',resourceType:'disk'},conditions:'{"resource_type":"disk","status":"available","min_days":30}',titleTemplate:'云硬盘 {resource_name} 未挂载',savingType:'fixed',savingAmount:50},
+      {id:4,name:'AWS 闲置实例',type:'idle',severity:'high',enabled:true,description:'AWS 美东已停止实例',scope:{cloud:'AWS',account:'',region:'us-east-1',resourceType:'instance'},conditions:'{"resource_type":"instance","status":"stopped","min_stopped_days":3}',titleTemplate:'AWS 闲置实例 {resource_name}',savingType:'spec_ratio',savingPercent:100},
+      {id:5,name:'AWS 低利用率',type:'downsize',severity:'medium',enabled:true,description:'AWS 实例 CPU < 5%',scope:{cloud:'AWS',account:'',region:'',resourceType:'instance'},conditions:'{"resource_type":"instance","metrics":{"avg_cpu_7d":{"lt":5}}}',titleTemplate:'AWS 实例 {resource_name} 建议降配',savingType:'spec_ratio',savingPercent:40},
+      {id:6,name:'部门预算超支',type:'budget',severity:'high',enabled:true,description:'预算使用超过 80%',scope:{cloud:'',account:'',region:'',resourceType:''},conditions:'{"budget_usage_percent":{"gte":80}}',titleTemplate:'{department_name} 预算已用 {usage_percent}%',savingType:'none'},
+    ])
+
+    const enabledRules=computed(()=>rules.filter(r=>r.enabled))
+    const rulesByCloud=computed(()=>{
+      const groups={}
+      enabledRules.value.forEach(r=>{
+        const cloud=r.scope.cloud||'全部云'
+        if(!groups[cloud])groups[cloud]={_open:true,rules:[]}
+        groups[cloud].rules.push(r)
+      })
+      // 把"全部云"排在最后
+      const ordered={};Object.keys(groups).sort((a,b)=>{if(a==='全部云')return 1;if(b==='全部云')return -1;return a.localeCompare(b)}).forEach(k=>ordered[k]=groups[k])
+      return ordered
+    })
+
+    // 模拟资源
+    const mockResources=[
+      {name:'web-prod-001',id:'i-3a7b2c8d9e01',type:'instance',status:'stopped',region:'cn-hangzhou',cloud:'阿里云',account:'主账号-001',spec:'ecs.g6.2xlarge',cpu:2.1},
+      {name:'api-staging-002',id:'i-8f1a4b5c6d02',type:'instance',status:'stopped',region:'cn-beijing',cloud:'阿里云',account:'测试账号-003',spec:'ecs.g6.xlarge',cpu:3.5},
+      {name:'worker-prod-003',id:'i-2e3d4c5b6a03',type:'instance',status:'stopped',region:'cn-hangzhou',cloud:'阿里云',account:'主账号-001',spec:'ecs.c7.xlarge',cpu:1.8},
+      {name:'aws-web-001',id:'i-9a8b7c6d5e04',type:'instance',status:'stopped',region:'us-east-1',cloud:'AWS',account:'主账号-001',spec:'t3.xlarge',cpu:1.5},
+      {name:'aws-api-002',id:'i-1b2c3d4e5f05',type:'instance',status:'stopped',region:'us-east-1',cloud:'AWS',account:'财务账号-002',spec:'t3.large',cpu:2.2},
+      {name:'db-backup-001',id:'d-9k8j7h6g5f01',type:'disk',status:'available',region:'cn-hangzhou',cloud:'阿里云',account:'主账号-001',spec:'500GB SSD'},
+      {name:'log-archive-002',id:'d-4b5c6d7e8f02',type:'disk',status:'available',region:'cn-shanghai',cloud:'阿里云',account:'主账号-001',spec:'1TB HDD'},
+      {name:'data-tmp-003',id:'d-1a2b3c4d5e03',type:'disk',status:'available',region:'cn-beijing',cloud:'阿里云',account:'测试账号-003',spec:'200GB SSD'},
+      {name:'web-prod-004',id:'i-5f6a7b8c9d06',type:'instance',status:'running',region:'cn-hangzhou',cloud:'阿里云',account:'主账号-001',spec:'ecs.g6.2xlarge',cpu:3.2},
+      {name:'api-prod-005',id:'i-6g7h8i9j0k07',type:'instance',status:'running',region:'cn-beijing',cloud:'阿里云',account:'主账号-001',spec:'ecs.g6.xlarge',cpu:4.1},
+      {name:'cache-prod-001',id:'i-7h8i9j0k1l08',type:'instance',status:'running',region:'cn-hangzhou',cloud:'阿里云',account:'主账号-001',spec:'ecs.c7.large',cpu:2.8},
+      {name:'gateway-prod-001',id:'i-8i9j0k1l2m09',type:'instance',status:'running',region:'cn-shanghai',cloud:'阿里云',account:'主账号-001',spec:'ecs.g6.xlarge',cpu:4.5},
+      {name:'aws-worker-003',id:'i-3c4d5e6f7a10',type:'instance',status:'running',region:'us-east-1',cloud:'AWS',account:'主账号-001',spec:'t3.medium',cpu:3.0},
+      {name:'aws-db-001',id:'i-4d5e6f7a8b11',type:'instance',status:'running',region:'us-east-1',cloud:'AWS',account:'主账号-001',spec:'t3.large',cpu:4.8},
+    ]
+
+    const suggestions=ref([]),execLogs=ref([]),reportHistory=ref([])
+    const pendingSuggestions=computed(()=>suggestions.value.filter(s=>!s.resolved))
+    const totalSaving=computed(()=>pendingSuggestions.value.reduce((s,x)=>s+x.saving,0))
+    const totalMatched=computed(()=>execLogs.value.reduce((s,l)=>s+l.matched,0))
+    const totalCreated=computed(()=>execLogs.value.reduce((s,l)=>s+l.created,0))
+    const cloudSummary=computed(()=>{const m={};suggestions.value.forEach(s=>{if(!m[s.cloud])m[s.cloud]=0;m[s.cloud]++});return m})
+
+    function filterByScope(resources,scope){
+      return resources.filter(r=>{
+        if(scope.cloud&&r.cloud!==scope.cloud)return false
+        if(scope.account&&r.account!==scope.account)return false
+        if(scope.region&&r.region!==scope.region)return false
+        if(scope.resourceType&&r.type!==scope.resourceType)return false
+        return true
+      })
+    }
+    function estimateSaving(resource,rule){
+      const sp={'ecs.g6.2xlarge':1200,'ecs.g6.xlarge':600,'ecs.c7.xlarge':500,'ecs.c7.large':250,'t3.xlarge':800,'t3.large':400,'t3.medium':200,'500GB SSD':200,'1TB HDD':150,'200GB SSD':80}
+      const bp=sp[resource.spec]||300
+      if(rule.savingType==='fixed')return rule.savingAmount||0
+      if(rule.savingType==='spec_ratio')return Math.round(bp*(rule.savingPercent||100)/100)
+      return 0
+    }
+
+    function runEngine(){
+      running.value=true;executing.value=true;execDone.value=false;execLogs.value=[];suggestions.value=[]
+      const batchLogs=[],allItems=[]
+      enabledRules.value.forEach((rule,i)=>{
+        setTimeout(()=>{
+          const scoped=filterByScope(mockResources,rule.scope)
+          let matched=[]
+          if(rule.type==='idle')matched=scoped.filter(r=>r.status==='stopped')
+          else if(rule.type==='downsize')matched=scoped.filter(r=>r.status==='running'&&r.cpu&&r.cpu<5)
+          else if(rule.type==='unused')matched=scoped.filter(r=>r.status==='available')
+          else if(rule.type==='budget')matched=[{name:'研发部',id:'DEPT-001',region:'-',spec:'-',cloud:'全部',account:'-'}]
+
+          matched.forEach(r=>{
+            const item={name:r.name,id:r.id,cloud:r.cloud||'全部',account:r.account||'-',region:r.region||'-',type:r.type,spec:r.spec||'-',
+              title:rule.titleTemplate.replace('{resource_name}',r.name).replace('{department_name}',r.name).replace('{account_name}',r.name),
+              description:rule.description,severity:rule.severity,saving:estimateSaving(r,rule),resolved:false,
+              ruleName:rule.name,ruleType:rule.type}
+            suggestions.value.push({...item,id:suggestions.value.length+1})
+            allItems.push(item)
+          })
+          const log={cloud:rule.scope.cloud||'全部',name:rule.name,matched:matched.length,created:matched.length}
+          execLogs.value.push(log);batchLogs.push(log)
+          if(execLogs.value.length===enabledRules.value.length){
+            running.value=false;execDone.value=true
+            // 构建层级树
+            const tree=buildTree(allItems)
+            const cloudCount=Object.keys(tree).length
+            reportHistory.value.unshift({
+              title:`多云优化分析报告 - ${new Date().toLocaleDateString('zh-CN')}`,
+              time:new Date().toLocaleString('zh-CN'),
+              totalRules:enabledRules.value.length,totalMatched:totalMatched.value,totalSaving:totalSaving.value,
+              cloudCount,tree:Object.values(tree).map(t=>({...t,_open:true})),
+              _expanded:false,
+            })
+            setTimeout(()=>{activeTab.value='suggestions'},600)
+          }
+        },(i+1)*400)
+      })
+    }
+
+    function buildTree(items){
+      const tree={}
+      items.forEach(item=>{
+        const c=item.cloud||'全部'
+        if(!tree[c])tree[c]={cloud:c,matched:0,saving:0,accounts:{},_open:true}
+        tree[c].matched++;tree[c].saving+=item.saving
+        const a=item.account||'-'
+        if(!tree[c].accounts[a])tree[c].accounts[a]={account:a,matched:0,saving:0,regions:{},_open:false}
+        tree[c].accounts[a].matched++;tree[c].accounts[a].saving+=item.saving
+        const rg=item.region||'-'
+        if(!tree[c].accounts[a].regions[rg])tree[c].accounts[a].regions[rg]={region:rg,matched:0,saving:0,types:{},_open:false}
+        tree[c].accounts[a].regions[rg].matched++;tree[c].accounts[a].regions[rg].saving+=item.saving
+        const tn=resourceTypeLabels[item.type]||item.type
+        if(!tree[c].accounts[a].regions[rg].types[tn])tree[c].accounts[a].regions[rg].types[tn]={typeName:tn,matched:0,saving:0,items:[],_open:false}
+        tree[c].accounts[a].regions[rg].types[tn].matched++;tree[c].accounts[a].regions[rg].types[tn].saving+=item.saving
+        tree[c].accounts[a].regions[rg].types[tn].items.push({name:item.name,id:item.id,spec:item.spec,saving:item.saving})
+      })
+      // 转为数组
+      Object.values(tree).forEach(c=>{
+        c.accounts=Object.values(c.accounts).map(a=>{a.regions=Object.values(a.regions).map(r=>{r.types=Object.values(r.types);return r});return a})
+      })
+      return tree
+    }
+
+    function exportReport(report){
+      const lines=[report.title,`生成时间: ${report.time}`,`覆盖云厂商: ${report.cloudCount}`,`扫描规则: ${report.totalRules}`,`匹配资源: ${report.totalMatched}`,`预估月节省: ¥${report.totalSaving.toLocaleString()}`,'','--- 层级明细 ---']
+      report.tree.forEach(c=>{lines.push('',`[${c.cloud}] ${c.matched} 项 ¥${c.saving}/月`);c.accounts.forEach(a=>{lines.push(`  🔑 ${a.account} ${a.matched} 项`);a.regions.forEach(r=>{lines.push(`    📍 ${r.region} ${r.matched} 项`);r.types.forEach(t=>{lines.push(`      📦 ${t.typeName} ${t.matched} 项`);t.items.forEach(it=>lines.push(`        ${it.name} (${it.id}) ${it.spec} → ¥${it.saving}/月`))})})})})
+      const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'})
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=report.title+'.txt';a.click()
+    }
+
+    // 表单
+    const form=reactive({name:'',type:'idle',severity:'medium',description:'',scope:{cloud:'',account:'',region:'',resourceType:''},conditions:'{}',titleTemplate:'{resource_name} 建议处理',savingType:'spec_ratio',savingAmount:200,savingPercent:40})
+    const condTpls={idle:'{"resource_type":"instance","status":"stopped","min_stopped_days":7}',downsize:'{"resource_type":"instance","status":"running","metrics":{"avg_cpu_7d":{"lt":5}}}',unused:'{"resource_type":"disk","status":"available","min_days":30}',budget:'{"budget_usage_percent":{"gte":80}}',trend:'{"compare":"month_over_month","threshold_percent":20}'}
+    function onTypeChange(){let tpl=condTpls[form.type]||'{}';if(form.scope.resourceType){try{const o=JSON.parse(tpl);o.resource_type=form.scope.resourceType;tpl=JSON.stringify(o,null,2)}catch(e){}}form.conditions=tpl}
+    function onResourceTypeChange(){try{const o=JSON.parse(form.conditions);if(form.scope.resourceType)o.resource_type=form.scope.resourceType;else delete o.resource_type;form.conditions=JSON.stringify(o,null,2)}catch(e){if(form.scope.resourceType)form.conditions=JSON.stringify({resource_type:form.scope.resourceType},null,2)}}
+    function openCreateModal(){editingRule.value=null;form.name='';form.type='idle';form.severity='medium';form.description='';form.scope={cloud:'',account:'',region:'',resourceType:''};form.conditions=condTpls.idle;form.titleTemplate='{resource_name} 建议处理';form.savingType='spec_ratio';form.savingAmount=200;form.savingPercent=40;showModal.value=true}
+    function openEditModal(rule){editingRule.value=rule;form.name=rule.name;form.type=rule.type;form.severity=rule.severity;form.description=rule.description;form.scope={...rule.scope};form.conditions=rule.conditions;form.titleTemplate=rule.titleTemplate;form.savingType=rule.savingType;form.savingAmount=rule.savingAmount||200;form.savingPercent=rule.savingPercent||40;showModal.value=true}
+    function closeModal(){showModal.value=false;editingRule.value=null}
+    function saveRule(){if(editingRule.value){const r=editingRule.value;Object.assign(r,{name:form.name,type:form.type,severity:form.severity,description:form.description,scope:{...form.scope},conditions:form.conditions,titleTemplate:form.titleTemplate,savingType:form.savingType,savingAmount:form.savingAmount,savingPercent:form.savingPercent})}else{rules.push({id:rules.length+1,name:form.name,type:form.type,severity:form.severity,enabled:true,description:form.description,scope:{...form.scope},conditions:form.conditions,titleTemplate:form.titleTemplate,savingType:form.savingType,savingAmount:form.savingAmount,savingPercent:form.savingPercent})}closeModal()}
+    const previewTitle=computed(()=>(form.titleTemplate||'').replace(/\{resource_name\}/g,'<span class="placeholder">web-prod-001</span>').replace(/\{department_name\}/g,'<span class="placeholder">研发部</span>').replace(/\{account_name\}/g,'<span class="placeholder">主账号</span>').replace(/\{usage_percent\}/g,'<span class="placeholder">85%</span>'))
+
+    return{activeTab,showModal,editingRule,running,executing,execDone,typeIcons,sevLabel,cloudIcon,cloudClass,resourceTypeLabel,rules,enabledRules,rulesByCloud,suggestions,execLogs,reportHistory,pendingSuggestions,totalSaving,totalMatched,totalCreated,cloudSummary,form,previewTitle,runEngine,exportReport,openCreateModal,openEditModal,closeModal,saveRule,onTypeChange,onResourceTypeChange}
+  }
+}).mount('#app')
+</script>
+</body>
+</html>

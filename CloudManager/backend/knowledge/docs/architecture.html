@@ -1,0 +1,46 @@
+
+<h2>一、总体架构：还原真实项目四层骨架</h2>
+<table>
+  <thead><tr><th>层级</th><th>职责</th><th>技术选型（Demo）</th></tr></thead>
+  <tbody>
+    <tr><td>接入层</td><td>Web / 用户交互</td><td>Vue 3 + Ant Design Vue</td></tr>
+    <tr><td>业务层</td><td>资源 / 工单 / 成本 / 权限</td><td>Django REST Framework</td></tr>
+    <tr><td>流程层</td><td>审批流 / 自动化任务</td><td>工单系统 + Mock Provider</td></tr>
+    <tr><td>数据层</td><td>唯一数据源</td><td>CMDB（MySQL 8）</td></tr>
+  </tbody>
+</table>
+<p>关键：<b>所有数据以 CMDB 为唯一数据源</b>，前端不直接操作云厂商，统一走后端 API。</p>
+
+<h2>二、核心设计决策（面试重点）</h2>
+<h3>决策 1：操作为什么必须走工单系统？</h3>
+<ul>
+  <li>变更可控：所有写操作统一入口，未审批不执行。</li>
+  <li>责任可溯：操作人、审批人、执行结果全程留痕。</li>
+  <li>便于接入审计 / 合规要求。</li>
+</ul>
+<h3>决策 2：CMDB 为什么是唯一数据源？</h3>
+<ul>
+  <li>云上资源与内部数据一致，避免多头维护。</li>
+  <li>支持跨云统一建模（多态资源表）。</li>
+  <li>成本 / 拓扑 / 权限均基于 CMDB 数据派生。</li>
+</ul>
+<h3>决策 3：云操作是异步长任务，如何保证最终一致？</h3>
+<ol>
+  <li>工单通过后提交到 <b>Mock Provider 执行队列</b>（真实系统为消息队列）。</li>
+  <li>执行结果异步回写 CMDB（采集 / 回写任务）。</li>
+  <li>失败可重试 / 回滚，保证最终一致。</li>
+</ol>
+
+<h2>三、云适配层设计（核心扩展点）</h2>
+<p>通过 <b>Provider 适配层</b> 屏蔽云厂商差异：</p>
+<ul>
+  <li>统一操作接口（create / start / stop / resize / delete）。</li>
+  <li>统一资源模型（Resource 多态 + 类型映射）。</li>
+  <li>新增云厂商 = 新增一个 Provider 适配器，业务层无感。</li>
+</ul>
+
+<h2>四、数据流</h2>
+<h3>查询链路（读）</h3>
+<pre>前端 → /api/... → CMDB → 统一响应</pre>
+<h3>操作链路（写）</h3>
+<pre>前端 → 工单提交 → 审批通过 → Provider 执行 → 回写 CMDB → 前端刷新</pre>

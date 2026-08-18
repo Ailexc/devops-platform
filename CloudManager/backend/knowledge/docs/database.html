@@ -1,0 +1,45 @@
+
+<h2>一、总体 ER 概览</h2>
+<p>四大模块：<b>CMDB（资源）</b> / <b>工单系统（流程）</b> / <b>权限审计</b> / <b>成本（账单）</b>。</p>
+
+<h2>二、CMDB 模块</h2>
+<h3>cmdb_cloud_account 云账号表</h3>
+<p>云厂商、账号名、AK/SK 引用、区域列表、状态。</p>
+<h3>cmdb_resource 统一资源表（多态建模核心）</h3>
+<table>
+  <thead><tr><th>字段</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>resource_type</td><td>instance / database / cache / load_balancer ...</td></tr>
+    <tr><td>metadata</td><td>JSON 扩展字段（规格 / IP / 配置）</td></tr>
+    <tr><td>provider_type / region / account</td><td>云厂商、区域、归属账号</td></tr>
+    <tr><td>application / department</td><td>归属标签（业务视角）</td></tr>
+    <tr><td>status</td><td>运行中 / 已停止 / 异常</td></tr>
+  </tbody>
+</table>
+<h3>cmdb_resource_relation 资源关系表</h3>
+<p>source_id → target_id + relation_type，支撑依赖图谱。</p>
+<h3>cmdb_resource_change 变更历史表</h3>
+<p>每次操作留痕：操作人、类型、前后 diff、工单号。</p>
+<h3>cmdb_application 应用表</h3>
+<p>应用归属组织、环境（dev / prod）、预算（budget_amount）。</p>
+
+<h2>三、工单系统模块</h2>
+<ul>
+  <li><b>ticket_order</b>：单号 WO+日期+序列、类型（create/start/stop/change/delete/relation_change/apply_quota）、状态 8 种流转、请求参数、关联资源。</li>
+  <li><b>ticket_approval</b>：审批人、意见、时间，支持多人 / 驳回重提。</li>
+  <li><b>ticket_task</b>：自动化任务（执行 Provider / 回写 CMDB）。</li>
+</ul>
+
+<h2>四、成本模块</h2>
+<ul>
+  <li><b>fin_cost_bill</b>：账单（云厂商 / 账号 / 月份 / 总额）。</li>
+  <li><b>fin_cost_item</b>：成本明细，含 department / application 分摊标签（Cost Allocation Tag）。</li>
+  <li><b>fin_budget</b>：部门 / 应用预算。</li>
+</ul>
+
+<h2>五、索引与性能要点</h2>
+<ul>
+  <li>资源表按 (provider_type, status) 建索引。</li>
+  <li>成本明细按 (bill_id, department, application) 建组合索引，支撑分摊聚合。</li>
+  <li>变更历史按 resource_id + created_at 索引，分页查询。</li>
+</ul>

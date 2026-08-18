@@ -1,0 +1,32 @@
+
+<h2>一、核心结论</h2>
+<blockquote>业务、资源、成本三者通过 <b>统一标签（application / department）</b> 打通：
+资源归属业务、账单归属业务，两者都基于同一套标签，从而回答"业务用了多少资源、花了多少钱"。</blockquote>
+
+<h2>二、三角关系总览</h2>
+<table>
+  <thead><tr><th>块</th><th>问题</th><th>打通机制</th></tr></thead>
+  <tbody>
+    <tr><td>业务</td><td>有哪些应用 / 环境？</td><td>cmdb_application + 环境</td></tr>
+    <tr><td>资源</td><td>业务用了哪些资源？</td><td>资源表 application 标签</td></tr>
+    <tr><td>成本</td><td>业务花了多少钱？</td><td>账单 CostItem 的 department / application 标签</td></tr>
+  </tbody>
+</table>
+
+<h2>三、三大块打通（架构层三步）</h2>
+<h3>5.1 供给侧：业务 → 资源（自动打标）</h3>
+<p>申请资源时绑定应用，Resource 自动带上 application 标签。</p>
+<h3>5.2 消费侧：资源 → CMDB（采集映射）</h3>
+<p>云上资源通过采集任务映射进 CMDB，保持一致。</p>
+<h3>5.3 成本侧：账单 → 分摊（标签归集）</h3>
+<p>云账单的 Cost Allocation Tag 落到 CostItem，按 department / application 聚合分摊；未打标签归入「未归属」。</p>
+
+<h2>四、映射到本项目建模（关键）</h2>
+<ul>
+  <li>Resource.application / department：资源归属业务标签。</li>
+  <li>CostItem.department / application：账单分摊标签（与资源标签分离，模拟真实账单标签）。</li>
+  <li>应用中心成本 = 按应用过滤的账单聚合，避免"环境成本 = 账号全部费用"失真。</li>
+</ul>
+
+<h2>五、面试话术要点</h2>
+<p>强调"标签主线"设计：<b>不靠人工对账，靠统一标签自动归集</b>，三层（业务 / 资源 / 成本）任何一层有标签即可回答成本归属问题。</p>

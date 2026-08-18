@@ -1,0 +1,66 @@
+services:
+  # ── 统一数据层（由根目录 infra/docker-compose.yml 提供，devops-net 网络）──
+  # PostgreSQL: devops-postgres（库 devops_cloud）
+  # Redis:      devops-redis（db index 1=cloud）
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cloud_manager_backend
+    environment:
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=devops_cloud
+      - DB_USER=devops
+      - DB_PASSWORD=devops
+      - DB_HOST=devops-postgres
+      - DB_PORT=5432
+      - REDIS_HOST=devops-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-your-secret-key-here}
+      - DJANGO_DEBUG=false
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-*,backend,cloud_manager_backend,cloud-manager-backend.orb.local}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://cloud-manager-nginx.orb.local,http://cloud-manager-backend.orb.local}
+    restart: unless-stopped
+    networks:
+      - cloud_net
+      - devops-net
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  nginx:
+    image: nginx:alpine
+    container_name: cloud_manager_nginx
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./frontend/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+
+    depends_on:
+      - backend
+    networks:
+      - cloud_net
+      - devops-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+
+
+networks:
+  cloud_net:
+    driver: bridge
+  devops-net:              # 统一基础设施网络（根目录 infra/docker-compose.yml）
+    external: true

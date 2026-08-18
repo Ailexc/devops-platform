@@ -1,0 +1,39 @@
+
+<h2>一、选型前提（硬约束）</h2>
+<ul>
+  <li>面向企业内网部署，单机 / 小型集群即可。</li>
+  <li>需快速演示完整业务闭环，降低基建成本。</li>
+  <li>架构上需与真实项目（Java Spring Boot）保持同构。</li>
+</ul>
+
+<h2>二、选型建议</h2>
+<table>
+  <thead><tr><th>领域</th><th>技术</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td>前端</td><td>Vue 3 + TypeScript + Vite + Ant Design Vue</td><td>组件丰富、生态成熟、类型安全</td></tr>
+    <tr><td>后端</td><td>Django 4.2 + DRF + SimpleJWT</td><td>快速建模、自带 Admin、认证完善</td></tr>
+    <tr><td>数据库</td><td>MySQL 8（生产）/ SQLite（本地）</td><td>稳定通用，支持 JSON / 多表</td></tr>
+    <tr><td>消息队列</td><td>RabbitMQ（真实）→ 本 Demo 用 Mock Provider 异步</td><td>异步长任务解耦</td></tr>
+    <tr><td>部署</td><td>Docker Compose + Nginx</td><td>一键起多服务，便于演示</td></tr>
+  </tbody>
+</table>
+
+<h2>三、关键选型理由</h2>
+<h3>前端：Vue 3 + Ant Design Vue</h3>
+<p>企业级组件全（表格 / 表单 / 图表联动），配合 ECharts 实现成本大屏与依赖图谱。</p>
+<h3>后端：Django REST Framework</h3>
+<p>ORM 建模高效、DRF 序列化 + 视图集快速出 API、自带 JWT 认证与权限体系，适合快速交付 Demo。</p>
+
+<h2>四、Mock 策略（Demo 关键设计）</h2>
+<ul>
+  <li><b>数据全 Mock</b>：账号、资源、账单、建议均由 seed 脚本生成，贴近真实分布。</li>
+  <li><b>Provider Mock</b>：云操作由 Mock Provider 模拟执行 + 回写 CMDB，闭环完整。</li>
+  <li><b>成本模拟采集</b>：seed_metrics 写 CPU / 内存指标，供规则引擎检测。</li>
+</ul>
+
+<h2>五、暂缓 / 排除项</h2>
+<ul>
+  <li>真实云 SDK 对接（Demo 阶段 Mock Provider 足够）。</li>
+  <li>消息队列 / 缓存中间件（异步用任务表模拟）。</li>
+  <li>复杂工作流引擎（工单状态机简化实现）。</li>
+</ul>

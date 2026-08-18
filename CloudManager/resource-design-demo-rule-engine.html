@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>可配置优化规则引擎 - Demo</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/ant-design-vue@4/dist/antd.min.js"></script>
+  <script src="https://unpkg.com/@ant-design/icons-vue"></script>
+  <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4/dist/reset.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1f2937; }
+    
+    /* 顶部导航 */
+    .top-bar {
+      height: 48px; background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      display: flex; align-items: center; padding: 0 24px; color: white; gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .top-bar .logo { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+    .top-bar .divider { width: 1px; height: 20px; background: rgba(255,255,255,0.2); }
+    .top-bar .breadcrumb { font-size: 13px; opacity: 0.85; }
+    
+    /* 布局 */
+    .layout { display: flex; min-height: calc(100vh - 48px); }
+    .sidebar { width: 220px; background: #001529; padding: 16px 0; flex-shrink: 0; }
+    .sidebar .menu-group { margin-bottom: 8px; }
+    .sidebar .menu-label { padding: 8px 20px 4px; font-size: 11px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 1px; }
+    .sidebar .menu-item { padding: 10px 20px 10px 24px; color: rgba(255,255,255,0.65); font-size: 14px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 10px; }
+    .sidebar .menu-item:hover { color: white; background: rgba(255,255,255,0.06); }
+    .sidebar .menu-item.active { color: white; background: #1677ff; border-right: 3px solid #4096ff; }
+    .sidebar .menu-item .icon { width: 16px; text-align: center; font-size: 14px; }
+    .sidebar .submenu { padding-left: 20px; }
+    
+    .main-content { flex: 1; padding: 24px; overflow-y: auto; }
+    
+    /* 页面头部 */
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+    .page-header p { color: #6b7280; font-size: 14px; }
+    
+    /* 统计卡片 */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #f0f0f0; }
+    .stat-card .stat-label { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+    .stat-card .stat-value { font-size: 28px; font-weight: 700; }
+    .stat-card .stat-value.purple { color: #7c3aed; }
+    .stat-card .stat-value.green { color: #059669; }
+    .stat-card .stat-value.orange { color: #d97706; }
+    .stat-card .stat-value.red { color: #dc2626; }
+    .stat-card .stat-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+    
+    /* Tab 切换 */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 24px; background: white; border-radius: 12px; padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); width: fit-content; }
+    .tab-btn { padding: 10px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.2s; color: #6b7280; font-weight: 500; border: none; background: none; }
+    .tab-btn:hover { color: #1f2937; }
+    .tab-btn.active { background: #1677ff; color: white; box-shadow: 0 2px 4px rgba(22,119,255,0.3); }
+    
+    /* 卡片 */
+    .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #f0f0f0; margin-bottom: 16px; }
+    .card-header { padding: 16px 20px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+    .card-header h3 { font-size: 15px; font-weight: 600; }
+    .card-body { padding: 20px; }
+    
+    /* 规则列表 */
+    .rule-item { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #f5f5f5; transition: background 0.15s; }
+    .rule-item:last-child { border-bottom: none; }
+    .rule-item:hover { background: #fafbfc; }
+    .rule-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; margin-right: 16px; flex-shrink: 0; }
+    .rule-icon.idle { background: #fef2f2; color: #dc2626; }
+    .rule-icon.downsize { background: #fff7ed; color: #d97706; }
+    .rule-icon.unused { background: #eff6ff; color: #2563eb; }
+    .rule-icon.budget { background: #fdf4ff; color: #9333ea; }
+    .rule-icon.trend { background: #f0fdf4; color: #16a34a; }
+    .rule-info { flex: 1; min-width: 0; }
+    .rule-info .rule-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+    .rule-info .rule-desc { font-size: 12px; color: #9ca3af; }
+    .rule-meta { display: flex; align-items: center; gap: 12px; margin-left: 16px; flex-shrink: 0; }
+    .rule-tag { padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+    .rule-tag.high { background: #fef2f2; color: #dc2626; }
+    .rule-tag.medium { background: #fff7ed; color: #d97706; }
+    .rule-tag.low { background: #f0fdf4; color: #16a34a; }
+    .rule-tag.enabled { background: #f0fdf4; color: #059669; }
+    .rule-tag.disabled { background: #f3f4f6; color: #6b7280; }
+    
+    /* 开关 */
+    .toggle { width: 44px; height: 24px; border-radius: 12px; cursor: pointer; transition: background 0.2s; position: relative; }
+    .toggle.on { background: #1677ff; }
+    .toggle.off { background: #d1d5db; }
+    .toggle::after { content: ''; position: absolute; width: 20px; height: 20px; border-radius: 50%; background: white; top: 2px; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .toggle.on::after { left: 22px; }
+    .toggle.off::after { left: 2px; }
+    
+    /* 操作按钮 */
+    .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: #1677ff; color: white; }
+    .btn-primary:hover { background: #4096ff; }
+    .btn-success { background: #52c41a; color: white; }
+    .btn-success:hover { background: #73d13d; }
+    .btn-default { background: white; color: #374151; border: 1px solid #d1d5db; }
+    .btn-default:hover { border-color: #1677ff; color: #1677ff; }
+    .btn-danger { background: white; color: #dc2626; border: 1px solid #fca5a5; }
+    .btn-danger:hover { background: #fef2f2; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    
+    /* 模态框 */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s; }
+    .modal { background: white; border-radius: 16px; width: 680px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: slideUp 0.25s ease-out; }
+    .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+    .modal-header h2 { font-size: 18px; font-weight: 600; }
+    .modal-close { width: 32px; height: 32px; border-radius: 8px; border: none; background: none; cursor: pointer; font-size: 18px; color: #9ca3af; display: flex; align-items: center; justify-content: center; }
+    .modal-close:hover { background: #f3f4f6; color: #374151; }
+    .modal-body { padding: 24px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 10px; }
+    
+    /* 表单 */
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    .form-hint { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+    .form-input { width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+    .form-input:focus { border-color: #1677ff; box-shadow: 0 0 0 3px rgba(22,119,255,0.1); }
+    .form-select { width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; background: white; cursor: pointer; }
+    .form-textarea { width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; resize: vertical; min-height: 80px; font-family: inherit; }
+    .form-textarea:focus { border-color: #1677ff; box-shadow: 0 0 0 3px rgba(22,119,255,0.1); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    
+    /* JSON 编辑器 */
+    .json-editor { background: #1e1e2e; border-radius: 10px; padding: 16px; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 13px; line-height: 1.6; color: #cdd6f4; min-height: 160px; overflow-x: auto; position: relative; }
+    .json-editor textarea { width: 100%; min-height: 140px; background: transparent; border: none; color: #cdd6f4; font-family: inherit; font-size: inherit; line-height: inherit; resize: vertical; outline: none; }
+    .json-editor .line-numbers { position: absolute; left: 0; top: 16px; width: 32px; text-align: right; color: #585b70; font-size: 12px; line-height: 1.6; }
+    
+    /* 执行日志 */
+    .exec-log { display: flex; flex-direction: column; gap: 8px; }
+    .exec-log-item { display: flex; align-items: center; padding: 10px 14px; background: #f8fafc; border-radius: 8px; gap: 12px; }
+    .exec-log-item .log-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .exec-log-item .log-status.success { background: #22c55e; }
+    .exec-log-item .log-status.warning { background: #f59e0b; }
+    .exec-log-item .log-name { flex: 1; font-size: 13px; }
+    .exec-log-item .log-result { font-size: 12px; color: #6b7280; }
+    
+    /* 建议列表表格 */
+    .suggestion-table { width: 100%; border-collapse: collapse; }
+    .suggestion-table th { text-align: left; padding: 12px 16px; background: #f8fafc; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e7eb; }
+    .suggestion-table td { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+    .suggestion-table tr:hover td { background: #fafbfc; }
+    .suggestion-table .resource-name { font-weight: 500; color: #1f2937; }
+    .suggestion-table .resource-id { font-size: 11px; color: #9ca3af; font-family: monospace; }
+    .suggestion-table .saving { color: #059669; font-weight: 600; }
+    
+    /* 空状态 */
+    .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
+    .empty-state .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+    .empty-state p { font-size: 14px; }
+    
+    /* 动画 */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .pulse { animation: pulse 1.5s infinite; }
+    
+    /* 模板预览 */
+    .template-preview { background: #f8fafc; border: 1px dashed #d1d5db; border-radius: 8px; padding: 12px 16px; margin-top: 8px; }
+    .template-preview .preview-label { font-size: 11px; color: #9ca3af; margin-bottom: 4px; }
+    .template-preview .preview-text { font-size: 13px; color: #374151; }
+    .template-preview .placeholder { color: #1677ff; font-weight: 500; }
+    
+    /* 执行结果卡片 */
+    .result-card { background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin-top: 16px; }
+    .result-card h4 { color: #166534; font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .result-items { display: flex; flex-direction: column; gap: 8px; }
+    .result-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #166534; }
+    .result-item .check { color: #22c55e; font-weight: bold; }
+    
+    /* 规则条件标签 */
+    .condition-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .condition-tag { padding: 2px 8px; background: #eff6ff; color: #2563eb; border-radius: 4px; font-size: 11px; font-family: monospace; }
+    
+    /* 提示条 */
+    .tip-banner { background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%); border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px; }
+    .tip-banner .tip-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+    .tip-banner .tip-content { flex: 1; }
+    .tip-banner .tip-title { font-size: 13px; font-weight: 600; color: #1e40af; margin-bottom: 3px; }
+    .tip-banner .tip-text { font-size: 12px; color: #3b82f6; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部导航 -->
+    <div class="top-bar">
+      <span class="logo">☁️ Cloud Manager</span>
+      <span class="divider"></span>
+      <span class="breadcrumb">财务管理 / 成本管理 / 优化建议</span>
+    </div>
+    
+    <div class="layout">
+      <!-- 侧边栏 -->
+      <div class="sidebar">
+        <div class="menu-group">
+          <div class="menu-label">概览</div>
+          <div class="menu-item"><span class="icon">📊</span> 工作台</div>
+        </div>
+        <div class="menu-group">
+          <div class="menu-label">资源管理</div>
+          <div class="menu-item"><span class="icon">🖥️</span> 资源管理</div>
+        </div>
+        <div class="menu-group">
+          <div class="menu-label">业务中心</div>
+          <div class="menu-item"><span class="icon">📱</span> 应用中心</div>
+        </div>
+        <div class="menu-group">
+          <div class="menu-label">运维中心</div>
+          <div class="menu-item"><span class="icon">📋</span> 工单中心</div>
+          <div class="menu-item"><span class="icon">🎬</span> 场景模板库</div>
+        </div>
+        <div class="menu-group">
+          <div class="menu-label">财务管理</div>
+          <div class="menu-item"><span class="icon">💰</span> 成本趋势</div>
+          <div class="menu-item active"><span class="icon">💡</span> 优化建议</div>
+          <div class="menu-item" style="padding-left: 44px; font-size: 13px; opacity: 0.7;">规则引擎</div>
+        </div>
+      </div>
+      
+      <!-- 主内容区 -->
+      <div class="main-content">
+        <!-- 页面标题 -->
+        <div class="page-header">
+          <h1>💡 智能优化建议</h1>
+          <p>基于可配置规则引擎，自动识别资源优化机会，助力降本增效</p>
+        </div>
+        
+        <!-- 提示条 -->
+        <div class="tip-banner">
+          <span class="tip-icon">🏗️</span>
+          <div class="tip-content">
+            <div class="tip-title">平台能力：可配置规则引擎</div>
+            <div class="tip-text">优化规则由运维团队通过下方配置面板自主定义，平台提供规则引擎能力。规则条件、建议模板、优先级均可在线配置，无需开发介入。</div>
+          </div>
+        </div>
+        
+        <!-- 统计卡片 -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">启用规则数</div>
+            <div class="stat-value purple">{{ enabledRules.length }}</div>
+            <div class="stat-sub">共 {{ rules.length }} 条规则</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">待处理建议</div>
+            <div class="stat-value orange">{{ pendingSuggestions.length }}</div>
+            <div class="stat-sub">需要关注的优化项</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">预估月节省</div>
+            <div class="stat-value green">¥{{ totalSaving.toLocaleString() }}</div>
+            <div class="stat-sub">优化后预计节省</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">已处理</div>
+            <div class="stat-value" style="color: #6b7280;">{{ resolvedCount }}</div>
+            <div class="stat-sub">历史已优化项</div>
+          </div>
+        </div>
+        
+        <!-- Tab 切换 -->
+        <div class="tab-bar">
+          <button class="tab-btn" :class="{ active: activeTab === 'rules' }" @click="activeTab = 'rules'">
+            ⚙️ 规则配置
+          </button>
+          <button class="tab-btn" :class="{ active: activeTab === 'suggestions' }" @click="activeTab = 'suggestions'">
+            📋 优化建议
+          </button>
+          <button class="tab-btn" :class="{ active: activeTab === 'logs' }" @click="activeTab = 'logs'">
+            📊 执行日志
+          </button>
+        </div>
+        
+        <!-- ==================== 规则配置 Tab ==================== -->
+        <div v-show="activeTab === 'rules'">
+          <div class="card">
+            <div class="card-header">
+              <h3>优化规则列表</h3>
+              <button class="btn btn-primary" @click="openCreateModal">+ 新建规则</button>
+            </div>
+            <div>
+              <div v-for="rule in rules" :key="rule.id" class="rule-item">
+                <div class="rule-icon" :class="rule.type">
+                  {{ typeIcons[rule.type] }}
+                </div>
+                <div class="rule-info">
+                  <div class="rule-name">{{ rule.name }}</div>
+                  <div class="rule-desc">{{ rule.description }}</div>
+                  <div class="condition-tags">
+                    <span class="condition-tag" v-for="tag in rule.conditionTags" :key="tag">{{ tag }}</span>
+                  </div>
+                </div>
+                <div class="rule-meta">
+                  <span class="rule-tag" :class="rule.severity">{{ severityLabels[rule.severity] }}</span>
+                  <span class="rule-tag" :class="rule.enabled ? 'enabled' : 'disabled'">
+                    {{ rule.enabled ? '已启用' : '已禁用' }}
+                  </span>
+                  <div class="toggle" :class="rule.enabled ? 'on' : 'off'" @click="toggleRule(rule)"></div>
+                  <button class="btn btn-default btn-sm" @click="openEditModal(rule)">编辑</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- ==================== 优化建议 Tab ==================== -->
+        <div v-show="activeTab === 'suggestions'">
+          <div class="card">
+            <div class="card-header">
+              <h3>优化建议列表</h3>
+              <div style="display: flex; gap: 10px;">
+                <button class="btn btn-success" @click="runEngine" :disabled="running">
+                  {{ running ? '⏳ 执行中...' : '🚀 执行规则引擎' }}
+                </button>
+              </div>
+            </div>
+            <div v-if="executing" class="card-body">
+              <div class="exec-log">
+                <div v-for="(log, i) in execLogs" :key="i" class="exec-log-item">
+                  <div class="log-status success"></div>
+                  <span class="log-name">{{ log.name }}</span>
+                  <span class="log-result">匹配 {{ log.matched }} 个资源 → 生成 {{ log.created }} 条建议</span>
+                </div>
+              </div>
+              <div class="result-card" v-if="execDone">
+                <h4>✅ 规则引擎执行完成</h4>
+                <div class="result-items">
+                  <div class="result-item">
+                    <span class="check">✓</span>
+                    扫描了 {{ enabledRules.length }} 条启用规则
+                  </div>
+                  <div class="result-item">
+                    <span class="check">✓</span>
+                    共匹配 {{ totalMatched }} 个资源
+                  </div>
+                  <div class="result-item">
+                    <span class="check">✓</span>
+                    生成 {{ totalCreated }} 条新建议，预估月节省 ¥{{ totalSaving.toLocaleString() }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="suggestions.length === 0" class="card-body">
+              <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <p>暂无优化建议，点击上方按钮执行规则引擎生成</p>
+              </div>
+            </div>
+            <table v-else class="suggestion-table">
+              <thead>
+                <tr>
+                  <th>优先级</th>
+                  <th>类型</th>
+                  <th>建议内容</th>
+                  <th>关联资源</th>
+                  <th>预估月节省</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in suggestions" :key="s.id">
+                  <td><span class="rule-tag" :class="s.severity">{{ severityLabels[s.severity] }}</span></td>
+                  <td><span class="rule-tag" :class="s.type">{{ typeLabels[s.type] }}</span></td>
+                  <td>
+                    <div style="font-weight: 500;">{{ s.title }}</div>
+                    <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">{{ s.description }}</div>
+                  </td>
+                  <td>
+                    <div class="resource-name">{{ s.resourceName }}</div>
+                    <div class="resource-id">{{ s.resourceId }}</div>
+                  </td>
+                  <td class="saving" v-if="s.saving > 0">¥{{ s.saving.toLocaleString() }}/月</td>
+                  <td v-else style="color: #9ca3af;">-</td>
+                  <td>
+                    <span class="rule-tag" :class="s.resolved ? 'enabled' : 'disabled'">
+                      {{ s.resolved ? '已处理' : '待处理' }}
+                    </span>
+                  </td>
+                  <td>
+                    <button v-if="!s.resolved" class="btn btn-default btn-sm" @click="resolveSuggestion(s)">标记处理</button>
+                    <span v-else style="color: #9ca3af; font-size: 12px;">-</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- ==================== 执行日志 Tab ==================== -->
+        <div v-show="activeTab === 'logs'">
+          <div class="card">
+            <div class="card-header">
+              <h3>规则执行历史</h3>
+            </div>
+            <div v-if="historyLogs.length === 0" class="card-body">
+              <div class="empty-state">
+                <div class="empty-icon">📊</div>
+                <p>暂无执行记录</p>
+              </div>
+            </div>
+            <div v-else class="card-body">
+              <div v-for="(batch, i) in historyLogs" :key="i" style="margin-bottom: 16px;">
+                <div style="font-size: 12px; color: #9ca3af; margin-bottom: 8px;">{{ batch.time }}</div>
+                <div class="exec-log">
+                  <div v-for="(log, j) in batch.logs" :key="j" class="exec-log-item">
+                    <div class="log-status success"></div>
+                    <span class="log-name">{{ log.name }}</span>
+                    <span class="log-result">匹配 {{ log.matched }} → 生成 {{ log.created }} 条建议，耗时 {{ log.ms }}ms</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- ==================== 创建/编辑规则模态框 ==================== -->
+    <div class="modal-overlay" v-if="showModal" @click.self="closeModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>{{ editingRule ? '编辑规则' : '新建优化规则' }}</h2>
+          <button class="modal-close" @click="closeModal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">规则名称</label>
+            <input class="form-input" v-model="form.name" placeholder="如：闲置主机检测">
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">规则类型</label>
+              <select class="form-select" v-model="form.type" @change="onTypeChange">
+                <option value="idle">闲置资源检测</option>
+                <option value="downsize">规格降配建议</option>
+                <option value="unused">未使用资源</option>
+                <option value="budget">预算超支告警</option>
+                <option value="trend">费用趋势异常</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">建议优先级</label>
+              <select class="form-select" v-model="form.severity">
+                <option value="high">高</option>
+                <option value="medium">中</option>
+                <option value="low">低</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">规则描述</label>
+            <input class="form-input" v-model="form.description" placeholder="简要说明这条规则的用途">
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">触发条件（JSON 配置）</label>
+            <div class="json-editor">
+              <textarea v-model="form.conditions" spellcheck="false"></textarea>
+            </div>
+            <div class="form-hint">声明式条件配置，引擎根据此 JSON 匹配资源</div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">建议标题模板</label>
+              <input class="form-input" v-model="form.titleTemplate" placeholder="{resource_name} 建议处理">
+              <div class="template-preview">
+                <div class="preview-label">预览</div>
+                <div class="preview-text" v-html="previewTitle"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">预估节省方式</label>
+              <select class="form-select" v-model="form.savingType">
+                <option value="fixed">固定金额</option>
+                <option value="spec_ratio">按规格比例</option>
+                <option value="none">不估算</option>
+              </select>
+              <div v-if="form.savingType === 'fixed'" style="margin-top: 8px;">
+                <input class="form-input" type="number" v-model.number="form.savingAmount" placeholder="金额（元/月）">
+              </div>
+              <div v-if="form.savingType === 'spec_ratio'" style="margin-top: 8px;">
+                <input class="form-input" type="number" v-model.number="form.savingPercent" placeholder="比例（%）" max="100" min="1">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default" @click="closeModal">取消</button>
+          <button class="btn btn-primary" @click="saveRule">{{ editingRule ? '保存修改' : '创建规则' }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, computed, reactive } = Vue
+    
+    const app = createApp({
+      setup() {
+        const activeTab = ref('rules')
+        const showModal = ref(false)
+        const editingRule = ref(null)
+        const running = ref(false)
+        const executing = ref(false)
+        const execDone = ref(false)
+        
+        const typeIcons = { idle: '🔴', downsize: '🟠', unused: '🔵', budget: '🟣', trend: '🟢' }
+        const typeLabels = { idle: '闲置资源', downsize: '建议降配', unused: '未使用', budget: '预算告警', trend: '趋势异常' }
+        const severityLabels = { high: '高', medium: '中', low: '低' }
+        
+        // ========== 预设规则（模拟运维配置） ==========
+        const rules = reactive([
+          {
+            id: 1, name: '闲置主机检测', type: 'idle', severity: 'high', enabled: true,
+            description: '检测已停止超过 7 天的云主机，建议下架释放',
+            conditionTags: ['resource_type: instance', 'status: stopped', 'min_days: 7'],
+            conditions: JSON.stringify({ resource_type: 'instance', status: 'stopped', min_stopped_days: 7 }, null, 2),
+            titleTemplate: '闲置主机 {resource_name} 建议下架',
+            savingType: 'spec_ratio', savingPercent: 100,
+          },
+          {
+            id: 2, name: '高规格低利用率降配', type: 'downsize', severity: 'medium', enabled: true,
+            description: '运行中但 CPU 平均利用率 < 5% 的主机，建议降配',
+            conditionTags: ['resource_type: instance', 'status: running', 'avg_cpu_7d: <5%'],
+            conditions: JSON.stringify({ resource_type: 'instance', status: 'running', metrics: { avg_cpu_7d: { lt: 5 } } }, null, 2),
+            titleTemplate: '主机 {resource_name} CPU 利用率过低，建议降配',
+            savingType: 'spec_ratio', savingPercent: 40,
+          },
+          {
+            id: 3, name: '未挂载云硬盘', type: 'unused', severity: 'low', enabled: true,
+            description: '状态为 available 超过 30 天的云硬盘，建议释放',
+            conditionTags: ['resource_type: disk', 'status: available', 'min_days: 30'],
+            conditions: JSON.stringify({ resource_type: 'disk', status: 'available', min_days: 30 }, null, 2),
+            titleTemplate: '云硬盘 {resource_name} 未挂载，建议释放',
+            savingType: 'fixed', savingAmount: 50,
+          },
+          {
+            id: 4, name: '部门预算超支告警', type: 'budget', severity: 'high', enabled: true,
+            description: '部门月度预算使用超过 80% 时触发告警',
+            conditionTags: ['budget_usage: >=80%', 'alert: true'],
+            conditions: JSON.stringify({ budget_usage_percent: { gte: 80 }, notify: true }, null, 2),
+            titleTemplate: '{department_name} 部门预算已使用 {usage_percent}%',
+            savingType: 'none',
+          },
+          {
+            id: 5, name: '费用环比异常检测', type: 'trend', severity: 'medium', enabled: false,
+            description: '检测月度费用环比增长超过 20% 的账号',
+            conditionTags: ['compare: month_over_month', 'threshold: +20%'],
+            conditions: JSON.stringify({ compare: 'month_over_month', threshold_percent: 20, direction: 'increase' }, null, 2),
+            titleTemplate: '{account_name} 费用环比增长 {change_percent}%',
+            savingType: 'none',
+          },
+        ])
+        
+        const enabledRules = computed(() => rules.filter(r => r.enabled))
+        
+        // ========== 模拟资源数据 ==========
+        const mockResources = [
+          { name: 'web-prod-001', id: 'i-3a7b2c8d9e01', type: 'instance', status: 'stopped', region: 'cn-hangzhou', spec: 'ecs.g6.2xlarge', cpu: 2.1 },
+          { name: 'api-staging-002', id: 'i-8f1a4b5c6d02', type: 'instance', status: 'stopped', region: 'cn-beijing', spec: 'ecs.g6.xlarge', cpu: 3.5 },
+          { name: 'worker-prod-003', id: 'i-2e3d4c5b6a03', type: 'instance', status: 'stopped', region: 'cn-hangzhou', spec: 'ecs.c7.xlarge', cpu: 1.8 },
+          { name: 'db-backup-001', id: 'd-9k8j7h6g5f01', type: 'disk', status: 'available', region: 'cn-hangzhou', spec: '500GB SSD', cpu: null },
+          { name: 'log-archive-002', id: 'd-4b5c6d7e8f02', type: 'disk', status: 'available', region: 'cn-shanghai', spec: '1TB HDD', cpu: null },
+          { name: 'data-tmp-003', id: 'd-1a2b3c4d5e03', type: 'disk', status: 'available', region: 'cn-beijing', spec: '200GB SSD', cpu: null },
+          { name: 'web-prod-004', id: 'i-5f6a7b8c9d04', type: 'instance', status: 'running', region: 'cn-hangzhou', spec: 'ecs.g6.2xlarge', cpu: 3.2 },
+          { name: 'api-prod-005', id: 'i-6g7h8i9j0k05', type: 'instance', status: 'running', region: 'cn-beijing', spec: 'ecs.g6.xlarge', cpu: 4.1 },
+          { name: 'cache-prod-001', id: 'i-7h8i9j0k1l06', type: 'instance', status: 'running', region: 'cn-hangzhou', spec: 'ecs.c7.large', cpu: 2.8 },
+          { name: 'gateway-prod-001', id: 'i-8i9j0k1l2m07', type: 'instance', status: 'running', region: 'cn-shanghai', spec: 'ecs.g6.xlarge', cpu: 4.5 },
+        ]
+        
+        // ========== 生成建议 ==========
+        const suggestions = ref([])
+        const execLogs = ref([])
+        const historyLogs = ref([])
+        
+        const pendingSuggestions = computed(() => suggestions.value.filter(s => !s.resolved))
+        const resolvedCount = computed(() => suggestions.value.filter(s => s.resolved).length)
+        const totalSaving = computed(() => pendingSuggestions.value.reduce((sum, s) => sum + s.saving, 0))
+        
+        function estimateSaving(resource, rule) {
+          const specPrices = {
+            'ecs.g6.2xlarge': 1200, 'ecs.g6.xlarge': 600, 'ecs.c7.xlarge': 500,
+            'ecs.c7.large': 250, '500GB SSD': 200, '1TB HDD': 150, '200GB SSD': 80,
+          }
+          const basePrice = specPrices[resource.spec] || 300
+          if (rule.savingType === 'fixed') return rule.savingAmount || 0
+          if (rule.savingType === 'spec_ratio') return Math.round(basePrice * (rule.savingPercent || 100) / 100)
+          return 0
+        }
+        
+        function runEngine() {
+          running.value = true
+          executing.value = true
+          execDone.value = false
+          execLogs.value = []
+          suggestions.value = []
+          
+          const batchLogs = []
+          let totalM = 0, totalC = 0
+          
+          enabledRules.value.forEach((rule, i) => {
+            setTimeout(() => {
+              let matched = []
+              if (rule.type === 'idle') {
+                matched = mockResources.filter(r => r.status === 'stopped' && r.type === 'instance')
+              } else if (rule.type === 'downsize') {
+                matched = mockResources.filter(r => r.status === 'running' && r.cpu && r.cpu < 5)
+              } else if (rule.type === 'unused') {
+                matched = mockResources.filter(r => r.status === 'available' && r.type === 'disk')
+              } else if (rule.type === 'budget') {
+                matched = [{ name: '研发部', id: 'DEPT-001' }]
+              }
+              
+              const created = matched.length
+              matched.forEach(r => {
+                suggestions.value.push({
+                  id: suggestions.value.length + 1,
+                  type: rule.type,
+                  severity: rule.severity,
+                  title: rule.titleTemplate.replace('{resource_name}', r.name).replace('{department_name}', r.name).replace('{account_name}', r.name),
+                  description: rule.description,
+                  resourceName: r.name,
+                      resourceId: r.id,
+                  saving: estimateSaving(r, rule),
+                  resolved: false,
+                })
+              })
+              
+              const log = { name: rule.name, matched: matched.length, created, ms: Math.floor(Math.random() * 50) + 10 }
+              execLogs.value.push(log)
+              batchLogs.push(log)
+              totalM += matched.length
+              totalC += created
+              
+              if (execLogs.value.length === enabledRules.value.length) {
+                running.value = false
+                execDone.value = true
+                historyLogs.value.unshift({
+                  time: new Date().toLocaleString('zh-CN'),
+                  logs: [...batchLogs],
+                })
+                setTimeout(() => { activeTab.value = 'suggestions' }, 600)
+              }
+            }, (i + 1) * 400)
+          })
+        }
+        
+        const totalMatched = computed(() => execLogs.value.reduce((s, l) => s + l.matched, 0))
+        const totalCreated = computed(() => execLogs.value.reduce((s, l) => s + l.created, 0))
+        
+        function resolveSuggestion(s) { s.resolved = true }
+        function toggleRule(rule) { rule.enabled = !rule.enabled }
+        
+        // ========== 表单 ==========
+        const form = reactive({
+          name: '', type: 'idle', severity: 'medium', description: '',
+          conditions: '{}', titleTemplate: '{resource_name} 建议处理',
+          savingType: 'spec_ratio', savingAmount: 200, savingPercent: 40,
+        })
+        
+        const conditionTemplates = {
+          idle: JSON.stringify({ resource_type: 'instance', status: 'stopped', min_stopped_days: 7 }, null, 2),
+          downsize: JSON.stringify({ resource_type: 'instance', status: 'running', metrics: { avg_cpu_7d: { lt: 5 } } }, null, 2),
+          unused: JSON.stringify({ resource_type: 'disk', status: 'available', min_days: 30 }, null, 2),
+          budget: JSON.stringify({ budget_usage_percent: { gte: 80 }, notify: true }, null, 2),
+          trend: JSON.stringify({ compare: 'month_over_month', threshold_percent: 20, direction: 'increase' }, null, 2),
+        }
+        
+        function onTypeChange() { form.conditions = conditionTemplates[form.type] || '{}' }
+        
+        function openCreateModal() {
+          editingRule.value = null
+          form.name = ''; form.type = 'idle'; form.severity = 'medium'; form.description = ''
+          form.conditions = conditionTemplates.idle; form.titleTemplate = '{resource_name} 建议处理'
+          form.savingType = 'spec_ratio'; form.savingAmount = 200; form.savingPercent = 40
+          showModal.value = true
+        }
+        
+        function openEditModal(rule) {
+          editingRule.value = rule
+          form.name = rule.name; form.type = rule.type; form.severity = rule.severity
+          form.description = rule.description; form.conditions = rule.conditions
+          form.titleTemplate = rule.titleTemplate; form.savingType = rule.savingType
+          form.savingAmount = rule.savingAmount || 200; form.savingPercent = rule.savingPercent || 40
+          showModal.value = true
+        }
+        
+        function closeModal() { showModal.value = false; editingRule.value = null }
+        
+        function saveRule() {
+          if (editingRule.value) {
+            const r = editingRule.value
+            r.name = form.name; r.type = form.type; r.severity = form.severity
+            r.description = form.description; r.conditions = form.conditions
+            r.titleTemplate = form.titleTemplate; r.savingType = form.savingType
+            r.savingAmount = form.savingAmount; r.savingPercent = form.savingPercent
+          } else {
+            rules.push({
+              id: rules.length + 1, name: form.name, type: form.type, severity: form.severity,
+              enabled: true, description: form.description, conditions: form.conditions,
+              conditionTags: [form.type + ': ' + form.name],
+              titleTemplate: form.titleTemplate, savingType: form.savingType,
+              savingAmount: form.savingAmount, savingPercent: form.savingPercent,
+            })
+          }
+          closeModal()
+        }
+        
+        const previewTitle = computed(() => {
+          return (form.titleTemplate || '')
+            .replace(/\{resource_name\}/g, '<span class="placeholder">web-prod-001</span>')
+            .replace(/\{department_name\}/g, '<span class="placeholder">研发部</span>')
+            .replace(/\{account_name\}/g, '<span class="placeholder">主账号</span>')
+            .replace(/\{usage_percent\}/g, '<span class="placeholder">85%</span>')
+            .replace(/\{change_percent\}/g, '<span class="placeholder">+32%</span>')
+        })
+        
+        return {
+          activeTab, showModal, editingRule, running, executing, execDone,
+          typeIcons, typeLabels, severityLabels,
+          rules, enabledRules, suggestions, execLogs, historyLogs,
+          pendingSuggestions, resolvedCount, totalSaving,
+          totalMatched, totalCreated,
+          form, previewTitle,
+          runEngine, resolveSuggestion, toggleRule,
+          openCreateModal, openEditModal, closeModal, saveRule, onTypeChange,
+        }
+      }
+    })
+    
+    app.mount('#app')
+  </script>
+</body>
+</html>

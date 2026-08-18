@@ -1,0 +1,36 @@
+
+<h2>一、设计目标</h2>
+<p>优化建议不是写死的，而是由 <b>可配置规则引擎</b> 驱动：运维按需定义"检测什么、什么条件、省多少"。</p>
+
+<h2>二、7 种规则类型</h2>
+<table>
+  <thead><tr><th>类型</th><th>检测逻辑</th></tr></thead>
+  <tbody>
+    <tr><td>闲置资源</td><td>近 30 天 CPU &lt; 5%</td></tr>
+    <tr><td>规格降配</td><td>CPU 峰值 &lt; 40% 且内存 &lt; 50%</td></tr>
+    <tr><td>未使用资源</td><td>7 天无访问流量</td></tr>
+    <tr><td>预算告警</td><td>本月花费 &gt; 预算 80%</td></tr>
+    <tr><td>趋势上涨</td><td>连续 3 月涨幅 &gt; 15%</td></tr>
+    <tr><td>预留实例</td><td>持续运行 &gt; 6 个月</td></tr>
+    <tr><td>存储优化</td><td>快照保留 &gt; 90 天</td></tr>
+  </tbody>
+</table>
+
+<h2>三、MatcherRegistry 注册表</h2>
+<pre>class MatcherRegistry:
+    _registry = {}
+    @classmethod
+    def register(cls, rule_type): ...
+    @classmethod
+    def get(cls, rule_type): ...</pre>
+<p>新增规则类型 = 实现一个匹配器并注册，即插即用（类 ActionRegistry 模式）。</p>
+
+<h2>四、执行与报告</h2>
+<ul>
+  <li><b>执行</b>：execute_rule 按检测范围（云 / 账号 / 区域 / 类型）过滤资源，跑匹配器生成建议。</li>
+  <li><b>报告单号</b>：RPT-YYYYMMDD-NNN，当天序号递增，便于追踪。</li>
+  <li><b>报告下钻</b>：云 → 账号 → 区域 → 资源类型 左树右表联动，支持 CSV 导出。</li>
+</ul>
+
+<h2>五、设计价值</h2>
+<p>平台提供"规则引擎能力"，规则内容由运维配置，避免面试时被追问"规则怎么定的"深坑，同时体现可扩展架构。</p>

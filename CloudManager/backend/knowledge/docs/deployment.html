@@ -1,0 +1,26 @@
+
+<h2>一、部署架构</h2>
+<pre>浏览器 → Nginx(前端静态 + 反代) → Django Backend(DRF) → MySQL 8</pre>
+<p>docker-compose.prod.yml 编排：frontend（Nginx）、backend（Django + uvicorn/gunicorn）、db（MySQL 8）。</p>
+
+<h2>二、快速开始</h2>
+<ol>
+  <li>构建后端镜像（含 seed 命令）：<code>docker compose -f docker-compose.prod.yml build backend</code></li>
+  <li>构建前端：<code>cd frontend && npm run build</code>（dist 挂载进 Nginx）</li>
+  <li>启动：<code>./deploy.sh</code> 或 <code>docker compose up -d</code></li>
+  <li>访问：前端 http://cloud-manager-nginx.orb.local · 后端 http://cloud-manager-backend.orb.local/api/</li>
+</ol>
+
+<h2>三、关键配置</h2>
+<ul>
+  <li>MySQL 启动参数需加 <code>--sort-buffer-size=16M</code>，避免大批量排序触发 1038 错误。</li>
+  <li>entrypoint.sh 按序执行 migrate + seed 数据（账号 / 资源 / 成本 / 规则 / 知识库）。</li>
+  <li>前端 dist 由 Nginx 挂载，重构建后自动生效。</li>
+</ul>
+
+<h2>四、常见问题</h2>
+<ul>
+  <li>接口返回非 JSON：后端容器未就绪，等待后重试（grep "Listening at" 确认）。</li>
+  <li>后端改动不生效：需 <code>build backend</code> 重建镜像（代码 COPY 进镜像）。</li>
+  <li>数据库错误：检查 MySQL 容器与卷。</li>
+</ul>
