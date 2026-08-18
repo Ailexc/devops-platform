@@ -123,27 +123,33 @@ ok "服务已启动"
 
 # ── 6. 等待后端就绪 ─────────────────────────────────────────────────────────
 # 注意：.orb.local 域名仅在本地 OrbStack 可用；统一管理/ECS 环境下无该域名
-#       （release 经统一网关暴露），此时 URL 探测必然失败。故探测失败仅告警、
-#       不中断，最终以后端进程 + 第 7 步 Django shell 硬核验证为准。
+#       （release 经统一网关暴露），此时 URL 探测必然失败。故：
+#       - 先检测域名可解析性，不可用则直接跳过 URL 探测（不空转/不挂起）
+#       - 即使可解析，curl 也加 --max-time 防 DNS/TCP 长时间挂起
+#       - 最终以容器进程 + 第 7 步 Django shell 硬核验证为准
 #       如需强制指定探测地址：RELEASE_HEALTH_URL=https://<host>/api/v1/releases/ ./scripts/reset-all.sh
 info "等待后端就绪..."
-BACKEND_READY=0
-for i in $(seq 1 30); do
-    HEALTH_URL="${RELEASE_HEALTH_URL:-https://frontend.${PROJECT_NAME}.orb.local/api/v1/releases/}"
-    if curl -sk -o /dev/null -w '%{http_code}' "$HEALTH_URL" 2>/dev/null | grep -qE '401|200'; then
-        ok "后端已就绪（${i}s）"
-        BACKEND_READY=1
-        break
+if [ -z "$RELEASE_HEALTH_URL" ] && ! timeout 3 getent hosts "frontend.${PROJECT_NAME}.orb.local" >/dev/null 2>&1; then
+    warn "无 .orb.local 域名解析（ECS/统一网关环境），跳过 URL 探测，由 Django shell 验证兜底"
+else
+    BACKEND_READY=0
+    for i in $(seq 1 30); do
+        HEALTH_URL="${RELEASE_HEALTH_URL:-https://frontend.${PROJECT_NAME}.orb.local/api/v1/releases/}"
+        if curl -sk -o /dev/null --max-time 3 -w '%{http_code}' "$HEALTH_URL" 2>/dev/null | grep -qE '401|200'; then
+            ok "后端已就绪（${i}s）"
+            BACKEND_READY=1
+            break
+        fi
+        # 容器健康（本地/ECS 均可判定）：容器进程在跑即视为启动中
+        if ! docker ps --format '{{.Names}}' | grep -q '^release-backend$'; then
+            err "release-backend 容器未运行"
+            exit 1
+        fi
+        sleep 1
+    done
+    if [ "$BACKEND_READY" = "0" ]; then
+        warn "URL 健康探测未通过（可能无 .orb.local 域名，属预期）；由下方 Django shell 验证兜底"
     fi
-    # 容器健康（本地/ECS 均可判定）：容器进程在跑即视为启动中
-    if ! docker ps --format '{{.Names}}' | grep -q '^release-backend$'; then
-        err "release-backend 容器未运行"
-        exit 1
-    fi
-    sleep 1
-done
-if [ "$BACKEND_READY" = "0" ]; then
-    warn "URL 健康探测未通过（可能无 .orb.local 域名，属预期）；由下方 Django shell 验证兜底"
 fi
 
 # ── 7. 验证 Demo 应用权限 ───────────────────────────────────────────────────
