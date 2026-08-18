@@ -140,9 +140,14 @@ init_python() {
     if [[ "$MODE" == "docker" ]]; then
         info "使用 Docker 模式初始化 Python 栈..."
         
-        # 确保 Python 基础服务正在运行（PostgreSQL/Redis 已统一接入 devops-infra）
-        info "启动 Python 基础服务..."
-        docker compose up -d rabbitmq
+        # RabbitMQ 由统一基础设施提供（devops-rabbitmq），此处仅确保其已运行
+        info "确保统一 RabbitMQ (devops-rabbitmq) 运行..."
+        if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^devops-rabbitmq$'; then
+            info "统一 RabbitMQ 已就绪"
+        else
+            warning "未检测到 devops-rabbitmq，尝试通过统一基础设施启动..."
+            ( cd "$(dirname "$0")/../../infra" && docker compose up -d rabbitmq )
+        fi
 
         # 先拉起 api 容器，避免 exec 依赖"容器已在运行"（健壮性）
         info "确保 api 容器运行（供 exec 执行 migrate/seed）..."
