@@ -6,6 +6,8 @@
 # Build stage
 FROM node:20-alpine AS build
 WORKDIR /app
+# 中国 ECS：registry.npmjs.org 慢/不可达 → 使用 npmmirror（阿里/国内镜像）
+RUN npm config set registry https://registry.npmmirror.com
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
 COPY . .

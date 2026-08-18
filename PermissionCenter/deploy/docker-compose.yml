@@ -41,9 +41,9 @@ services:
       - devops-net
 
   # Traefik 网关（PEP 执行点，forwardAuth ≈ APISIX ext-authz）
-  # 镜像来自 ghcr.io（daocloud 对 apache/apisix 403，Traefik 发布到 ghcr 且无需 etcd）
+  # 镜像：docker.io 官方 traefik（中国 ECS 走阿里镜像加速器；ghcr.io 在 ECS 不可达）
   traefik:
-    image: ghcr.io/traefik/traefik:v3.1.2
+    image: traefik:v3.1.2
     container_name: iam-traefik
     command:
       - --configFile=/etc/traefik/traefik.yml
