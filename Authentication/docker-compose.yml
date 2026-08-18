@@ -132,9 +132,9 @@ services:
     image: traefik:v3.2
     container_name: authentication-gateway
     ports:
-      - "8001:80"    # 统一网关入口（forwardAuth 保护 mock-app）
+      - "28001:80"   # 统一网关入口（forwardAuth 保护 mock-app）；云端改高位端口避开 aianytra-api(8001)
       - "8004:8004"  # 试点应用入口（forwardAuth 保护 pilot-app）
-      - "8080:8080"  # Traefik Dashboard
+      - "28080:8080" # Traefik Dashboard；云端改高位端口避开 aianytra-frontend(8080)
     volumes:
       - ./gateway:/etc/traefik:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

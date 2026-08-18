@@ -76,7 +76,7 @@ services:
     restart: unless-stopped
     command: ["./cmdb-server", "--seed"]
     ports:
-      - "8081:8080"          # 8080 被 OrbStack 占用，映射到 8081
+      - "28081:8080"  # 云端改高位端口避开 aianytra-admin(8081)；本地原 8081 被 OrbStack 占用
     environment:
       DB_DSN: "postgresql://devops:devops@devops-postgres:5432/devops_cmdb_go?sslmode=disable"
       REDIS_ADDR: "devops-redis:6379"
