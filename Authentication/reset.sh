@@ -6,6 +6,13 @@
 
 set -e  # 遇到错误立即退出
 
+# 加载部署环境变量（本地/云端统一：ENV=local|cloud 自动检测）
+# 由 reset-all.sh 调用时父进程已导出，此处幂等重载；独立运行也能正确识别环境。
+if [ -f ../scripts/lib.sh ]; then
+    source ../scripts/lib.sh
+    load_env
+fi
+
 echo "🔄 统一认证中心 - 数据库重置"
 echo "================================="
 

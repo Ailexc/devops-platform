@@ -7,7 +7,7 @@ build/
 .eggs/
 *.egg
 venv/
-.env
+# .env 已由仓库根白名单放行（演示环境无真实密钥）
 
 # Django
 *.sqlite3

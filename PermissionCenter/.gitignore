@@ -9,8 +9,7 @@ frontend/dist/
 frontend/*.local
 
 # Env
-.env
-deploy/.env
+# .env / deploy/.env 已由仓库根白名单放行（演示环境无真实密钥）
 
 # IDE
 .idea/

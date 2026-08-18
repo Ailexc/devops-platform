@@ -20,7 +20,6 @@ set -euo pipefail
 # ---------- 配置 ----------
 GIT_REPO="git@gitee.com:ailexc-code/dev-ops-platform.git"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/DevOpsPlatform}"
-CLOUD_ENV="deploy/cloud/.env.cloud"
 RESET_FLAG="${1:-}"
 
 log()  { echo -e "\033[1;36m[deploy-cloud]\033[0m $*"; }
@@ -37,13 +36,14 @@ cd "$DEPLOY_DIR"
 log "拉取最新代码（$(git log --oneline -1)）"
 git pull --rebase
 
-# ---------- 1. 加载云端环境变量 ----------
-if [ ! -f "$CLOUD_ENV" ]; then
-  err "缺少 $CLOUD_ENV，请检查仓库完整性"
-  exit 1
-fi
-set -a; source "$CLOUD_ENV"; set +a
-ok "已加载云端环境变量（$CLOUD_ENV）"
+# ---------- 加载公共库（load_env 等），保持本脚本 [deploy-cloud] 前缀 ----------
+source scripts/lib.sh
+log()  { echo -e "\033[1;36m[deploy-cloud]\033[0m $*"; }
+err()  { echo -e "\033[1;31m[deploy-cloud:错误]\033[0m $*" >&2; }
+ok()   { echo -e "\033[1;32m[deploy-cloud]\033[0m $*"; }
+
+# ---------- 1. 加载云端环境变量（统一入口，ENV=cloud 强制）----------
+ENV=cloud load_env
 
 # ---------- 2. 检查 Docker ----------
 if ! docker info >/dev/null 2>&1; then err "Docker 未运行"; exit 1; fi

@@ -3,6 +3,16 @@
 .env.*
 !.env.example
 !.env.cloud
+# 演示环境 .env 允许提交（无真实密钥，便于 git clone 后一键部署）
+!Authentication/.env
+!CloudManager/.env
+!EventManager/.env
+!EventManager/backend-go/.env
+!PermissionCenter/deploy/.env
+!ReleaseManager/.env
+!WorkFlowCenter/.env
+!WorkFlowCenter/frontend/.env
+!deploy/local/.env.local
 *.key
 *.pem
 

@@ -15,6 +15,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib.sh
+# 加载部署环境变量（ENV=local|cloud 自动检测；云端 /opt/DevOpsPlatform → cloud）
+load_env
 
 P="${1:-}"
 DBS=(devops_auth devops_cloud devops_event devops_event_go devops_iam devops_openfga devops_release devops_cmdb devops_cmdb_go devops_workflow)

@@ -29,7 +29,7 @@ dist-ssr
 *.sw?
 
 # Environment
-.env
+# .env 已由仓库根白名单放行（演示环境无真实密钥）
 .env.local
 .env.*.local
 

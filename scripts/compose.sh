@@ -11,6 +11,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib.sh
+# 加载部署环境变量（ENV=local|cloud 自动检测；云端 /opt/DevOpsPlatform → cloud）
+load_env
 
 ACTION="${1:-up}"
 P="${2:-}"

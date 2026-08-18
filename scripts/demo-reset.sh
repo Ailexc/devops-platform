@@ -28,6 +28,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib.sh
+# 加载部署环境变量（ENV=local|cloud 自动检测；云端 /opt/DevOpsPlatform → cloud）
+load_env
 
 BUILD="${BUILD:-0}"
 log "══════════════════════════════════════════════════════"
@@ -137,7 +139,18 @@ check_http "认证 API           " "${BASE}:8099/api/system/health"
 echo ""
 if [ "$FAIL" = "0" ]; then
   ok "✅ 一键恢复完成！全部系统已回到干净出厂态并可达。"
-  log "   统一门户: ${BASE}:8088/"
+  # 门户 URL 按环境显示（本地/云端各不相同，避免显示 127.0.0.1 无法点击）
+  PORTAL_URL="${DEMO_RESET_PORTAL_URL:-}"
+  if [ -z "$PORTAL_URL" ]; then
+    if [ "$ENV" = "cloud" ]; then
+      # 云端：ECS 公网 IP 直达
+      PORTAL_URL="http://${HOST_HEADER}:${GATEWAY_PORT}/"
+    else
+      # 本地：OrbStack 自动 DNS 域名（经统一网关 8088）
+      PORTAL_URL="http://portal.devops.orb.local:${GATEWAY_PORT}/"
+    fi
+  fi
+  log "   统一门户: ${PORTAL_URL}"
   log "   端口说明: docs/端口分配.md"
 else
   err "❌ 一键恢复完成，但部分系统冒烟未通过，请查看上方 ✗ 项。"
