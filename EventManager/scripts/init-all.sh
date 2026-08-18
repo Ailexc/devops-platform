@@ -150,18 +150,27 @@ init_python() {
         fi
 
         # 先拉起 api 容器，避免 exec 依赖"容器已在运行"（健壮性）
-        info "确保 api 容器运行（供 exec 执行 migrate/seed）..."
+        # 注意：api 容器 command 自带 migrate（幂等），此处不可再 exec 重复 migrate，
+        #   schema 刚清空时并发 migrate 会触发 pg_type_typname_nsp_index 唯一约束冲突。
+        info "确保 api 容器运行（供 exec 执行 seed）..."
         docker compose up -d api
         
-        # 等待服务就绪
-        info "等待服务就绪..."
-        sleep 5
+        # 等待容器内 migrate 完成（gunicorn 起来 = 迁移+collectstatic 完成）
+        info "等待 api 容器就绪（容器内自动 migrate/collectstatic）..."
+        local ready=0
+        for i in $(seq 1 120); do
+            if docker logs cmdb-event-api 2>/dev/null | grep -qE "Booting worker|Listening at|Application startup complete"; then
+                ready=1; break
+            fi
+            sleep 1
+        done
+        if [[ "$ready" != "1" ]]; then
+            error "api 容器未在 120s 内就绪"
+            docker logs cmdb-event-api 2>/dev/null | tail -20
+            return 1
+        fi
         
-        # 执行迁移
-        info "执行数据库迁移..."
-        docker compose exec -T api python manage.py migrate --noinput
-        
-        # 运行种子数据
+        # 运行种子数据（seed_data 幂等）
         info "生成 $TOTAL_EVENTS 条模拟事件数据..."
         docker compose exec -T api python manage.py seed_data --total $TOTAL_EVENTS $clear_flag
         

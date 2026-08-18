@@ -56,6 +56,25 @@ ensure_up() {
   ( cd "$dir" && docker compose ${opts} up -d --build ${services} )
 }
 
+# 等待容器内初始化完成（容器 command 自带 migrate/seed，runserver/gunicorn 起来即代表完成）
+# 用法：wait_container_ready <容器名> <就绪关键字> <超时秒(默认120)>
+wait_container_ready() {
+  local name="$1" kw="${2:-Starting development server}" tries="${3:-120}" i
+  for i in $(seq 1 "$tries"); do
+    if docker logs "$name" 2>/dev/null | grep -q "$kw"; then
+      ok "  ✓ ${name} 已就绪（migrate/seed 完成）"
+      return 0
+    fi
+    if ! docker ps --format '{{.Names}}' | grep -q "^${name}$"; then
+      err "  ✗ ${name} 容器未在运行"; return 1
+    fi
+    sleep 1
+  done
+  err "  ✗ ${name} 未在 ${tries}s 内就绪（等待关键字 '$kw'）"
+  docker logs "$name" 2>/dev/null | tail -20
+  return 1
+}
+
 reset_project() {
   local db
   db="$(project_db "$1")"
@@ -77,15 +96,18 @@ reset_project() {
       ( cd ReleaseManager && ./scripts/reset-all.sh -y )
       ;;
     cmdb)
-      # reset_data 为 TRUNCATE 语义（依赖既有表），schema 已清空 → 直接 migrate + 播种
+      # backend 容器 command 自带 migrate + seed_demo_data（幂等），拉起即完成重置。
+      # 注意：不可再 exec 重复 migrate —— schema 刚清空时并发 migrate 会触发
+      #   pg_type_typname_nsp_index 唯一约束冲突。只需等待容器就绪。
       ensure_up cmdb backend
-      ( cd TaskManager && docker compose exec backend python manage.py migrate && \
-        docker compose exec backend python manage.py seed_demo_data )
+      wait_container_ready cmdb-task-backend "Starting development server" 180
       ;;
     workflow)
-      # reset_demo 自带 migrate（幂等）→ flush（清空重建）→ loaddata 恢复 Demo 快照 → 补齐演示数据
+      # api 容器 command 自带 migrate --noinput（幂等），先拉起并等它就绪，
+      # 再 exec reset_demo（migrate+flush+loaddata+seed，幂等）——避免并发 migrate 冲突
       ensure_up workflow api
-      ( cd WorkFlowCenter && docker compose exec api python manage.py reset_demo )
+      wait_container_ready workflow-api "Starting development server" 180
+      ( cd WorkFlowCenter && docker compose exec -T api python manage.py reset_demo )
       ;;
     *) err "未知项目 '$1'（可用: auth/cloud/event/iam/release/cmdb/workflow）"; exit 1 ;;
   esac
