@@ -1,8 +1,19 @@
-# 前端管理台运行时镜像：nginx + 宿主机预构建 dist
-# 背景：容器内 npm install 网络不稳定（lockfile 锁定 registry 容器内不可达），
-# 而宿主机 npm 可用 → 由 Makefile 先 `npm ci && npm run build` 到 dist/，此处仅拷贝 + 反代。
-# 构建：make frontend-image（内部先宿主机构建 dist 再 docker build）
+# 前端管理台镜像：容器内多阶段构建（ECS 云端无 Node 也能构建）
+# 背景：本地 OrbStack 容器内 npm registry 不可达 → 曾用宿主机 npm 预构建 dist；
+#       云端 ECS 无 Node 工具链，改为容器内多阶段构建（与 CloudManager 等一致）。
+# 构建：docker build -f frontend/Dockerfile -t iam-frontend frontend
+
+# Build stage
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --legacy-peer-deps
+COPY . .
+RUN npm run build
+
+# Production stage
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY dist/ /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

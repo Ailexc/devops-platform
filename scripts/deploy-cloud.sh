@@ -49,10 +49,12 @@ ok "已加载云端环境变量（$CLOUD_ENV）"
 if ! docker info >/dev/null 2>&1; then err "Docker 未运行"; exit 1; fi
 ok "Docker 就绪：$(docker --version)"
 
-# ---------- 3. PermissionCenter：amd64 交叉编译 + 前端 ----------
-log "构建 PermissionCenter（GOARCH=amd64，云 ECS 为 x86_64）..."
-( cd PermissionCenter && make backend-image GOARCH=amd64 )
-( cd PermissionCenter && make frontend-image )
+# ---------- 3. PermissionCenter：容器内构建（ECS 无 Go/Node 工具链）----------
+# 后端：Dockerfile.build 多阶段编译（GOARCH=amd64，x86_64 ECS）
+# 前端：Dockerfile 容器内 npm 构建 → nginx（已改造，与 CloudManager 一致）
+log "构建 PermissionCenter 镜像（GOARCH=amd64，容器内多阶段）..."
+docker build -f PermissionCenter/backend/Dockerfile.build --build-arg GOARCH=amd64 -t iam-backend PermissionCenter/backend
+docker build -f PermissionCenter/frontend/Dockerfile -t iam-frontend PermissionCenter/frontend
 
 # ---------- 4. 统一基础设施（PG + Redis + RabbitMQ + 建库）----------
 log "启动统一基础设施并创建业务库"
