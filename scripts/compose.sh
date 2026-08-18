@@ -26,7 +26,11 @@ run_one() {
   opts="$(project_compose_opts "$name")"
   echo "==> ${ACTION} ${name} (${dir} ${opts})"
   case "$ACTION" in
-    up)    ( cd "$dir" && docker compose ${opts} up -d --build ) ;;
+    up)    if [ "${NO_BUILD:-0}" = "1" ]; then
+             ( cd "$dir" && docker compose ${opts} up -d )
+           else
+             ( cd "$dir" && docker compose ${opts} up -d --build )
+           fi ;;
     build) ( cd "$dir" && docker compose ${opts} build ) ;;
     down)  ( cd "$dir" && docker compose ${opts} down ) ;;
     logs)  ( cd "$dir" && docker compose ${opts} logs -f --tail=200 ) ;;

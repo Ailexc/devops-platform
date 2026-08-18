@@ -43,7 +43,11 @@ echo "4️⃣  保留 JWT 密钥（保持 token 有效性）..."
 
 # 5. 重启服务
 echo "5️⃣  重启服务..."
-docker compose up -d --build
+if [ "${NO_BUILD:-0}" = "1" ]; then
+    docker compose up -d
+else
+    docker compose up -d --build
+fi
 
 # 6. 等待服务启动
 echo "6️⃣  等待服务启动..."

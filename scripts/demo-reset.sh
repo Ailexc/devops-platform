@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
 # demo-reset —— 一键恢复到干净出厂态（演示专用）
-# 用法：make demo-reset
+# 用法：make demo-reset          # 快速恢复（默认，复用现有镜像，只重建数据）
+#       make demo-reset BUILD=1  # 完整模式（先构建最新镜像再恢复，代码变更时用）
 #
 # 目标：不论业务数据被如何破坏（删除/篡改/清空/异常），
 #       一条命令即可把整站恢复到"出厂演示态"，保证随时可演示。
@@ -9,22 +10,33 @@
 # 原理（硬恢复，不依赖备份）：
 #   - 数据层从代码重建：DROP DATABASE 重建全部统一业务库 → 逐项目 migrate/seed
 #   - Redis 业务数据清空（asynq 队列 / 缓存 / 任务状态）
-#   - 全部应用镜像重建并启动
+#   - 应用容器复用现有镜像重启（基建/镜像本身不会被业务数据破坏，无需重建）
 #   - 冒烟测试验证各系统 HTTP 可达
+#
+# 为什么默认不 build：
+#   业务数据再脏也只会污染"数据"，不会污染"镜像/基础设施"。恢复数据只需
+#   重建 DB + 清 Redis + 重启容器，无需重新编译镜像（节省 90%+ 时间）。
+#   仅当代码变更、需要部署新代码时才需 BUILD=1 先构建镜像。
 #
 # 流程：
 #   1. 确保统一基础设施运行（bootstrap 幂等）
-#   2. 构建全部业务镜像（确保最新代码）
+#   2. [BUILD=1 时] 构建全部业务镜像（确保最新代码）
 #   3. 全量硬重置（scripts/reset-all.sh：DB 重建 + 逐项目种子 + Redis 清空）
-#   4. 重建并启动全部应用（含演示 app / 认证 API / 统一网关）
+#   4. 启动全部应用（含演示 app / 认证 API / 统一网关）
 #   5. 冒烟测试（门户 + 各系统 + 演示 app HTTP 可达）
 # ============================================================
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib.sh
 
+BUILD="${BUILD:-0}"
 log "══════════════════════════════════════════════════════"
 log "  make demo-reset —— 一键恢复到干净出厂态"
+if [ "${BUILD}" = "1" ]; then
+  log "  模式：完整（BUILD=1，先构建最新镜像再恢复）"
+else
+  log "  模式：快速（默认，复用现有镜像只重建数据；需构建请 BUILD=1）"
+fi
 log "══════════════════════════════════════════════════════"
 
 check_docker
@@ -37,27 +49,43 @@ else
   bash scripts/bootstrap.sh
 fi
 
-# ── 2. 构建全部业务镜像（确保最新代码）────────────────────
-log "构建全部业务镜像 ..."
-bash scripts/compose.sh build
-# 认证项目（含演示 mock/direct/pilot/oidc + 认证 API）由 Authentication/reset.sh 构建启动
-# 统一网关单独构建（聚合 7 系统 + 演示 app + 认证 API 到 8088-8099）
-log "构建统一网关镜像 ..."
-docker compose -f infra/gateway/docker-compose.yml build
+# ── 2. [可选] 构建全部业务镜像 ────────────────────────────
+if [ "${BUILD}" = "1" ]; then
+  log "构建全部业务镜像（BUILD=1）..."
+  bash scripts/compose.sh build
+  # 认证项目（含演示 mock/direct/pilot/oidc + 认证 API）由 Authentication/reset.sh 构建启动
+  # 统一网关单独构建（聚合 7 系统 + 演示 app + 认证 API 到 8088-8099）
+  log "构建统一网关镜像 ..."
+  docker compose -f infra/gateway/docker-compose.yml build
+else
+  ok "跳过镜像构建（快速模式；BUILD=1 可强制重新构建）"
+fi
 
 # ── 3. 全量硬重置（DB 重建 + 逐项目种子 + Redis 清空）─────
 log "全量硬重置数据库并逐项目回种数据 ..."
-bash scripts/reset-all.sh
+# 快速模式（默认）：透传 NO_BUILD=1，reset 链路内各 up 不再触发 build
+if [ "${BUILD}" = "1" ]; then
+  bash scripts/reset-all.sh
+else
+  NO_BUILD=1 bash scripts/reset-all.sh
+fi
 # 说明：reset-all.sh 阶段三 auth 分支已调用 Authentication/reset.sh
 #   （内含 drop schema + 种子 + 认证/门户/演示 app/认证 API 的 up --build），
 #   故认证相关服务无需在此重复构建/启动。
 
-# ── 4. 重建并启动全部业务应用 ─────────────────────────────
-log "重建并启动其余业务应用 ..."
-bash scripts/compose.sh up
-# 启动统一网关（Traefik，聚合 7 系统 + 演示 app + 认证 API）
-log "启动统一网关 ..."
-docker compose -f infra/gateway/docker-compose.yml up -d --build
+# ── 4. 启动全部业务应用 ──────────────────────────────────
+log "启动全部业务应用 ..."
+if [ "${BUILD}" = "1" ]; then
+  bash scripts/compose.sh up
+  # 启动统一网关（Traefik，聚合 7 系统 + 演示 app + 认证 API）
+  log "启动统一网关 ..."
+  docker compose -f infra/gateway/docker-compose.yml up -d --build
+else
+  NO_BUILD=1 bash scripts/compose.sh up
+  # 启动统一网关（复用现有镜像）
+  log "启动统一网关 ..."
+  docker compose -f infra/gateway/docker-compose.yml up -d
+fi
 
 # ── 5. 冒烟测试 ──────────────────────────────────────────
 log "冒烟测试：验证各系统 HTTP 可达 ..."

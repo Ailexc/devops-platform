@@ -51,11 +51,13 @@ drop_schema() {
 #   例：ensure_up cmdb backend --force-recreate
 ensure_up() {
   local name="$1" services="${2:-}" extra="${*:3}"
-  local dir opts
+  local dir opts build_flag
   dir="$(project_dir "$name")"
   opts="$(project_compose_opts "$name")"
+  build_flag="--build"
+  [ "${NO_BUILD:-0}" = "1" ] && build_flag=""
   log "确保 ${name} 容器运行（${dir}）..."
-  ( cd "$dir" && docker compose ${opts} up -d --build ${services} ${extra} )
+  ( cd "$dir" && docker compose ${opts} up -d ${build_flag} ${services} ${extra} )
 }
 
 # 等待容器内初始化完成（容器 command 自带 migrate/seed，runserver/gunicorn 起来即代表完成）
