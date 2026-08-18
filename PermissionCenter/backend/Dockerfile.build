@@ -1,13 +1,16 @@
 # 多阶段构建：在容器内编译 Go 代码
+# 目标架构：本地 OrbStack=aarch64(arm64) / 云端 ECS=x86_64(amd64)
+# 用法：docker build -f backend/Dockerfile.build --build-arg GOARCH=amd64 -t iam-backend backend
+ARG GOARCH=arm64
 FROM golang:1.23-alpine AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o bin/iam-server ./cmd/iam-server && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o bin/mock-cmdb ./cmd/mock-cmdb && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o bin/mock-identity ./cmd/mock-identity && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o bin/iam-agent ./cmd/iam-agent
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH go build -o bin/iam-server ./cmd/iam-server && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH go build -o bin/mock-cmdb ./cmd/mock-cmdb && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH go build -o bin/mock-identity ./cmd/mock-identity && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH go build -o bin/iam-agent ./cmd/iam-agent
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata

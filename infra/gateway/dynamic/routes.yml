@@ -5,7 +5,7 @@
 http:
   routers:
     portal:
-      rule: "Host(`devops.orb.local`) || Host(`portal.devops.orb.local`)"
+      rule: "Host(`devops.orb.local`) || Host(`portal.devops.orb.local`) || Host(`112.124.69.224`)"
       entryPoints: ["web"]
       service: portal
 

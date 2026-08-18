@@ -842,8 +842,8 @@ footer .row a:hover{color:var(--g2)}
 <script>
 /* ==================== 配置 ==================== */
 const CONFIG = {
-  // 🔧 统一门户地址：本地是 Authentication 的 portal；部署后替换为公网地址（如 https://demo-portal.onrender.com）
-  portalUrl: 'http://portal.authentication.orb.local',
+  // 🔧 统一门户地址：本地是 Authentication 的 portal；云端部署指向 ECS 统一网关（IP + 端口 8088）
+  portalUrl: 'http://112.124.69.224:8088',
   // 🔧 GitHub 仓库地址（可选）：填了之后系统卡片/详情会指向对应目录；留空则跳 #
   githubRepo: '',
 };

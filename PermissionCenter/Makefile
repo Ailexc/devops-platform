@@ -1,13 +1,16 @@
 .PHONY: up down seed seed-reset reset-all backup restore backend-image frontend-image run run-cmdb run-id run-agent demo web test build tidy clean logs ps
 
+# 目标架构：本地 OrbStack=aarch64(arm64) / 云端 ECS=x86_64(amd64)，用 make ... GOARCH=amd64 覆盖
+GOARCH ?= arm64
+
 # ---- OrbStack 全栈部署（统一管理）----
-backend-image:  # 宿主机交叉编译 4 个 Linux/arm64 二进制 + 构建 iam-backend 镜像
-	# macOS 编译产物为 Mach-O，Linux 容器需 ELF → 交叉编译（OrbStack 容器架构 aarch64）
+backend-image:  # 宿主机交叉编译 4 个 Linux/$(GOARCH) 二进制 + 构建 iam-backend 镜像
+	# macOS 编译产物为 Mach-O，Linux 容器需 ELF → 交叉编译（本地 aarch64 / 云端 x86_64）
 	cd backend && mkdir -p bin && \
-	  GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/iam-server ./cmd/iam-server && \
-	  GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/mock-cmdb ./cmd/mock-cmdb && \
-	  GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/mock-identity ./cmd/mock-identity && \
-	  GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/iam-agent ./cmd/iam-agent
+	  GOOS=linux GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o bin/iam-server ./cmd/iam-server && \
+	  GOOS=linux GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o bin/mock-cmdb ./cmd/mock-cmdb && \
+	  GOOS=linux GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o bin/mock-identity ./cmd/mock-identity && \
+	  GOOS=linux GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o bin/iam-agent ./cmd/iam-agent
 	docker build -f backend/Dockerfile -t iam-backend backend
 
 frontend-image:  # 宿主机构建 dist + 构建 iam-frontend 镜像（容器内 npm install 网络不稳定，故本地构建）
