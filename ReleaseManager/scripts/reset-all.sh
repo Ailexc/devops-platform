@@ -129,7 +129,7 @@ ok "服务已启动"
 #       - 最终以容器进程 + 第 7 步 Django shell 硬核验证为准
 #       如需强制指定探测地址：RELEASE_HEALTH_URL=https://<host>/api/v1/releases/ ./scripts/reset-all.sh
 info "等待后端就绪..."
-if [ -z "$RELEASE_HEALTH_URL" ] && ! timeout 3 getent hosts "frontend.${PROJECT_NAME}.orb.local" >/dev/null 2>&1; then
+if [ -z "${RELEASE_HEALTH_URL:-}" ] && ! timeout 3 getent hosts "frontend.${PROJECT_NAME}.orb.local" >/dev/null 2>&1; then
     warn "无 .orb.local 域名解析（ECS/统一网关环境），跳过 URL 探测，由 Django shell 验证兜底"
 else
     BACKEND_READY=0
