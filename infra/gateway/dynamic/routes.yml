@@ -5,6 +5,19 @@
 #         面试官无需 hosts 映射，http://112.124.69.224:<port> 直达
 # ============================================================
 http:
+  middlewares:
+    # 认证中心 forwardAuth：校验 Authorization: Bearer <统一JWT>，通过则注入 X-Auth-* 头
+    # 用于受网关保护的演示应用（mock-app / pilot-app 的 /api/*）
+    auth-forward:
+      forwardAuth:
+        address: "http://authentication-auth-backend:8000/api/auth/verify"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "X-Auth-User"
+          - "X-Auth-Username"
+          - "X-Auth-Name"
+          - "X-Auth-Source"
+
   routers:
     portal:
       rule: "Host(`devops.orb.local`) || Host(`portal.devops.orb.local`) || Host(`112.124.69.224`)"
@@ -78,6 +91,51 @@ http:
       entryPoints: ["web"]
       service: auth-api
 
+    # ===== Demo 应用 + 认证 API：多端口纯 IP 路由 =====
+    # mock-app / pilot-app 的 /api/* 经 forwardAuth 鉴权，首页免鉴权（SPA 读 token）
+    mock-ip-api:
+      rule: "Host(`112.124.69.224`) && PathPrefix(`/api/`)"
+      entryPoints: ["web-mock"]
+      service: mock-app
+      middlewares:
+        - auth-forward
+      priority: 10
+
+    mock-ip-home:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-mock"]
+      service: mock-app
+      priority: 1
+
+    pilot-ip-api:
+      rule: "Host(`112.124.69.224`) && PathPrefix(`/api/`)"
+      entryPoints: ["web-pilot"]
+      service: pilot-app
+      middlewares:
+        - auth-forward
+      priority: 10
+
+    pilot-ip-home:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-pilot"]
+      service: pilot-app
+      priority: 1
+
+    direct-ip:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-direct"]
+      service: direct-app
+
+    oidc-ip:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-oidc"]
+      service: oidc-demo
+
+    auth-api-ip:
+      rule: "Host(`112.124.69.224`)"
+      entryPoints: ["web-auth-api"]
+      service: auth-api
+
     # Traefik Dashboard
     traefik:
       rule: "Host(`traefik.devops.orb.local`)"
@@ -124,3 +182,24 @@ http:
       loadBalancer:
         servers:
           - url: "http://authentication-auth-backend:8000"
+
+    # ---- Demo 应用（容器名已加入 devops-net）----
+    mock-app:
+      loadBalancer:
+        servers:
+          - url: "http://authentication-mock-app:8081"
+
+    direct-app:
+      loadBalancer:
+        servers:
+          - url: "http://authentication-direct-app:8003"
+
+    pilot-app:
+      loadBalancer:
+        servers:
+          - url: "http://authentication-pilot-app:8004"
+
+    oidc-demo:
+      loadBalancer:
+        servers:
+          - url: "http://authentication-oidc-demo:8005"

@@ -90,6 +90,9 @@ services:
     # 不对外暴露端口，只能经 Traefik 网关访问（体现「受保护业务系统」）
     depends_on:
       - auth-backend
+    networks:
+      - default
+      - devops-net
 
   direct-app:
     build: ./direct-app
@@ -104,6 +107,9 @@ services:
       - auth-backend
     labels:
       - "dev.orbstack.domains=direct.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    networks:
+      - default
+      - devops-net
 
   pilot-app:
     build: ./pilot-app
@@ -111,6 +117,9 @@ services:
     # 试点接入示例：经统一网关访问（不对外直接暴露），模拟真实业务系统接入后
     depends_on:
       - auth-backend
+    networks:
+      - default
+      - devops-net
 
   oidc-demo:
     build: ./oidc-demo
@@ -119,14 +128,19 @@ services:
     environment:
       - CLIENT_ID=oidc-demo-app
       - CLIENT_SECRET=oidc-demo-secret-123456
-      - REDIRECT_URI=http://localhost:8005/callback
-      - AUTH_AUTHORIZE_URL=http://localhost:8002/oauth/authorize
+      # redirect_uri / authorize_url 云端用 .env.cloud 覆盖为公网地址（OIDC_REDIRECT_URI / OIDC_AUTHORIZE_URL）
+      - REDIRECT_URI=${OIDC_REDIRECT_URI:-http://localhost:8005/callback}
+      - AUTH_AUTHORIZE_URL=${OIDC_AUTHORIZE_URL:-http://localhost:8002/oauth/authorize}
+      # token / userinfo 由本应用后端调用，走 devops-net 内部服务名，无需公网
       - AUTH_TOKEN_URL=http://auth-backend:8000/oauth/token
       - AUTH_USERINFO_URL=http://auth-backend:8000/oauth/userinfo
     ports:
       - "8005:8005"
     depends_on:
       - auth-backend
+    networks:
+      - default
+      - devops-net
 
   traefik:
     image: traefik:v3.2

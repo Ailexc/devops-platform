@@ -45,13 +45,20 @@ class OidcDemoHandler(BaseHTTPRequestHandler):
             self._home()
 
     def _home(self):
-        auth_url = AUTHORIZE_URL + "?" + urllib.parse.urlencode({
+        # 门户 SSO 跳转场景：home_url?token=<统一JWT>，读取并透传给 authorize，
+        # 使云端「门户跳转 → 授权码流程」一次完成（无需再走登录页）
+        qs = urllib.parse.urlparse(self.path).query
+        token = urllib.parse.parse_qs(qs).get("token", [""])[0]
+        auth_params = {
             "response_type": "code",
             "client_id": CLIENT_ID,
             "redirect_uri": REDIRECT_URI,
             "scope": "openid profile",
             "state": "demo-state-123",
-        })
+        }
+        if token:
+            auth_params["token"] = token
+        auth_url = AUTHORIZE_URL + "?" + urllib.parse.urlencode(auth_params)
         html = """<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" />
 <title>OIDC 演示应用 · 授权码模式</title>
