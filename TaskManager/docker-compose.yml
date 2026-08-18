@@ -77,8 +77,6 @@ services:
     command: ["./cmdb-server", "--seed"]
     ports:
       - "8081:8080"          # 8080 被 OrbStack 占用，映射到 8081
-    volumes:
-      - ./go-backend/docs:/app/docs
     environment:
       DB_DSN: "postgresql://devops:devops@devops-postgres:5432/devops_cmdb_go?sslmode=disable"
       REDIS_ADDR: "devops-redis:6379"
