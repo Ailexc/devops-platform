@@ -2,7 +2,7 @@
 # 目标架构：本地 OrbStack=aarch64(arm64) / 云端 ECS=x86_64(amd64)
 # 用法：docker build -f backend/Dockerfile.build --build-arg GOARCH=amd64 -t iam-backend backend
 ARG GOARCH=arm64
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
