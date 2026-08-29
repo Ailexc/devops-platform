@@ -53,7 +53,8 @@ services:
       - LDAP_BIND_PASSWORD=${LDAP_ADMIN_PASSWORD:-adminpass}
       - LDAP_USER_SEARCH_BASE=ou=people,dc=devops,dc=com
       - LDAP_USER_SEARCH_FILTER=(uid={username})
-      - PORTAL_URL=http://portal.${COMPOSE_PROJECT_NAME:-authentication}.orb.local
+      # 门户地址（云端部署用 PORTAL_URL 覆盖为公网网关入口，默认本地统一入口）
+      - PORTAL_URL=${PORTAL_URL:-http://portal.${COMPOSE_PROJECT_NAME:-authentication}.orb.local}
       # 应用跳转地址（云端部署用 APP_URL_<APP_ID> 覆盖为统一网关地址，默认本地统一入口）
       - APP_URL_TASK_MANAGER=${APP_URL_TASK_MANAGER:-http://cmdb.devops.orb.local}
       - APP_URL_CLOUD_MANAGER=${APP_URL_CLOUD_MANAGER:-http://cloud.devops.orb.local}
