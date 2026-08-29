@@ -93,7 +93,7 @@ for h in devops portal cloud event iam release cmdb workflow api.auth; do
 done
 echo ""
 echo "── IP 直达门户 ──"
-echo "  http://112.124.69.224:8088 → $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/ 2>/dev/null || echo ERR)"
+echo "  http://114.55.244.220:8088 → $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/ 2>/dev/null || echo ERR)"
 echo ""
 echo "=================================================="
-ok "部署完成！公网访问：http://112.124.69.224:8088（各系统见 docs/commands.md Host 头映射）"
+ok "部署完成！公网访问：http://114.55.244.220:8088（各系统见 docs/commands.md Host 头映射）"

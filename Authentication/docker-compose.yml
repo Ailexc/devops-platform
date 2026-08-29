@@ -61,7 +61,7 @@ services:
       - APP_URL_EVENT_MANAGER=${APP_URL_EVENT_MANAGER:-http://event.devops.orb.local}
       - APP_URL_RELEASE_MANAGER=${APP_URL_RELEASE_MANAGER:-http://release.devops.orb.local}
       - APP_URL_PERMISSION_CENTER=${APP_URL_PERMISSION_CENTER:-http://iam.devops.orb.local}
-      # Demo 应用跳转地址（云端由 .env.cloud 覆盖为 112.124.69.224:809X）
+      # Demo 应用跳转地址（云端由 .env.cloud 覆盖为 114.55.244.220:809X）
       - APP_URL_MOCK_APP=${APP_URL_MOCK_APP:-http://mock.authentication.orb.local}
       - APP_URL_DIRECT_APP=${APP_URL_DIRECT_APP:-http://direct.authentication.orb.local}
       - APP_URL_PILOT_APP=${APP_URL_PILOT_APP:-http://localhost:8004}

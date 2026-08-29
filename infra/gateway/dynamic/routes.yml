@@ -2,7 +2,7 @@
 # 统一网关动态路由：Host 规则 → 各系统 frontend（devops-net 服务名）
 # 各目标容器必须已加入 devops-net 网络
 # 方案 B：另加多端口纯 IP 路由，每个 entryPoint 对应一个系统，
-#         面试官无需 hosts 映射，http://112.124.69.224:<port> 直达
+#         面试官无需 hosts 映射，http://114.55.244.220:<port> 直达
 # ============================================================
 http:
   middlewares:
@@ -20,7 +20,7 @@ http:
 
   routers:
     portal:
-      rule: "Host(`devops.orb.local`) || Host(`portal.devops.orb.local`) || Host(`112.124.69.224`)"
+      rule: "Host(`devops.orb.local`) || Host(`portal.devops.orb.local`) || Host(`114.55.244.220`)"
       entryPoints: ["web"]
       service: portal
 
@@ -56,32 +56,32 @@ http:
 
     # ===== 方案 B：多端口纯 IP 路由（对外预览，免 hosts 映射）=====
     cmdb-ip:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-cmdb"]
       service: cmdb
 
     cloud-ip:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-cloud"]
       service: cloud
 
     workflow-ip:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-workflow"]
       service: workflow
 
     event-ip:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-event"]
       service: event
 
     release-ip:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-release"]
       service: release
 
     iam-ip:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-iam"]
       service: iam
 
@@ -94,7 +94,7 @@ http:
     # ===== Demo 应用 + 认证 API：多端口纯 IP 路由 =====
     # mock-app / pilot-app 的 /api/* 经 forwardAuth 鉴权，首页免鉴权（SPA 读 token）
     mock-ip-api:
-      rule: "Host(`112.124.69.224`) && PathPrefix(`/api/`)"
+      rule: "Host(`114.55.244.220`) && PathPrefix(`/api/`)"
       entryPoints: ["web-mock"]
       service: mock-app
       middlewares:
@@ -102,13 +102,13 @@ http:
       priority: 10
 
     mock-ip-home:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-mock"]
       service: mock-app
       priority: 1
 
     pilot-ip-api:
-      rule: "Host(`112.124.69.224`) && PathPrefix(`/api/`)"
+      rule: "Host(`114.55.244.220`) && PathPrefix(`/api/`)"
       entryPoints: ["web-pilot"]
       service: pilot-app
       middlewares:
@@ -116,23 +116,23 @@ http:
       priority: 10
 
     pilot-ip-home:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-pilot"]
       service: pilot-app
       priority: 1
 
     direct-ip:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-direct"]
       service: direct-app
 
     oidc-ip:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-oidc"]
       service: oidc-demo
 
     auth-api-ip:
-      rule: "Host(`112.124.69.224`)"
+      rule: "Host(`114.55.244.220`)"
       entryPoints: ["web-auth-api"]
       service: auth-api
 

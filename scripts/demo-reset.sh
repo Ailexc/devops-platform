@@ -93,7 +93,7 @@ fi
 log "冒烟测试：验证各系统 HTTP 可达 ..."
 
 # 等待统一网关就绪（端口可连，避免 up 后立即探测返回 000）
-HOST_HEADER="${DEMO_RESET_HOST:-112.124.69.224}"
+HOST_HEADER="${DEMO_RESET_HOST:-114.55.244.220}"
 GATEWAY_PORT="${DEMO_RESET_GATEWAY_PORT:-8088}"
 log "等待网关（${GATEWAY_PORT}）就绪 ..."
 GATEWAY_OK=0
@@ -111,7 +111,7 @@ fi
 FAIL=0
 check_http() {
   local name="$1" url="$2" code
-  # 路由规则为 Host(112.124.69.224)，须显式带 Host 头（ECS 用公网 IP 访问时天然匹配，本地 loopback 需带上）
+  # 路由规则为 Host(114.55.244.220)，须显式带 Host 头（ECS 用公网 IP 访问时天然匹配，本地 loopback 需带上）
   code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H "Host: ${HOST_HEADER}" "$url" || echo 000)
   if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ] || [ "$code" = "303" ] || [ "$code" = "401" ] || [ "$code" = "403" ]; then
     ok "  ✓ ${name} -> HTTP ${code}"
