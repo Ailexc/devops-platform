@@ -7,8 +7,12 @@
 - 身份统一（认证中心/网关）：用户是谁
 - 授权分散（本系统）：本地 User 关联的角色/权限由本系统自治
 
+注意：认证中心在 HTTP 头中只放 latin-1，中文等非 ASCII 字符按 URL 编码
+（X-Auth-Name 为 quote 后的值），本类消费时需 unquote。
 无网关头时返回 None，交给后续认证类（如 SimpleJWT 本地登录）兜底。
 """
+from urllib.parse import unquote
+
 from django.contrib.auth import get_user_model
 from rest_framework.authentication import BaseAuthentication
 
@@ -28,4 +32,8 @@ class GatewayAuthentication(BaseAuthentication):
             username=username,
             defaults={"is_active": True},
         )
+        # 同步网关显示名（仅内存，不落库；以认证中心目录为准，授权仍由本系统自治）
+        gateway_name = request.META.get("HTTP_X_AUTH_NAME")
+        if gateway_name:
+            user.display_name = unquote(gateway_name)
         return (user, None)

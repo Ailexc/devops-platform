@@ -52,12 +52,20 @@ http:
 
     # ---- 真实业务系统接入（方式一：经统一网关 forwardAuth）----
     # 云管 CloudManager：后端 API 经网关鉴权（前端仍走各自入口）
+    # 云管 CloudManager：统一入口（前端经网关）→ 后端 API 经网关鉴权
     cloud-manager-api:
-      rule: "Host(`cloud.devops.orb.local`) && PathPrefix(`/api/`)"
+      rule: "(Host(`cloud.authentication.orb.local`) || Host(`cloud.devops.orb.local`)) && PathPrefix(`/api/`)"
       entryPoints: ["web"]
       service: cloud-manager-service
       middlewares:
         - auth-forward
+      priority: 10
+
+    # 云管前端页面：免鉴权（加载 SPA，前端读取 SSO token 后携 header 调 API）
+    cloud-manager-home:
+      rule: "Host(`cloud.authentication.orb.local`) && PathPrefix(`/`)"
+      entryPoints: ["web"]
+      service: cloud-manager-frontend-service
       priority: 10
 
     # 工单中心 WorkFlowCenter：后端 API 经网关鉴权
@@ -94,6 +102,12 @@ http:
       loadBalancer:
         servers:
           - url: "http://cloud_manager_backend:8000"
+
+    # 云管前端（SPA 静态，经统一网关按 Host 分发）
+    cloud-manager-frontend-service:
+      loadBalancer:
+        servers:
+          - url: "http://cloud_manager_nginx:80"
 
     workflow-center-service:
       loadBalancer:

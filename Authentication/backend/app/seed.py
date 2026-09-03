@@ -80,7 +80,7 @@ SEED_APPS = [
     {"app_id": "task-manager", "name": "任务管理 TaskManager", "description": "任务管理平台（任务编排与调度）",
      "icon": "ScheduleOutlined", "home_url": _home_url("task-manager", "http://cmdb.devops.orb.local"), "sort_order": 1, "access_mode": "direct", "redirect_uris": []},
     {"app_id": "cloud-manager", "name": "多云管理 CloudManager", "description": "多云资源管理控制台",
-     "icon": "CloudServerOutlined", "home_url": _home_url("cloud-manager", "http://cloud.devops.orb.local"), "sort_order": 2, "access_mode": "gateway", "redirect_uris": []},
+     "icon": "CloudServerOutlined", "home_url": _home_url("cloud-manager", "http://cloud.authentication.orb.local"), "sort_order": 2, "access_mode": "gateway", "redirect_uris": []},
     {"app_id": "workflow-center", "name": "工单中心 WorkFlowCenter", "description": "工单 / 流程管理平台",
      "icon": "ApartmentOutlined", "home_url": _home_url("workflow-center", "http://workflow.devops.orb.local"), "sort_order": 3, "access_mode": "gateway", "redirect_uris": []},
     {"app_id": "event-manager", "name": "事件管理 EventManager", "description": "告警与事件处理",

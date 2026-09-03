@@ -85,7 +85,7 @@ services:
       - PORTAL_URL=${PORTAL_URL:-http://portal.${COMPOSE_PROJECT_NAME:-authentication}.orb.local}
       # 应用跳转地址（云端部署用 APP_URL_<APP_ID> 覆盖为统一网关地址，默认本地统一入口）
       - APP_URL_TASK_MANAGER=${APP_URL_TASK_MANAGER:-http://cmdb.devops.orb.local}
-      - APP_URL_CLOUD_MANAGER=${APP_URL_CLOUD_MANAGER:-http://cloud.devops.orb.local}
+      - APP_URL_CLOUD_MANAGER=${APP_URL_CLOUD_MANAGER:-http://cloud.authentication.orb.local}
       - APP_URL_WORKFLOW_CENTER=${APP_URL_WORKFLOW_CENTER:-http://workflow.devops.orb.local}
       - APP_URL_EVENT_MANAGER=${APP_URL_EVENT_MANAGER:-http://event.devops.orb.local}
       - APP_URL_RELEASE_MANAGER=${APP_URL_RELEASE_MANAGER:-http://release.devops.orb.local}
@@ -190,7 +190,7 @@ services:
       - auth-backend
       - mock-app
     labels:
-      - "dev.orbstack.domains=mock.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,traefik.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+      - "dev.orbstack.domains=mock.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,traefik.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,cloud.authentication.orb.local"
     networks:
       - default
       - devops-net
