@@ -50,6 +50,34 @@ http:
       service: pilot-app-service
       priority: 1
 
+    # ---- 真实业务系统接入（方式一：经统一网关 forwardAuth）----
+    # 云管 CloudManager：后端 API 经网关鉴权（前端仍走各自入口）
+    cloud-manager-api:
+      rule: "Host(`cloud.devops.orb.local`) && PathPrefix(`/api/`)"
+      entryPoints: ["web"]
+      service: cloud-manager-service
+      middlewares:
+        - auth-forward
+      priority: 10
+
+    # 工单中心 WorkFlowCenter：后端 API 经网关鉴权
+    workflow-center-api:
+      rule: "Host(`workflow.devops.orb.local`) && PathPrefix(`/api/v1/`)"
+      entryPoints: ["web"]
+      service: workflow-center-service
+      middlewares:
+        - auth-forward
+      priority: 10
+
+    # 权限中心 PermissionCenter：后端 API 经网关鉴权
+    permission-center-api:
+      rule: "Host(`iam.devops.orb.local`) && PathPrefix(`/api/v1/`)"
+      entryPoints: ["web"]
+      service: permission-center-service
+      middlewares:
+        - auth-forward
+      priority: 10
+
   services:
     mock-app-service:
       loadBalancer:
@@ -60,3 +88,19 @@ http:
       loadBalancer:
         servers:
           - url: "http://pilot-app:8004"
+
+    # 真实业务系统（经 devops-net 访问各自后端）
+    cloud-manager-service:
+      loadBalancer:
+        servers:
+          - url: "http://cloud_manager_backend:8000"
+
+    workflow-center-service:
+      loadBalancer:
+        servers:
+          - url: "http://workflow-api:8000"
+
+    permission-center-service:
+      loadBalancer:
+        servers:
+          - url: "http://permission-center-iam-server-1:8080"

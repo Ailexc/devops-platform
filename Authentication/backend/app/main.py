@@ -5,9 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import models  # noqa: F401  确保模型注册
-from .api import apps, auth, jwks, oauth, system, users
+from .api import apps, auth, docs, jwks, oauth, portal, system, users
 from .config import get_settings
 from .db import Base, engine
+from .migrate import ensure_schema
 from .seed import seed_all
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -35,14 +36,17 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(oauth.router)
+app.include_router(portal.router)
 app.include_router(apps.router)
 app.include_router(users.router)
 app.include_router(system.router)
+app.include_router(docs.router)
 app.include_router(jwks.router)
 
 
 @app.on_event("startup")
 def on_startup() -> None:
+    ensure_schema()  # 老库补齐新增列
     Base.metadata.create_all(bind=engine)
     seed_all()
     logger.info("统一认证中心启动完成：数据库已就绪，身份源顺序=%s", settings.auth_provider_order)

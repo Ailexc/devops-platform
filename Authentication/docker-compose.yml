@@ -36,6 +36,25 @@ services:
       retries: 12
       start_period: 15s
 
+  # OpenLDAP 可视化管理界面（与 openldap 同 profile，随 --profile ldap 一起启动）
+  phpldapadmin:
+    image: osixia/phpldapadmin:0.9.0
+    profiles: ["ldap"]
+    container_name: authentication-phpldapadmin
+    environment:
+      - PHPLDAPADMIN_LDAP_HOSTS=openldap
+      - PHPLDAPADMIN_HTTPS=false
+      - PHPLDAPADMIN_TRUSTED_PROXY_IPS=127.0.0.1
+    ports:
+      - "8083:80"
+    depends_on:
+      openldap:
+        condition: service_healthy
+    labels:
+      - "dev.orbstack.domains=ldapadmin.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    networks:
+      - default
+
   auth-backend:
     build: ./backend
     container_name: authentication-auth-backend
@@ -45,9 +64,9 @@ services:
     environment:
       # 统一 PostgreSQL（devops-net 网络，一实例多库 devops_auth）
       - DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_auth
-      - AUTH_PROVIDER_ORDER=${AUTH_PROVIDER_ORDER:-local}
+      - AUTH_PROVIDER_ORDER=${AUTH_PROVIDER_ORDER:-ldap,local}
       - AUTH_PROVIDER_LOCAL_ENABLED=${AUTH_PROVIDER_LOCAL_ENABLED:-true}
-      - AUTH_PROVIDER_LDAP_ENABLED=${AUTH_PROVIDER_LDAP_ENABLED:-false}
+      - AUTH_PROVIDER_LDAP_ENABLED=${AUTH_PROVIDER_LDAP_ENABLED:-true}
       - LDAP_SERVER_URI=ldap://openldap:389
       - LDAP_BIND_DN=cn=admin,dc=devops,dc=com
       - LDAP_BIND_PASSWORD=${LDAP_ADMIN_PASSWORD:-adminpass}
@@ -163,6 +182,9 @@ services:
       - mock-app
     labels:
       - "dev.orbstack.domains=mock.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,traefik.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    networks:
+      - default
+      - devops-net
 
 volumes:
   ldap-data:

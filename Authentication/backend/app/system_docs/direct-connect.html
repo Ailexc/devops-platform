@@ -1,0 +1,55 @@
+<h2 id="what">什么是"直连接入"</h2>
+<p>直连接入（direct connect）指业务系统<strong>不经过统一网关</strong>，而是自己直接校验统一 JWT 的接入方式。它适用于：外部部署的应用、内网直接互通的内部服务、网关覆盖不到的系统。</p>
+<p>核心机制是 <strong>JWKS（JSON Web Key Set）公钥验签</strong>：认证中心用私钥签发统一 JWT，把公钥通过 <code>/.well-known/jwks.json</code> 发布；直连应用定期拉取公钥，在<strong>本地</strong>验签 JWT，无需每次回源认证中心。</p>
+
+<h2 id="jwks">JWKS 公钥机制</h2>
+<p>统一 JWT 使用 <strong>RS256 非对称签名</strong>：</p>
+<ul>
+  <li>私钥：只存在认证中心，负责签发 JWT，绝不外泄；</li>
+  <li>公钥：通过 <code>/.well-known/jwks.json</code> 公开发布，任何系统都能获取；</li>
+  <li>密钥 ID（kid）：JWT 头部携带 <code>kid</code>，指明用哪把公钥验签，支持未来多公钥共存、平滑轮换。</li>
+</ul>
+<p>公钥是公开信息，被谁拿到都不影响安全——因为只有持有私钥的认证中心才能伪造签名。这也是"谁都能验、又没人能伪造"的设计根基。</p>
+
+<h2 id="verify">本地验签的完整步骤</h2>
+<ol>
+  <li>从 <code>/.well-known/jwks.json</code> 拉取公钥列表（可缓存，按 kid 索引）；</li>
+  <li>收到请求时，取出 <code>Authorization: Bearer &lt;JWT&gt;</code>；</li>
+  <li>按 JWT 头部的 kid 找到对应公钥，本地验 RS256 签名；</li>
+  <li>校验有效期（exp）、签发方（iss）、受众（aud）；</li>
+  <li>通过后从载荷读取用户身份（sub / name / source 等）。</li>
+</ol>
+
+<pre><code># 一次验签的伪代码（direct-app 中的核心中间件，约 20 行）
+def verify_jwt(token: str) -> dict:
+    header = decode_header(token)                     # 取 kid
+    jwks = load_cached_jwks()                         # 缓存拉取 /.well-known/jwks.json
+    key = find_key_by_kid(jwks, header["kid"])
+    payload = jwt.decode(token, key, algorithms=["RS256"])
+    assert payload["iss"] == settings.issuer
+    assert payload["exp"] &gt; now()
+    return payload
+</code></pre>
+
+<h2 id="why">为什么选择直连而非统一走网关</h2>
+<table>
+  <thead>
+    <tr><th>对比</th><th>直连 JWKS 验签</th><th>经网关 forwardAuth</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>回源依赖</td><td>无，本地验签</td><td>每次请求转发认证中心验签</td></tr>
+    <tr><td>认证中心宕机</td><td>已发 token 仍可验（高可用）</td><td>网关校验失败，请求被拦</td></tr>
+    <tr><td>鉴权代码</td><td>每个服务实现一次验签中间件</td><td>业务零鉴权代码</td></tr>
+    <tr><td>适用场景</td><td>外部部署 / 跨网络 / 网关覆盖不到</td><td>网关能覆盖的内部应用</td></tr>
+  </tbody>
+</table>
+<div class="note">
+  <strong>本项目落地：</strong><code>direct-app</code>（端口 8003）就是直连示例，实现了 20 行左右的本地验签中间件，演示"不经网关、拉公钥本地验签"的完整链路。统一 JWT 由门户应用广场经 <code>sso-url</code> 签发（内部链路凭证）。
+</div>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>直连接入 = 不经网关，本地拉 JWKS 公钥验签统一 JWT。</li>
+  <li>RS256 非对称 + JWKS 是基础：公钥公开、私钥唯一、kid 支持轮换。</li>
+  <li>本地验签无回源、高可用，适合网关覆盖不到的系统。</li>
+</ul>

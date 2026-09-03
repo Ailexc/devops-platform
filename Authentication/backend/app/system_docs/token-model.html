@@ -1,0 +1,61 @@
+<h2 id="three">三种 Token 的分工</h2>
+<p>认证中心签发三种 Token，各司其职、互不越权：</p>
+<table>
+  <thead>
+    <tr><th>Token</th><th>用途</th><th>时效</th><th>特征</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>id_token</code></td><td>身份断言，证明"你是谁"</td><td>短（与 access 同）</td><td>JWT 签名，含 sub / nonce / aud，<strong>不用于调 API</strong></td></tr>
+    <tr><td><code>access_token</code></td><td>访问凭证，调 /userinfo 或业务 API</td><td>1 小时</td><td>RS256 签名，aud 标识归属应用</td></tr>
+    <tr><td><code>refresh_token</code></td><td>换新 access_token（无感续期）</td><td>7 天</td><td>仅后端持有，<strong>轮换 + 复用检测</strong></td></tr>
+  </tbody>
+</table>
+
+<h2 id="id-token">id_token：身份断言</h2>
+<p>id_token 是 OIDC 的核心产物，是一个 JWT，声明了用户的身份事实：</p>
+<pre><code>{
+  "iss": "auth.devops.orb.local",   // 签发者
+  "sub": "2",                        // 用户唯一标识
+  "aud": "oidc-demo-app",            // 受众 = 客户端，必须匹配
+  "nonce": "WR1d...",                // 防重放随机数，客户端必须校验
+  "iat": 1788424000,
+  "exp": 1788424529
+}
+</code></pre>
+<p>客户端验 id_token 时要做四件事：验 RS256 签名、验 <code>aud</code> 等于自己的 client_id、验 <code>nonce</code> 与发起时一致、验 <code>exp</code> 未过期。这也是 <code>oidc-demo</code> 登录成功后展示的原始内容。</p>
+
+<h2 id="access-token">access_token：访问凭证</h2>
+<p>access_token 用于访问受保护资源：调 <code>/userinfo</code> 拿用户属性，或作为业务 API 的调用凭证（内部链路中与统一 JWT 的职责相似，但 access_token 是标准 OIDC 产物）。它短时效，降低泄露窗口。</p>
+
+<h2 id="refresh">refresh_token：轮换 + 复用检测</h2>
+<p>refresh_token 生命周期长，是"续期钥匙"，因此是本项目重点加固的对象：</p>
+<ol>
+  <li><strong>轮换（Rotation）</strong>：每次用 refresh_token 换新 token，旧号立即作废、签发新号。即使旧号泄露，攻击者拿到的也是废号；</li>
+  <li><strong>复用检测（Reuse Detection）</strong>：若检测到已经作废的旧号被再次使用，说明令牌可能被窃取，<strong>立即吊销该用户整族（family）会话</strong>；</li>
+  <li><strong>哈希入库</strong>：refresh_token 以 SHA-256 哈希存库，数据库泄露也无法直接使用。</li>
+</ol>
+
+<pre><code># 刷新流程（示意）
+POST /oauth/token  grant_type=refresh_token &amp;refresh_token=&lt;旧号&gt;
+  1. 验哈希 → 匹配到一条记录
+  2. 该记录已 revoked？ → 触发复用检测，吊销整族
+  3. 未用 → 作废旧号，签发新 access_token + 新 refresh_token（同 family）
+</code></pre>
+
+<h2 id="separation">为什么要三权分离</h2>
+<ul>
+  <li><strong>id_token 与 access_token 分离</strong>：身份信息（含 PII）不应随每个 API 请求到处传；access_token 对资源服务器只做"能不能进"的判断；</li>
+  <li><strong>access 与 refresh 分离</strong>：短时效降低泄露窗口，长时效 refresh 由后端安全持有，前端拿不到；</li>
+  <li>门户 BFF 模式下：<strong>三种 token 都不进浏览器</strong>，浏览器只有会话 Cookie，安全性最高。</li>
+</ul>
+
+<div class="warn">
+  <strong>不要做的事：</strong>不要把 refresh_token 或 client_secret 放进前端/浏览器；不要用 id_token 作为 API 访问凭证；不要复用旧 refresh_token。
+</div>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>id_token 管身份、access_token 管访问、refresh_token 管续期。</li>
+  <li>refresh 轮换 + 复用检测 + 哈希入库是本项目 Token 安全的三大亮点。</li>
+  <li>BFF 模式下三种 token 都不进浏览器。</li>
+</ul>

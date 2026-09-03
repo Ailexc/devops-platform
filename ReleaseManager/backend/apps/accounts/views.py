@@ -4,9 +4,17 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from django.shortcuts import redirect
 
 from .models import User
 from .serializers import UserSerializer, UserListSerializer
+from .oidc_client import (
+    build_authorize_url,
+    exchange_code,
+    generate_pkce,
+    generate_state,
+    verify_id_token,
+)
 from apps.authz.utils import get_user_effective_permissions
 
 
@@ -40,6 +48,55 @@ def login(request):
 @api_view(['POST'])
 def logout(request):
     return Response({'code': 200, 'message': '已退出'})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def oidc_login(request):
+    """统一认证登录（OIDC 授权码）：302 跳转统一认证中心。"""
+    verifier, challenge = generate_pkce()
+    state = generate_state()
+    request.session['oidc_verifier'] = verifier
+    request.session['oidc_state'] = state
+    return redirect(build_authorize_url(state, challenge))
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def oidc_callback(request):
+    """OIDC 回调：换令牌 → 验签 id_token → 映射本地用户 → 签发本地 JWT。"""
+    code = request.GET.get('code')
+    state = request.GET.get('state')
+    if not code or state != request.session.get('oidc_state'):
+        return Response({'code': 400, 'message': 'OIDC 回调校验失败（code/state 不合法）'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    verifier = request.session.pop('oidc_verifier', None)
+    try:
+        tokens = exchange_code(code, verifier)
+        id_token = tokens.get('id_token')
+        if not id_token:
+            return Response({'code': 400, 'message': '令牌响应缺少 id_token'}, status=400)
+        claims = verify_id_token(id_token)
+    except Exception as e:
+        return Response({'code': 400, 'message': f'OIDC 登录失败：{e}'}, status=400)
+
+    username = claims.get('uid') or claims.get('preferred_username') or claims.get('sub')
+    if not username:
+        return Response({'code': 400, 'message': 'id_token 缺少用户名'}, status=400)
+    user, _ = User.objects.get_or_create(
+        username=username,
+        defaults={'display_name': claims.get('name', username), 'is_active': True},
+    )
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        'code': 200,
+        'data': {
+            'token': str(refresh.access_token),
+            'user': UserSerializer(user).data,
+            'permissions': get_user_effective_permissions(user),
+            'sso': 'oidc',
+        }
+    })
 
 
 @api_view(['GET'])

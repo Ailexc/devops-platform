@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { scenes } from '../data/presentationScenes'
+import { SceneThumbnail } from '../components/PresentationVisuals'
 
 export default function PresentationHubPage() {
   const nav = useNavigate()
@@ -47,9 +48,14 @@ export default function PresentationHubPage() {
                 ;(e.currentTarget as HTMLElement).style.boxShadow = '0 2px 10px rgba(16,24,40,.06)'
               }}
             >
-              <div style={{ fontSize: 12, color: '#98a2b3' }}>{String(index + 1).padStart(2, '0')}</div>
-              <h3 style={{ margin: '6px 0 8px', fontSize: 17 }}>{scene.title}</h3>
-              <p style={{ margin: 0, color: '#667085', fontSize: 13, minHeight: 40 }}>{scene.description}</p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
+                <SceneThumbnail sceneId={scene.id} color={scene.themeColor} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: '#98a2b3', fontWeight: 600 }}>{String(index + 1).padStart(2, '0')} / {String(scenes.length).padStart(2, '0')}</div>
+                  <h3 style={{ margin: '2px 0 4px', fontSize: 16 }}>{scene.title}</h3>
+                </div>
+              </div>
+              <p style={{ margin: 0, color: '#667085', fontSize: 13, minHeight: 36, lineHeight: 1.5 }}>{scene.description}</p>
               <div style={{ marginTop: 12, display: 'flex', gap: 12, fontSize: 12, color: '#98a2b3' }}>
                 <span>🕐 {scene.duration}</span>
                 <span>📋 {scene.steps.length} 步</span>

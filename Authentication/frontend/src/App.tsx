@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
 import AppHeader from './components/AppHeader'
@@ -8,11 +9,36 @@ import AdminAppsPage from './pages/AdminAppsPage'
 import E2eTestPage from './pages/E2eTestPage'
 import PresentationHubPage from './pages/PresentationHubPage'
 import PresentationPlayerPage from './pages/PresentationPlayerPage'
+import SystemDocsHubPage from './pages/SystemDocsHubPage'
+import SystemDocsReaderPage from './pages/SystemDocsReaderPage'
 
-// 登录守卫：未登录跳转登录页
+// 登录守卫：启动时从 BFF 会话恢复用户；未登录跳转登录页
 function RequireAuth() {
-  const token = useAuthStore((s) => s.accessToken)
-  if (!token) return <Navigate to="/login" replace />
+  const user = useAuthStore((s) => s.user)
+  const initialized = useAuthStore((s) => s.initialized)
+  const bootstrap = useAuthStore((s) => s.bootstrap)
+
+  useEffect(() => {
+    void bootstrap()
+  }, [bootstrap])
+
+  if (!initialized) {
+    return (
+      <div
+        style={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#667085',
+          fontSize: 14,
+        }}
+      >
+        正在恢复登录状态…
+      </div>
+    )
+  }
+  if (!user) return <Navigate to="/login" replace />
   return (
     <div className="portal-container">
       <AppHeader />
@@ -46,6 +72,8 @@ export default function App() {
         <Route path="/dev/e2e-test" element={<E2eTestPage />} />
         <Route path="/presentation" element={<PresentationHubPage />} />
         <Route path="/presentation/:sceneId" element={<PresentationPlayerPage />} />
+        <Route path="/docs" element={<SystemDocsHubPage />} />
+        <Route path="/docs/:docId" element={<SystemDocsReaderPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

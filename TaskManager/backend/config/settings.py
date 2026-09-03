@@ -119,6 +119,10 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 50,
     "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # 统一认证接入（方式二：直连认证中心 JWKS 验签统一 JWT）
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "api.unified_auth.UnifiedJWTAuthentication",
+    ],
 }
 
 # drf-spectacular — OpenAPI 文档（供 Go 后端实现参考 / 契约对齐）

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>统一认证中心 · OIDC 标准改造方案</title>
+<style>
+  :root{
+    --text:#1A1B1C; --secondary:#6B7280; --bg:#F4F3EE; --card:#FFFFFF;
+    --border:#E4E3DD; --accent:#2b4a8f; --accent-soft:#eef3fb;
+    --green:#3a8a14; --green-soft:#edf7ed; --amber:#9a6a00; --amber-soft:#fef3e2;
+    --red:#c0392b; --red-soft:#fdeeec;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'PingFang SC','Roboto','Segoe UI','Microsoft YaHei',sans-serif;line-height:1.65;padding:0 0 64px;}
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px;}
+  header{background:linear-gradient(135deg,#1d2b52,#2b4a8f);color:#fff;padding:40px 20px 34px;}
+  header .wrap{max-width:960px;}
+  header h1{font-size:26px;font-weight:700;letter-spacing:.5px;}
+  header .sub{margin-top:8px;font-size:14px;color:#c7d4ef;}
+  header .meta{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;font-size:12px;}
+  header .meta span{background:rgba(255,255,255,.14);padding:3px 10px;border-radius:12px;}
+  h2{font-size:19px;font-weight:700;margin:40px 0 4px;color:var(--accent);}
+  h2 .no{color:#9db4e6;font-weight:700;margin-right:8px;}
+  h3{font-size:15px;font-weight:600;margin:18px 0 6px;color:#1A1B1C;}
+  p{font-size:14px;margin:6px 0;color:#333;}
+  .lead{font-size:14.5px;color:#333;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin:12px 0;}
+  .grid{display:flex;gap:14px;flex-wrap:wrap;}
+  .grid>.cell{flex:1 1 240px;min-width:0;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid #F0EFE9;vertical-align:top;}
+  th{background:#F3F6FC;color:var(--accent);font-weight:600;font-size:12.5px;white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;white-space:nowrap;}
+  .b-green{background:var(--green-soft);color:var(--green);}
+  .b-amber{background:var(--amber-soft);color:var(--amber);}
+  .b-red{background:var(--red-soft);color:var(--red);}
+  .b-blue{background:var(--accent-soft);color:var(--accent);}
+  ul,ol{margin:6px 0 6px 20px;font-size:14px;color:#333;}
+  li{margin:4px 0;}
+  code{background:#EEF0F4;border:1px solid #E4E6EC;border-radius:5px;padding:1px 6px;font-size:12.5px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#333;}
+  .tag{font-size:12px;color:var(--secondary);}
+  .box{border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin:8px 0;font-size:13px;background:#FAFAF8;}
+  .box b{color:var(--accent);}
+  .stepflow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;margin:10px 0;}
+  .stepflow .node{background:#F3F4F6;border:1px solid var(--border);border-radius:8px;padding:6px 10px;}
+  .stepflow .arrow{color:var(--secondary);}
+  .stepflow .warn{background:var(--amber-soft);border-color:#F0D9A8;}
+  .stepflow .ok{background:var(--green-soft);border-color:#C6E5C6;}
+  .arch{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0;}
+  .arch .layer{flex:1 1 300px;min-width:0;border-radius:12px;padding:14px 16px;border:1px solid var(--border);}
+  .arch .l1{background:#fff;}
+  .arch .l2{background:#fff;}
+  .arch .l3{background:#fff;}
+  .arch .layer h4{font-size:13.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .arch .layer ul{margin-left:16px;font-size:12.5px;color:#333;}
+  .cost{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0;}
+  .cost .plan{flex:1 1 260px;min-width:0;border:1px solid var(--border);border-radius:12px;padding:16px;background:#fff;}
+  .cost .plan.hl{border-color:var(--accent);box-shadow:0 4px 16px rgba(43,74,143,.12);}
+  .cost .plan h4{font-size:15px;}
+  .cost .plan .days{font-size:22px;font-weight:700;color:var(--accent);margin:6px 0 2px;}
+  .cost .plan .days span{font-size:12px;color:var(--secondary);font-weight:400;}
+  .cost .plan ul{margin-left:16px;font-size:12.5px;}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--secondary);}
+  .kpi{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;}
+  .kpi .cell{flex:1 1 180px;min-width:0;border-radius:12px;padding:14px 16px;background:linear-gradient(135deg,rgba(43,74,143,.06),rgba(43,74,143,.12));}
+  .kpi .cell .v{font-size:22px;font-weight:700;color:var(--accent);}
+  .kpi .cell .l{font-size:12px;color:var(--secondary);margin-top:2px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>统一认证中心 · OIDC 标准改造方案</h1>
+    <div class="sub">从「自研 token 透传 + 半成品 OIDC」改造为「规范、可讲、可面试的 OIDC 标准实现」</div>
+    <div class="meta">
+      <span>📄 方案文档 v1.0</span>
+      <span>🎯 定位：面试展示 + 学习项目</span>
+      <span>🕐 编制：2026-09-03</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- TL;DR -->
+  <h2><span class="no">▍</span>0. 摘要（TL;DR）</h2>
+  <div class="card">
+    <p class="lead"><b>能做，且强烈建议做。</b> 这是把项目从「看着像 OIDC」变成「就是 OIDC」的关键一步，也是面试叙事从「我有一套自研方案」升级为「我实现了标准 OIDC Provider + 首个客户端」的分水岭。</p>
+    <div class="kpi">
+      <div class="cell"><div class="v">7 ~ 9</div><div class="l">方案 B（推荐）总工作量 · 人天</div></div>
+      <div class="cell"><div class="v">5</div><div class="l">方案 A（起步）· 人天</div></div>
+      <div class="cell"><div class="v">2 ~ 3</div><div class="l">业余节奏（每晚3h）· 周</div></div>
+      <div class="cell"><div class="v">4</div><div class="l">改造阶段数（P0~P3）</div></div>
+    </div>
+    <p style="margin-top:10px;"><b>一句话方案：</b>认证中心改造为规范 OIDC Provider（授权码 + PKCE + refresh 轮换），<b>门户改造成第一个 OIDC 客户端（SPA + BFF）</b>，内部 mock 应用保留网关共享会话但定位讲清楚，<code>oidc-demo</code> 升级为完整 PKCE 接入演示。内部系统<b>无需真接入</b>，用模拟应用测试即可。</p>
+  </div>
+
+  <!-- 现状 -->
+  <h2><span class="no">▍</span>1. 为什么改：现状诊断</h2>
+  <div class="card">
+    <p class="lead">当前代码（<code>backend/app/api/auth.py</code>、<code>oauth.py</code>、<code>security.py</code>）经逐行核对，存在以下与标准冲突的点：</p>
+    <table>
+      <tr><th style="width:120px;">问题</th><th style="width:220px;">代码位置</th><th>影响</th></tr>
+      <tr><td><span class="badge b-red">标准冲突</span> id_token 与 access_token 完全同内容</td><td><code>oauth.py:136</code></td><td>OIDC 要求 id_token 是独立身份断言（含 nonce），与访问授权分离；当前两者是同一个 JWT</td></tr>
+      <tr><td><span class="badge b-red">标准冲突</span> 无 PKCE</td><td><code>oauth.py</code> authorize/token</td><td>OAuth 2.1 / RFC 9700 强制所有授权码流启用 PKCE，缺失意味着授权码可被拦截注入</td></tr>
+      <tr><td><span class="badge b-red">标准冲突</span> 无 nonce</td><td><code>oauth.py</code></td><td>id_token 无法防重放，无法校验「请求与响应属于同一次登录」</td></tr>
+      <tr><td><span class="badge b-amber">半标准</span> redirect_uri 用前缀匹配</td><td><code>oauth.py:73</code></td><td>规范要求精确匹配注册白名单，前缀匹配可被攻击者构造合法前缀 URL 劫持 code</td></tr>
+      <tr><td><span class="badge b-amber">半标准</span> 主链路 URL 传 token</td><td><code>auth.py:176</code> sso-url</td><td>access token 进 URL（历史/Referer 泄露风险），文档自己也标注「真实生产绝不」</td></tr>
+      <tr><td><span class="badge b-amber">半标准</span> 两套 token 不互通</td><td><code>oauth.py</code> vs <code>auth.py</code> verify</td><td>OIDC 签发的 token（aud=client_id）过不了主链路网关校验（aud=devops-portal）→ 双轨割裂的直接证据</td></tr>
+      <tr><td><span class="badge b-amber">缺失</span> 无 refresh_token grant / 无轮换</td><td><code>oauth.py</code></td><td>token 端点不支持 refresh_token grant；/api/auth/refresh 每次发新 refresh 但旧的不立即失效</td></tr>
+      <tr><td><span class="badge b-amber">缺失</span> 无 RP-initiated logout</td><td>—</td><td>无 end_session_endpoint，OIDC 单点登出链路缺失</td></tr>
+      <tr><td><span class="badge b-amber">演示级</span> 授权码 / refresh 存内存</td><td><code>oauth.py:31</code></td><td>进程重启即失效，无法支撑「入库 + 轮换 + 撤销」的工程叙事</td></tr>
+    </table>
+    <p class="tag" style="margin-top:8px;">这些问题的本质：<b>「统一入口 + 一个 token 访问多系统」被实现成了自研 token 透传，而 OIDC 只做了骨架</b> —— 面试时既讲不清标准的细节，又讲不清自研的价值，两头不靠。</p>
+  </div>
+
+  <!-- 目标架构 -->
+  <h2><span class="no">▍</span>2. 改造后目标架构</h2>
+  <p class="lead">改造成「三层清晰、边界明确」的架构，每一层都能单独讲出它的定位和为什么这么设计：</p>
+  <div class="arch">
+    <div class="layer l1">
+      <h4>① 认证中心 = 规范 OIDC Provider（IdP）<span class="badge b-green">核心改造</span></h4>
+      <ul>
+        <li><code>/oauth/authorize</code> — 授权码 + <b>PKCE</b> + state + nonce + 精确 redirect_uri</li>
+        <li><code>/oauth/token</code> — authorization_code + refresh_token（<b>轮换 + 复用检测</b>）</li>
+        <li><code>/oauth/userinfo</code> — 按 scope 返回标准 claims</li>
+        <li><code>/.well-known/openid-configuration</code> — 元数据补全</li>
+        <li><code>/oauth/logout</code> — RP-initiated logout（end_session）</li>
+        <li>授权码 / refresh token <b>入库</b>（含撤销、轮换、family 追踪）</li>
+      </ul>
+    </div>
+    <div class="layer l2">
+      <h4>② 门户 = 第一个 OIDC 客户端（RP）<span class="badge b-blue">关键改造</span></h4>
+      <ul>
+        <li>SPA + <b>BFF（轻后端）</b> 形态，符合 OAuth 2.1 对浏览器的安全建议</li>
+        <li>登录 → 门户 BFF 生成 PKCE → 302 到 /oauth/authorize → code 换 token</li>
+        <li>门户会话用 <b>HttpOnly Cookie</b>（不再 URL 传 token）</li>
+        <li>「统一入口」从此就是标准 OIDC 登录</li>
+      </ul>
+    </div>
+    <div class="layer l3">
+      <h4>③ 业务系统 = 两种接入，各自讲清<span class="badge b-amber">演示侧</span></h4>
+      <ul>
+        <li><b>信任域内</b>：mock-app / pilot-app 保留网关 forwardAuth，定位为「已共享门户会话的内部系统」，讲清这是网关鉴权而非 OIDC</li>
+        <li><b>标准接入</b>：oidc-demo 升级为「完整 OIDC 授权码 + PKCE」接入演示，代表外部/异构系统怎么接</li>
+      </ul>
+    </div>
+  </div>
+  <div class="box">✅ <b>内部系统无需改造</b>：mock / pilot / direct 均可继续用模拟方式接入测试；要演示「标准接入」时用 oidc-demo 即可。</div>
+
+  <!-- 改造清单 -->
+  <h2><span class="no">▍</span>3. 分阶段改造清单</h2>
+
+  <h3>P0 · 数据模型与存储（0.5 ~ 1 人天）</h3>
+  <div class="card">
+    <table>
+      <tr><th>任务</th><th>说明</th></tr>
+      <tr><td><code>AppRegistration</code> 加字段</td><td><code>redirect_uris</code>（JSON 白名单数组）、<code>allowed_scopes</code>、<code>is_public</code>（是否 public client）、<code>token_endpoint_auth_method</code>、<code>grant_types</code></td></tr>
+      <tr><td>新增 <code>AuthCode</code> 表</td><td>code、client_id、user_id、redirect_uri、code_challenge、code_challenge_method、nonce、scope、expires_at、used（一次性）</td></tr>
+      <tr><td>新增 <code>RefreshToken</code> 表</td><td>token_hash、client_id、user_id、family_id、expires_at、revoked、replaced_by（支撑轮换 + 复用检测）</td></tr>
+    </table>
+  </div>
+
+  <h3>P1 · OIDC Provider 规范化（2 ~ 3 人天）<span class="badge b-green">核心</span></h3>
+  <div class="card">
+    <table>
+      <tr><th>端点</th><th>改造内容</th></tr>
+      <tr><td><code>authorize</code></td><td>PKCE 参数校验（code_challenge 必填，S256）；redirect_uri <b>精确匹配白名单</b>；state 生成/回传校验；nonce 透传；scope 校验（⊆ 注册 scope 且含 openid）；授权码入库（5min 一次性）</td></tr>
+      <tr><td><code>token</code></td><td>grant_type=authorization_code：校验 client（secret/basic）、code 归属、<b>code_verifier 验证</b>；<b>id_token 与 access_token 分离</b>（access 只含 sub/scope/client_id；id_token 含 iss/sub/aud/exp/iat/nonce）；签发 refresh_token 入库；grant_type=refresh_token：轮换 + 复用检测</td></tr>
+      <tr><td><code>userinfo</code></td><td>按 scope 返回：openid→sub；profile→name/preferred_username/department/source；email→email</td></tr>
+      <tr><td>元数据</td><td>补全 grant_types_supported（含 refresh_token）、code_challenge_methods_supported、token_endpoint_auth_methods_supported、end_session_endpoint、claims_supported</td></tr>
+      <tr><td>密钥</td><td>保留 RS256 + kid + JWKS；预留多 kid 轮换接口（可在 P3 落地）</td></tr>
+    </table>
+  </div>
+
+  <h3>P2 · 登录会话 + 登出（1 ~ 2 人天）</h3>
+  <div class="card">
+    <ul>
+      <li>认证中心建立<b>登录会话</b>（HttpOnly Cookie）；authorize 时检查会话，无则跳登录，登录成功回跳（替代「URL 带 token 直开」的取巧方式）</li>
+      <li>实现 <code>/oauth/logout</code>（end_session_endpoint）：接收 id_token_hint + post_logout_redirect_uri，清除 IdP 会话</li>
+      <li>（可选加分）单点登出 SLO 广播，Demo 阶段可仅做 IdP 会话清除</li>
+      <li><code>/api/auth/login</code> 保留，但定位明确为「认证中心内部认证 API / 管理面」，不再是主登录路径，也不伪装成 OAuth 端点</li>
+    </ul>
+  </div>
+
+  <h3>P3 · 门户改造成 OIDC 客户端（2 ~ 3 人天）<span class="badge b-blue">关键</span></h3>
+  <div class="card">
+    <ul>
+      <li>门户加<b>轻量 BFF</b>（FastAPI 小服务，或挂在 auth-backend 的 portal 模块）</li>
+      <li>SPA 点登录 → BFF 生成 PKCE（code_verifier / code_challenge）→ 302 到 <code>/oauth/authorize</code> → 回调收 code → BFF 用 code + verifier 换 token</li>
+      <li>门户自己的会话存 <b>HttpOnly Cookie</b>（内存/缓存存 id_token 与用户信息），门户 API 从 Cookie 会话解析用户</li>
+      <li>登出 → 调 <code>/oauth/logout</code> + 清门户会话；刷新 → 后台用 refresh_token 轮换</li>
+      <li>「统一入口」从此走标准 OIDC；应用广场 / 个人中心逻辑不变</li>
+    </ul>
+  </div>
+
+  <h3>P4 · 演示应用 + 文档（1 ~ 2 人天）</h3>
+  <div class="card">
+    <ul>
+      <li><code>oidc-demo</code> 补 PKCE 演示，展示「外部系统标准接入」</li>
+      <li>mock-app / pilot-app / direct-app 保留，在应用广场标注清楚「网关信任域 / 直连验签」定位</li>
+      <li>更新 <code>docs/03</code>（OIDC 流程）、<code>docs/06</code>（面试准备）、<code>docs/08</code>（演示脚本）、README、两个 HTML 指南</li>
+      <li>新增「OIDC 安全清单」章节（PKCE/state/nonce/精确 redirect_uri/refresh 轮换/密钥轮换）作为面试叙事底稿</li>
+    </ul>
+  </div>
+
+  <!-- 成本 -->
+  <h2><span class="no">▍</span>4. 成本评估</h2>
+  <p class="lead">按「熟练开发者、单人、在现有代码上迭代」估算（<span class="tag">估算口径：1 人天 ≈ 一个整天专注；业余每晚 3 小时 ≈ 3 倍日历时间</span>）：</p>
+  <table>
+    <tr><th>阶段</th><th>内容</th><th>工作量</th><th>产出</th></tr>
+    <tr><td>P0</td><td>数据模型 / 新表</td><td>0.5 ~ 1 人天</td><td>表结构就绪</td></tr>
+    <tr><td>P1</td><td>OIDC Provider 规范化</td><td>2 ~ 3 人天</td><td>规范 IdP 核心</td></tr>
+    <tr><td>P2</td><td>登录会话 + 登出</td><td>1 ~ 2 人天</td><td>完整登录/登出闭环</td></tr>
+    <tr><td>P3</td><td>门户改造为 OIDC RP</td><td>2 ~ 3 人天</td><td>统一入口标准化</td></tr>
+    <tr><td>P4</td><td>演示 + 文档</td><td>1 ~ 2 人天</td><td>可展示、可讲解</td></tr>
+    <tr><td colspan="2"><b>合计</b></td><td><b>7 ~ 11 人天</b></td><td>完整方案</td></tr>
+  </table>
+  <div class="cost">
+    <div class="plan">
+      <h4>方案 A · 起步</h4>
+      <div class="days">4 ~ 5 <span>人天</span></div>
+      <ul>
+        <li>P0 + P1 + P2 简化</li>
+        <li>Provider 规范 + oidc-demo 走 PKCE</li>
+        <li>门户暂不改（仍是演示入口）</li>
+      </ul>
+    </div>
+    <div class="plan hl">
+      <h4>方案 B · 推荐 ⭐</h4>
+      <div class="days">7 ~ 9 <span>人天</span></div>
+      <ul>
+        <li>P0 ~ P4 全做</li>
+        <li>门户 = OIDC 客户端（BFF + PKCE）</li>
+        <li>统一入口真正标准化</li>
+        <li>面试叙事最完整</li>
+      </ul>
+    </div>
+    <div class="plan">
+      <h4>方案 C · 生产级</h4>
+      <div class="days">10 ~ 12 <span>人天</span></div>
+      <ul>
+        <li>方案 B + SLO 广播</li>
+        <li>JWT 密钥轮换（多 kid）</li>
+        <li>审计日志增强 / 限流</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 设计决策 -->
+  <h2><span class="no">▍</span>5. 关键设计决策（面试会追问）</h2>
+  <div class="card">
+    <table>
+      <tr><th style="width:220px;">决策点</th><th>选择</th><th>为什么（面试话术）</th></tr>
+      <tr><td>门户的客户端形态</td><td>SPA + BFF（轻后端）</td><td>纯 SPA 无法安全保存 client_secret，OAuth 2.1 建议浏览器客户端走「授权码 + PKCE + BFF」，用 HttpOnly Cookie 存会话</td></tr>
+      <tr><td>PKCE</td><td>强制启用（S256）</td><td>即使授权码被劫持，没有 code_verifier 也无法换 token；OAuth 2.1 已将其从可选变为强制</td></tr>
+      <tr><td>id_token vs access_token</td><td>彻底分离</td><td>id_token 是「身份断言」（给前端/客户端证明你是谁），access_token 是「授权凭证」（给资源服务器用，aud=client_id）；混用违反 OIDC 语义</td></tr>
+      <tr><td>refresh_token 策略</td><td>轮换 + 复用检测</td><td>每次刷新发新 refresh 并使旧失效；同一 refresh 被二次使用判定泄露，撤销整个 family</td></tr>
+      <tr><td>登录页归属</td><td>门户 BFF 代收 / 或 IdP 托管</td><td>IdP 托管登录页（Keycloak 式）最标准但改造最大；BFF 代收密码改造适中，二者都讲得清</td></tr>
+      <tr><td>/api/auth/login 去留</td><td>保留但降级为内部认证 API</td><td>作为认证中心验证密码的内部能力（供 BFF 用），不再扮演「OAuth 密码模式」，避免与 OAuth 2.1 移除 ROPC 冲突</td></tr>
+      <tr><td>内部系统接入</td><td>网关共享会话 + oidc-demo 双轨讲清</td><td>信任域内用网关（效率高、零改造），跨信任域/异构用 OIDC（标准）；把「为什么有两套」讲清楚反而是亮点</td></tr>
+    </table>
+  </div>
+
+  <!-- 面试叙事 -->
+  <h2><span class="no">▍</span>6. 改造后你能讲什么（面试价值）</h2>
+  <div class="card">
+    <ul>
+      <li><b>手绘完整授权码 + PKCE 流程</b>：authorize（带 code_challenge/state/nonce）→ 302 code → token（验 code_verifier）→ userinfo</li>
+      <li><b>id_token vs access_token 职责分离</b>：谁该看身份断言，谁该访问资源，aud 怎么用</li>
+      <li><b>每个安全细节都能答「为什么」</b>：PKCE 防授权码注入、state 防 CSRF、nonce 防重放、精确 redirect_uri 防劫持、refresh 轮换防泄露</li>
+      <li><b>SPA + BFF 安全模型</b>：为什么 client_secret 不能进浏览器、HttpOnly Cookie 为什么安全</li>
+      <li><b>三层架构的边界</b>：标准入口（OIDC）+ 信任域内共享（网关）+ 外部接入（OIDC），各自何时用、为什么</li>
+      <li><b>身份源降级链保持亮点</b>：Local/LDAP/Okta 抽象 + 认证失败不降级，这套与 OIDC 正交，继续是加分项</li>
+    </ul>
+  </div>
+
+  <!-- 执行顺序 -->
+  <h2><span class="no">▍</span>7. 推荐执行顺序</h2>
+  <div class="card">
+    <div class="stepflow">
+      <span class="node">P0 数据模型</span><span class="arrow">→</span>
+      <span class="node">P1 Provider 规范化</span><span class="arrow">→</span>
+      <span class="node">P2 登录/登出</span><span class="arrow">→</span>
+      <span class="node">P3 门户 RP</span><span class="arrow">→</span>
+      <span class="node ok">P4 演示 + 文档</span>
+    </div>
+    <p class="tag">建议每阶段结束跑通一次演示并更新 docs/08 脚本，保证「随时能上台」。P1 是最高杠杆：只做 P0+P1 就已经能把 OIDC 讲成「规范实现」，P3 是让「统一入口」真正变标准的关键一步。</p>
+  </div>
+
+  <!-- 风险 -->
+  <h2><span class="no">▍</span>8. 风险与注意事项</h2>
+  <div class="card">
+    <ul>
+      <li><b>改造期间破坏演示</b>：门户登录链路在 P2/P3 会被重建，建议先备份/打 tag，或保留 <code>/api/auth/login</code> 作为回退开关</li>
+      <li><b>oidc-demo 与 oidc-demo 注册数据</b>：client 注册需新增 redirect_uris 等字段，seed 数据要同步更新</li>
+      <li><b>后端依赖</b>：PKCE 的 SHA256 计算用标准库即可，无需新增依赖；JWT 库当前 <code>pyjwt</code> 已够用</li>
+      <li><b>云端部署</b>：改造后 OIDC 端点需在公网 HTTPS 下可访问，涉及 docs/09 的 Traefik 路由与 DNS 泛解析配置更新</li>
+      <li><b>范围克制</b>：不要顺手把「6 个业务系统全接入」也做了——保持 1 个 oidc-demo + 网关演示，聚焦叙事</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    本方案基于对 <code>backend/app</code> 现有源码（auth.py / oauth.py / security.py / models.py / config.py）的逐行核对编制 · 工作量均为估算值，实际以个人节奏为准 · 仅用于本项目学习与面试展示。
+  </div>
+</div>
+</body>
+</html>

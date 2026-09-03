@@ -1,0 +1,51 @@
+<h2 id="why">为什么数据库要"外部共享"</h2>
+<p>本项目的数据库（PostgreSQL，容器名 <code>devops-postgres</code>）<strong>独立于认证中心容器运行</strong>，是一个"外部共享库"。这样设计的原因：</p>
+<ul>
+  <li><strong>数据不随容器销毁</strong>：容器重建、镜像升级不会丢数据；</li>
+  <li><strong>多服务可共享</strong>：门户、认证中心、后续服务都能访问同一份数据；</li>
+  <li><strong>贴近生产</strong>：真实系统里数据库就是独立基础设施，高可用、备份、扩容都与应用解耦；</li>
+  <li><strong>对比进化</strong>：早期 Demo 用 SQLite（单文件、零依赖），标准化后迁移到 PostgreSQL 共享库，也是本项目的演进亮点。</li>
+</ul>
+
+<h2 id="connection">连接方式</h2>
+<p>认证中心通过环境变量 <code>DATABASE_URL</code> 连接外部共享库：</p>
+<pre><code># docker-compose.yml 中 auth-backend 的配置
+DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_auth
+
+# devops-postgres 是独立的外部容器（不在本 compose 内），
+# 通过 OrbStack 的容器网络（devops-net）互通
+</code></pre>
+<p>启动时认证中心会等待数据库就绪（<code>wait_for_db.py</code>），再执行建表与种子数据。</p>
+
+<h2 id="tables">数据库表结构</h2>
+<table>
+  <thead>
+    <tr><th>表名</th><th>作用</th><th>关键字段</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>users</code></td><td>用户账号</td><td>username / password_hash(bcrypt) / is_admin / source</td></tr>
+    <tr><td><code>app_registrations</code></td><td>应用注册表（接入配置）</td><td>client_id / client_secret / redirect_uris / token_mode / is_public</td></tr>
+    <tr><td><code>auth_codes</code></td><td>OIDC 一次性授权码</td><td>code(哈希) / client_id / user_id / code_challenge / expires_at / used_at</td></tr>
+    <tr><td><code>refresh_tokens</code></td><td>刷新令牌（轮换 + 复用检测）</td><td>token(哈希) / client_id / user_id / family_id / revoked_at / replaced_by</td></tr>
+    <tr><td><code>auth_logs</code></td><td>认证审计日志</td><td>username / source / success / ip / created_at</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <strong>安全设计：</strong>授权码与刷新令牌<strong>均以哈希形式入库</strong>（不是明文）。即使数据库泄露，攻击者也无法直接拿这些哈希去换取 token。
+</div>
+
+<h2 id="migration">Schema 迁移</h2>
+<p>老库升级新字段由 <code>migrate.py</code> 处理：</p>
+<ul>
+  <li>每个新列在<strong>独立事务</strong>中执行，单列失败只告警、不影响其他列（避免 PostgreSQL 单事务整体回滚）；</li>
+  <li>PostgreSQL 布尔列默认值必须写 <code>BOOLEAN DEFAULT FALSE</code>（不能用 <code>0</code>，否则类型不匹配报错）；</li>
+  <li>启动流程：<code>ensure_schema()</code> 补齐列 → <code>create_all()</code> 建新表 → <code>seed_all()</code> 写种子数据。</li>
+</ul>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>外部共享库 = 独立于应用容器的数据库，数据安全、可共享、贴近生产。</li>
+  <li>统一 JWT / OIDC 相关的授权码、刷新令牌都落库且哈希存储。</li>
+  <li>老库迁移用 migrate.py，独立事务逐列升级，稳妥可复现。</li>
+</ul>

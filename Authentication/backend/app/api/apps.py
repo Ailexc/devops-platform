@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..core.deps import get_current_admin, get_current_user
 from ..db import get_db
-from ..models import AppRegistration
+from ..models import AppRegistration, AuthCode, RefreshToken
 from ..schemas import AppCreate, AppCreateOut, AppOut, AppUpdate
 
 router = APIRouter(prefix="/api/apps", tags=["apps"])
@@ -14,9 +14,13 @@ router = APIRouter(prefix="/api/apps", tags=["apps"])
 
 @router.get("", response_model=list[AppOut], summary="门户应用广场列表（需登录）")
 def list_apps(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    # 过滤系统客户端（portal 门户自身），不出现在应用广场
     return (
         db.query(AppRegistration)
-        .filter(AppRegistration.enabled.is_(True))
+        .filter(
+            AppRegistration.enabled.is_(True),
+            AppRegistration.app_id != "portal",
+        )
         .order_by(AppRegistration.sort_order, AppRegistration.id)
         .all()
     )
@@ -34,6 +38,11 @@ def create_app(req: AppCreate, db: Session = Depends(get_db), _=Depends(get_curr
         home_url=req.home_url,
         sso_type=req.sso_type,
         access_mode=req.access_mode,
+        redirect_uris=req.redirect_uris,
+        allowed_scopes=req.allowed_scopes,
+        is_public=req.is_public,
+        token_endpoint_auth_method=req.token_endpoint_auth_method,
+        grant_types=req.grant_types,
         enabled=req.enabled,
         sort_order=req.sort_order,
         client_id=f"{req.app_id}-{secrets.token_hex(4)}",
@@ -72,6 +81,9 @@ def delete_app(app_id: str, db: Session = Depends(get_db), _=Depends(get_current
     app = db.query(AppRegistration).filter(AppRegistration.app_id == app_id).first()
     if app is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "应用不存在")
+    # 级联清理该客户端的授权码与刷新令牌（避免孤儿数据）
+    db.query(AuthCode).filter(AuthCode.client_id == app.client_id).delete()
+    db.query(RefreshToken).filter(RefreshToken.client_id == app.client_id).delete()
     db.delete(app)
     db.commit()
     return None

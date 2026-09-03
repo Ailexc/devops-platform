@@ -49,3 +49,27 @@ export interface LoginResponse {
   expires_in: number
   user: User
 }
+
+// ===== 系统文档（后端 /system-docs 提供）=====
+export interface SystemDocCategory {
+  id: string
+  name: string
+  color: string
+}
+
+export interface SystemDocItem {
+  id: string
+  title: string
+  description: string
+  category: string
+  icon: string
+  color: string
+  order: number
+  file: string
+}
+
+export interface SystemDocsIndex {
+  categories: SystemDocCategory[]
+  docs: SystemDocItem[]
+}
+

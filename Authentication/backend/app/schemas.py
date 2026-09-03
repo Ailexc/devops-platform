@@ -61,6 +61,12 @@ class AppCreate(BaseModel):
     sso_type: str = "token"
     # 接入方式：gateway(经统一网关) / direct(业务自验签 JWKS)
     access_mode: str = "gateway"
+    # OIDC 客户端配置
+    redirect_uris: list[str] = Field(default_factory=list)  # redirect_uri 白名单（精确匹配）
+    allowed_scopes: list[str] = Field(default_factory=lambda: ["openid", "profile", "email"])
+    is_public: bool = False
+    token_endpoint_auth_method: str = "client_secret_post"
+    grant_types: list[str] = Field(default_factory=lambda: ["authorization_code", "refresh_token"])
     enabled: bool = True
     sort_order: int = 0
 
@@ -72,6 +78,11 @@ class AppUpdate(BaseModel):
     home_url: str | None = None
     sso_type: str | None = None
     access_mode: str | None = None
+    redirect_uris: list[str] | None = None
+    allowed_scopes: list[str] | None = None
+    is_public: bool | None = None
+    token_endpoint_auth_method: str | None = None
+    grant_types: list[str] | None = None
     enabled: bool | None = None
     sort_order: int | None = None
 
@@ -88,6 +99,11 @@ class AppOut(BaseModel):
     sso_type: str
     access_mode: str
     client_id: str | None = None
+    redirect_uris: list[str] = Field(default_factory=list)
+    allowed_scopes: list[str] = Field(default_factory=list)
+    is_public: bool = False
+    token_endpoint_auth_method: str = "client_secret_post"
+    grant_types: list[str] = Field(default_factory=list)
     enabled: bool
     sort_order: int
 

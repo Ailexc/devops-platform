@@ -6,24 +6,20 @@ import {
 } from '@ant-design/icons'
 import { App as AntApp, Avatar, Dropdown, Space } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import { authApi } from '../api/client'
 import { useAuthStore } from '../store/auth'
 
 export default function AppHeader() {
   const nav = useNavigate()
   const { message } = AntApp.useApp()
   const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
 
   const handleLogout = async () => {
-    try {
-      await authApi.logout(useAuthStore.getState().refreshToken ?? '')
-    } catch {
-      /* 忽略：客户端清除即可 */
-    }
-    logout()
+    // 1. 清门户 BFF 会话（HttpOnly Cookie）
+    await useAuthStore.getState().logout()
     message.success('已退出登录')
-    nav('/login', { replace: true })
+    // 2. 跳 OIDC end_session 端点，清 IdP 会话（RP-initiated logout）
+    const back = encodeURIComponent(`${window.location.origin}/login`)
+    window.location.href = `/oauth/logout?post_logout_redirect_uri=${back}`
   }
 
   const isAdmin = user?.is_admin
@@ -51,6 +47,7 @@ export default function AppHeader() {
         </div>
         <div className="portal-header-nav">
           <span onClick={() => nav('/presentation')}>系统宣讲</span>
+          <span onClick={() => nav('/docs')}>系统文档</span>
           <span onClick={() => nav('/dev/e2e-test')}>测试流程</span>
         </div>
         <Dropdown

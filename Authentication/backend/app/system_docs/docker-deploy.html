@@ -1,0 +1,70 @@
+<h2 id="quickstart">一键启动</h2>
+<p>项目用 Docker Compose 编排全栈，在 OrbStack（或任意 Docker 环境）下执行：</p>
+<pre><code># 构建全部镜像并启动
+docker compose build
+docker compose up -d
+
+# 查看容器状态（应 7 个 Up）
+docker compose ps
+
+# 查看认证中心启动日志（确认建表 + 种子就绪）
+docker logs authentication-auth-backend
+</code></pre>
+
+<h2 id="services">Compose 服务</h2>
+<p><code>docker-compose.yml</code> 中 <code>COMPOSE_PROJECT_NAME=authentication</code>，容器名前缀为 <code>authentication-</code>。服务清单：</p>
+<table>
+  <thead>
+    <tr><th>服务</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>auth-backend</code></td><td>认证中心（OIDC Provider）+ 门户 BFF，端口 8002</td></tr>
+    <tr><td><code>portal</code></td><td>门户前端（React + nginx），端口 5175</td></tr>
+    <tr><td><code>traefik</code></td><td>统一网关，端口 28001/28080/8004</td></tr>
+    <tr><td><code>oidc-demo</code></td><td>OIDC 客户端演示，端口 8005</td></tr>
+    <tr><td><code>mock-app</code></td><td>经网关接入演示，端口 8081</td></tr>
+    <tr><td><code>direct-app</code></td><td>直连 JWKS 验签演示，端口 8003</td></tr>
+    <tr><td><code>pilot-app</code></td><td>试点接入模板，端口 8004</td></tr>
+    <tr><td><code>openldap</code>（可选）</td><td>LDAP 身份源，需 <code>--profile ldap</code> 启用</td></tr>
+  </tbody>
+</table>
+
+<h2 id="env">关键环境变量</h2>
+<pre><code># .env（compose 自动读取）
+COMPOSE_PROJECT_NAME=authentication   # 项目名/容器前缀
+AUTH_PROVIDER_ORDER=local             # 身份源顺序（当前仅本地库）
+AUTH_PROVIDER_LOCAL_ENABLED=true      # 本地身份源启用
+AUTH_PROVIDER_LDAP_ENABLED=false      # LDAP 身份源默认关闭
+
+# 认证中心容器内
+DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_auth
+</code></pre>
+<p>认证中心的核心配置默认值（<code>config.py</code>）：issuer = <code>auth.devops.orb.local</code>、audience = <code>devops-portal</code>、算法 RS256、access_token 1 小时、refresh_token 7 天、OIDC 授权码 5 分钟一次性。</p>
+
+<h2 id="db-dependency">外部数据库依赖</h2>
+<p>认证中心依赖外部共享库 <code>devops-postgres</code>（不在本 compose 内）。启动顺序：</p>
+<ol>
+  <li>数据库容器先就绪（<code>devops-postgres</code> 健康）；</li>
+  <li>auth-backend 通过 <code>wait_for_db.py</code> 等待数据库可达；</li>
+  <li>启动时执行 <code>ensure_schema()</code>（迁移）→ <code>create_all()</code>（建表）→ <code>seed_all()</code>（种子数据）。</li>
+</ol>
+
+<h2 id="troubleshoot">常见问题</h2>
+<table>
+  <thead>
+    <tr><th>现象</th><th>原因与处理</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>auth-backend 一直 Restarting</td><td>数据库不可达或 schema 报错。先确认 <code>devops-postgres</code> 健康，再 <code>docker logs authentication-auth-backend</code> 看具体错误</td></tr>
+    <tr><td><code>column xxx does not exist</code></td><td>老库缺新列。migrate.py 已自动补齐；若手动排查可用 psql 核对表结构</td></tr>
+    <tr><td>经 localhost 访问 OIDC 元数据端口异常</td><td>nginx 反代 + Starlette base_url 推导问题，用 OrbStack 域名（portal.authentication.orb.local）访问即正常；BFF 跳转不受影响</td></tr>
+    <tr><td>改代码不生效</td><td>需要重新 <code>docker compose build &lt;服务&gt; &amp;&amp; docker compose up -d &lt;服务&gt;</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li><code>docker compose build &amp;&amp; up -d</code> 一键全栈，7 容器 + 外部共享库。</li>
+  <li>身份源默认 local，LDAP 可选 profile。</li>
+  <li>数据库迁移/种子自动执行，日志可追溯。</li>
+</ul>

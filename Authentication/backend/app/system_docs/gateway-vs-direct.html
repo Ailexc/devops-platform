@@ -1,0 +1,56 @@
+<h2 id="question">要回答的核心问题</h2>
+<p>一个业务系统接入统一认证，最常问的就是：<strong>走网关还是不网关？</strong>这两条路都依赖"统一 JWT"（认证中心签发的 RS256 签名令牌），区别在于<strong>谁来做验签</strong>、以及<strong>业务系统要不要写鉴权代码</strong>。</p>
+
+<h2 id="compare">核心区别</h2>
+<table>
+  <thead>
+    <tr><th>维度</th><th>经网关（forwardAuth）</th><th>不经网关（直连 JWKS）</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>请求路径</td><td>客户端 → 网关 → 业务后端</td><td>客户端 → 业务后端（不经网关）</td></tr>
+    <tr><td>谁验签</td><td>网关转发给认证中心验签</td><td>业务后端本地拉公钥验签</td></tr>
+    <tr><td>业务鉴权代码</td><td><strong>零</strong>，读注入头即可</td><td>需实现一次验签中间件</td></tr>
+    <tr><td>认证中心宕机</td><td>请求被拦（网关验签失败）</td><td>已发 token 仍可验（高可用）</td></tr>
+    <tr><td>性能</td><td>多一次内部 HTTP 转发</td><td>本地验签，更快</td></tr>
+    <tr><td>管控能力</td><td>网关统一限流/审计/拦截</td><td>各自为政</td></tr>
+    <tr><td>适合场景</td><td>网关能覆盖的内部应用</td><td>外部部署/跨网络/网关覆盖不到</td></tr>
+  </tbody>
+</table>
+
+<h2 id="gateway-flow">经网关接入的链路</h2>
+<ol>
+  <li>用户访问业务系统，请求头带 <code>Authorization: Bearer &lt;统一JWT&gt;</code>；</li>
+  <li>网关（Traefik forwardAuth）拦截请求，转发给认证中心验签；</li>
+  <li>验签通过后，网关注入 <code>X-Auth-User / X-Auth-Username / X-Auth-Name / X-Auth-Source</code> 头放行；</li>
+  <li>业务后端<strong>零鉴权代码</strong>，直接读注入头就知道当前用户。</li>
+</ol>
+<pre><code># 业务后端读取注入的身份头（示意）
+user   = request.headers.get("X-Auth-Username")
+source = request.headers.get("X-Auth-Source")
+# 无需自己验签，网关已经保证请求是可信的
+</code></pre>
+
+<h2 id="direct-flow">不经网关（直连）接入的链路</h2>
+<ol>
+  <li>用户直接访问业务系统，请求头带统一 JWT；</li>
+  <li>业务后端从 <code>/.well-known/jwks.json</code> 拉取公钥（缓存）；</li>
+  <li>本地验 RS256 签名 + 有效期 + iss/aud；</li>
+  <li>通过后从载荷读用户身份。</li>
+</ol>
+
+<h2 id="choice">怎么选</h2>
+<div class="flow"><span class="step">业务系统在网关后面？</span><span class="arrow">→</span><span class="step">是：经网关接入</span><span class="arrow">→</span><span class="step">零鉴权代码</span></div>
+<div class="flow"><span class="step">业务系统在网关覆盖不到（外部/跨网络）？</span><span class="arrow">→</span><span class="step">直连 JWKS 验签</span><span class="arrow">→</span><span class="step">实现一次验签中间件</span></div>
+<p>补充：标准 OIDC 客户端接入（授权码 + PKCE）是另一条独立的"协议级"路径，适合需要完整用户会话与标准协议的第三方系统，见《<a class="doc-link" href="#" data-doc="oidc-client-guide">OIDC 客户端接入指南</a>》。</p>
+
+<h2 id="note">统一 JWT 的角色说明</h2>
+<div class="warn">
+  <strong>重要：</strong>统一 JWT 是本项目<strong>内部链路</strong>的凭证（门户应用广场经 <code>sso-url</code> 签发、网关/直连验签），属于 Demo 场景下对"真实企业 SSO 跳转"的模拟。门户自身的登录走的是<strong>标准 OIDC 授权码 + PKCE</strong>，两者解耦、职责不同。
+</div>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>经网关：网关统一验签 + 注入身份，业务零代码，适合网关覆盖范围。</li>
+  <li>直连：本地拉公钥验签，无回源、高可用，适合网关覆盖不到。</li>
+  <li>选择依据：系统是否在网关后面、是否愿意维护验签中间件。</li>
+</ul>

@@ -2,6 +2,8 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+
+	"github.com/xcy/permission-center/internal/auth"
 )
 
 // NewRouter 构建路由
@@ -19,7 +21,8 @@ func NewRouter(d *Deps) *gin.Engine {
 	api.POST("/auth/demo-login", d.handleDemoLogin)  // demo 一键登录（免密码）
 
 	// ---- 管理 API（JWT 保护 + 管理面 PEP 授权域边界）----
-	mg := api.Group("", jwtMiddleware(d), d.mgScope)
+	// 网关信任接入：统一网关 forwardAuth 通过后注入 X-Auth-Username，直接放行
+	mg := api.Group("", auth.GatewayTrust(), jwtMiddleware(d), d.mgScope)
 	{
 		// 用户
 		mg.GET("/users/me", d.getCurrentUser)
@@ -161,6 +164,11 @@ func NewRouter(d *Deps) *gin.Engine {
 
 func jwtMiddleware(d *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 统一网关已信任（X-Auth-* 身份头由 forwardAuth 注入）→ 跳过本地 JWT 校验
+		if _, ok := c.Get("gateway_trusted"); ok {
+			c.Next()
+			return
+		}
 		h := c.GetHeader("Authorization")
 		if len(h) < 7 || h[:7] != "Bearer " {
 			c.AbortWithStatusJSON(401, gin.H{"error": "missing token"})

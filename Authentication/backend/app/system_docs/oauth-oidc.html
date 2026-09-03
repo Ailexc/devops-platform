@@ -1,0 +1,65 @@
+<h2 id="overview">三个概念的关系</h2>
+<p>一句话概括：<strong>OIDC 是在 OAuth 2.0 之上加了"身份层"；OAuth 2.1 是 OAuth 2.0 的安全强化收敛版</strong>。本项目遵循的是 <strong>OAuth 2.1 授权码 + PKCE + OIDC</strong> 这一套现代组合。</p>
+
+<div class="flow"><span class="step">OAuth 2.0（2012）</span><span class="arrow">→</span><span class="step">安全强化</span><span class="arrow">→</span><span class="step">OAuth 2.1（收敛版）</span></div>
+<div class="flow"><span class="step">OAuth 2.x（授权框架）</span><span class="arrow">+</span><span class="step">OpenID Connect（身份层）</span><span class="arrow">=</span><span class="step">OIDC（认证 + 授权）</span></div>
+
+<h2 id="oauth20">OAuth 2.0：授权框架</h2>
+<p>OAuth 2.0 解决的是<strong>授权</strong>问题：让用户授权第三方应用访问自己在某个服务上的资源，而不用交出密码。核心角色：</p>
+<ul>
+  <li><strong>资源所有者</strong>：用户；</li>
+  <li><strong>资源服务器</strong>：持有用户数据（本项目 = 业务系统）；</li>
+  <li><strong>授权服务器</strong>：签发令牌（本项目 = 认证中心）；</li>
+  <li><strong>客户端</strong>：申请访问的应用。</li>
+</ul>
+<p>但它只管"你能不能访问"，<strong>不管"你是谁"</strong>。access_token 对客户端是不透明的（opaque），客户端无法从令牌本身得知用户身份。</p>
+
+<h2 id="oidc">OIDC：在 OAuth 上加身份层</h2>
+<p>OpenID Connect（OIDC）在 OAuth 2.0 授权码流程之上增加了标准化的<strong>身份层</strong>：</p>
+<ul>
+  <li>新增 <code>scope=openid</code> 与 <strong>id_token</strong>（JWT 身份断言，含 sub、name、nonce 等）；</li>
+  <li>新增 <code>/.well-known/openid-configuration</code> 发现文档，客户端可自动发现端点；</li>
+  <li>新增 <code>/userinfo</code> 端点，用 access_token 获取用户标准属性；</li>
+  <li>定义了 <code>nonce</code>（防重放）、<code>end_session</code>（登出）等。</li>
+</ul>
+<p>所以 OIDC = OAuth 2.0 授权 + 标准化身份信息，<strong>既管"你是谁"，又管"你能访问什么"</strong>。</p>
+
+<h2 id="oauth21">OAuth 2.1：2.0 的安全收敛版</h2>
+<p>OAuth 2.0 有多个可选 flow 和宽松配置，实践中最容易踩坑。OAuth 2.1 把这些<strong>收敛为更安全的最小集合</strong>：</p>
+<table>
+  <thead>
+    <tr><th>2.0 中的宽松做法</th><th>2.1 的收敛要求</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>授权码流程可不用 PKCE</td><td><strong>授权码 + PKCE 强制</strong></td></tr>
+    <tr><td>Implicit（隐式）流程允许发 token</td><td><strong>删除 Implicit 流程</strong></td></tr>
+    <tr><td>redirect_uri 可前缀匹配</td><td><strong>精确匹配</strong></td></tr>
+    <tr><td>资源所有者密码凭证流程（password）</td><td><strong>删除</strong></td></tr>
+    <tr><td>refresh_token 可无限复用</td><td><strong>建议轮换 + 复用检测</strong></td></tr>
+  </tbody>
+</table>
+<p>对本项目而言，门户 SPA + BFF 正是 2.1 推荐的标准形态：SPA 不能有 secret → 用 PKCE；需要后端 → 用 BFF 持有 secret。</p>
+
+<h2 id="compliance">本系统的遵循情况</h2>
+<table>
+  <thead>
+    <tr><th>OAuth 2.1 / OIDC 要求</th><th>本项目实现</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>授权码 + PKCE 强制</td><td>✅ 全部客户端强制校验 code_verifier</td></tr>
+    <tr><td>redirect_uri 精确匹配</td><td>✅ 精确白名单，前缀匹配已废弃</td></tr>
+    <tr><td>state 防 CSRF</td><td>✅ 回调严格比对 state</td></tr>
+    <tr><td>nonce 防重放</td><td>✅ id_token 内嵌 nonce 并校验</td></tr>
+    <tr><td>id_token / access_token 分离</td><td>✅ 三权分离，各司其职</td></tr>
+    <tr><td>refresh_token 轮换 + 复用检测</td><td>✅ 旧号作废、复用即吊销</td></tr>
+    <tr><td>授权码一次性 + 短时效</td><td>✅ 5 分钟一次性，哈希入库</td></tr>
+    <tr><td>发现文档 / userinfo</td><td>✅ openid-configuration + /userinfo</td></tr>
+  </tbody>
+</table>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>OAuth 管授权（能不能访问），OIDC 在其上加身份层（你是谁），OAuth 2.1 是安全强化版。</li>
+  <li>本项目 = OAuth 2.1 授权码 + PKCE + OIDC，标准协议实现。</li>
+  <li>标准的意义：可对接任意成熟 IdP、面试可讲清、安全默认内置。</li>
+</ul>

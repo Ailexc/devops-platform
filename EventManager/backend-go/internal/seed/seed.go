@@ -1,3 +1,4 @@
+package seed
 // Package seed 提供 EventManager Go 栈的统一幂等种子逻辑。
 //
 // 设计目标（对齐"启动时幂等种子"标准，替换独立 go-seed 容器）：

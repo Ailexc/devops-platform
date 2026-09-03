@@ -3,54 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getNextScene, getSceneById } from '../data/presentationScenes'
 import type { PStep } from '../data/presentationScenes'
-
-/* 横向流程示意图 */
-function FlowVisual({ nodes, color }: { nodes: string[]; color: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, flexWrap: 'wrap' }}>
-      {nodes.map((n, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
-          <div
-            style={{
-              background: i === nodes.length - 1 ? color : '#f1f5fe',
-              color: i === nodes.length - 1 ? '#fff' : color,
-              border: `2px solid ${i === nodes.length - 1 ? color : '#c7d7ff'}`,
-              borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600,
-              minWidth: 96, textAlign: 'center',
-            }}
-          >
-            {n}
-          </div>
-          {i < nodes.length - 1 && (
-            <div style={{ color: color, fontSize: 18, padding: '0 6px', fontWeight: 700 }}>→</div>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/* 要点分块网格 */
-function PointsGrid({ points, color }: { points: string[]; color: string }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
-      {points.map((p, i) => (
-        <div
-          key={i}
-          style={{
-            background: '#f8fafd', border: '1px solid #e4e9f2', borderRadius: 12, padding: '14px',
-            display: 'flex', gap: 10, alignItems: 'flex-start',
-          }}
-        >
-          <span style={{ width: 24, height: 24, borderRadius: 8, background: color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flex: 'none' }}>
-            {i + 1}
-          </span>
-          <span style={{ color: '#344054', fontSize: 13, lineHeight: 1.6 }}>{p}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
+import { renderSceneVisual } from '../components/PresentationVisuals'
 
 export default function PresentationPlayerPage() {
   const { sceneId = '' } = useParams()
@@ -124,39 +77,56 @@ export default function PresentationPlayerPage() {
         <div style={{ height: '100%', background: color, borderRadius: 4, width: `${((safeStep + 1) / scene.steps.length) * 100}%`, transition: 'width .3s' }} />
       </div>
 
-      {/* 主体：左讲解 + 右图例 */}
-      <div style={{ flex: 1, display: 'flex', gap: 20, minHeight: 0 }}>
-        {/* 左：STEP / 标题 / 讲解词 */}
+      {/* 主体：左讲解提纲（固定宽度） + 右架构图 */}
+      <div style={{ flex: 1, display: 'flex', gap: 18, minHeight: 0 }}>
+        {/* 左：STEP / 标题 / 讲解词 / 结构化要点 */}
         <div
           style={{
-            flex: '1 1 40%', background: '#fff', borderRadius: 16, padding: '28px 32px',
+            width: 360, flex: 'none', background: '#fff', borderRadius: 16, padding: '24px 26px',
             boxShadow: '0 8px 28px rgba(16,24,40,.08)', display: 'flex', flexDirection: 'column', overflow: 'auto',
           }}
         >
-          <div style={{ fontSize: 13, color, fontWeight: 700, marginBottom: 8 }}>STEP {step + 1}</div>
-          <h1 style={{ margin: '0 0 18px', fontSize: 26, lineHeight: 1.4 }}>{current.title}</h1>
-          <p style={{ color: '#475467', fontSize: 15, lineHeight: 1.95, margin: 0, flex: 1 }}>{current.narration}</p>
+          <div style={{ fontSize: 12, color, fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>STEP {step + 1} / {scene.steps.length}</div>
+          <h1 style={{ margin: '0 0 14px', fontSize: 22, lineHeight: 1.4, color: '#1e293b' }}>{current.title}</h1>
+
+          {/* 讲解词 */}
+          <div style={{ color: '#475569', fontSize: 13.5, lineHeight: 1.9, marginBottom: 16 }}>
+            {current.narration.split('。').filter(s => s.trim()).map((sentence, i) => (
+              <p key={i} style={{ margin: '0 0 8px', textIndent: '2em' }}>{sentence.trim()}。</p>
+            ))}
+          </div>
+
+          {/* 结构化要点 */}
+          {current.points && current.points.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 3, height: 14, background: color, borderRadius: 2 }} />
+                核心要点
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {current.points.map((p, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <span style={{ width: 20, height: 20, borderRadius: 5, background: `${color}15`, color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flex: 'none', marginTop: 1 }}>
+                      {i + 1}
+                    </span>
+                    <span style={{ color: '#334155', fontSize: 12.5, lineHeight: 1.7 }}>{p}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 高亮结论 */}
           {current.highlight && (
-            <div style={{ background: `${color}14`, color, borderRadius: 10, padding: '12px 16px', fontSize: 14, fontWeight: 700, marginTop: 20 }}>
-              ⭐ {current.highlight}
+            <div style={{ background: `${color}12`, borderLeft: `3px solid ${color}`, color: '#1e293b', borderRadius: '0 8px 8px 0', padding: '10px 14px', fontSize: 13, fontWeight: 600, marginTop: 'auto' }}>
+              💡 {current.highlight}
             </div>
           )}
         </div>
 
-        {/* 右：图例 + 要点分块 */}
-        <div style={{ flex: '1 1 60%', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
-          {current.flow && current.flow.length > 0 && (
-            <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', boxShadow: '0 8px 28px rgba(16,24,40,.08)' }}>
-              <div style={{ color: '#667085', fontSize: 13, marginBottom: 12, fontWeight: 600 }}>🧭 流程示意图</div>
-              <FlowVisual nodes={current.flow} color={color} />
-            </div>
-          )}
-          {current.points && current.points.length > 0 && (
-            <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', boxShadow: '0 8px 28px rgba(16,24,40,.08)', flex: 1, overflow: 'auto' }}>
-              <div style={{ color: '#667085', fontSize: 13, marginBottom: 12, fontWeight: 600 }}>📌 要点拆解</div>
-              <PointsGrid points={current.points} color={color} />
-            </div>
-          )}
+        {/* 右：场景专属可视化架构图 */}
+        <div style={{ flex: 1, background: '#fff', borderRadius: 16, padding: '18px 22px', boxShadow: '0 8px 28px rgba(16,24,40,.08)', overflow: 'auto', minHeight: 0 }}>
+          {renderSceneVisual(scene.id, safeStep, color)}
         </div>
       </div>
 

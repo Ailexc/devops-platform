@@ -1,0 +1,38 @@
+<h2 id="what">什么是 SPA</h2>
+<p>SPA（Single Page Application，单页应用）是一种 Web 前端架构：整个应用只有一个 HTML 页面（通常是一个空壳），页面内容全部由 JavaScript 在浏览器端动态渲染。用户切换页面时，浏览器<strong>不重新加载整个页面</strong>，而是通过 JS 局部更新 DOM，并按需向后端 API 请求数据。</p>
+<p>本项目的前端门户就是典型的 SPA：React 应用只有一个 <code>index.html</code>，应用广场、系统宣讲、系统文档、个人中心等"页面"实际是同一个文档里的不同视图，通过前端路由切换。</p>
+
+<h2 id="mpa">SPA 与多页应用（MPA）的区别</h2>
+<table>
+  <thead>
+    <tr><th>维度</th><th>SPA 单页应用</th><th>MPA 多页应用</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>页面切换</td><td>JS 局部更新，无整页刷新</td><td>每次跳转整页刷新</td></tr>
+    <tr><td>首屏速度</td><td>需加载 JS 包，首屏稍慢</td><td>按页面加载，首屏快</td></tr>
+    <tr><td>交互体验</td><td>流畅，接近原生 App</td><td>切换有白屏等待</td></tr>
+    <tr><td>前后端耦合</td><td>天然解耦，前端只管 UI</td><td>服务端渲染，耦合较高</td></tr>
+    <tr><td>适合场景</td><td>后台管理系统、工具平台</td><td>内容站、SEO 要求高的站点</td></tr>
+  </tbody>
+</table>
+<p>门户作为企业后台管理系统，交互密集、需要统一的登录态与界面，因此选择 SPA + React。</p>
+
+<h2 id="auth-challenge">SPA 的认证难点</h2>
+<p>SPA 有个天然的安全难题：<strong>前端代码和所有"秘密"都暴露在浏览器里</strong>。浏览器里放不下 client_secret，也不适合直接持有长期有效的令牌。如果 SPA 直接调 OAuth 令牌端点，会面临：</p>
+<ul>
+  <li>授权码容易被截获（没有 PKCE 时）；</li>
+  <li>访问令牌存 localStorage 有被 XSS 窃取的风险；</li>
+  <li>client_secret 无法安全保存在纯前端。</li>
+</ul>
+<p>这就是 <strong>OAuth 2.1 针对 SPA 推出 PKCE 强制</strong>、以及引入 <a class="doc-link" href="#" data-doc="bff">BFF（后端前置）</a>的原因。本项目的门户 SPA 本身不持有任何令牌，登录态由后端的 HttpOnly Cookie 会话保证——这正是 SPA 认证的正确姿势。</p>
+
+<div class="note">
+  <strong>本项目落地：</strong>门户 SPA 只做 UI 与路由；认证由门户 BFF 按 OIDC 授权码 + PKCE 完成；浏览器只保存 HttpOnly 的会话 Cookie（portal_session），JS 无法读取，天然防 XSS 窃取。
+</div>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>SPA = 单页应用，页面由 JS 动态渲染，切换无整页刷新。</li>
+  <li>门户用 SPA 是因为后台系统交互密集、体验要求高。</li>
+  <li>SPA 无法安全保存令牌 → 认证下沉到 BFF（见下一篇）。</li>
+</ul>

@@ -1,0 +1,76 @@
+<h2 id="layers">分层架构</h2>
+<p>系统按职责分为四层，每层只做一件事，边界清晰：</p>
+<ol>
+  <li><strong>接入层</strong>：统一门户（SPA + BFF）负责用户入口与 OIDC 登录；统一网关（Traefik forwardAuth）负责业务 API 的统一 JWT 验签与身份注入。</li>
+  <li><strong>认证层</strong>：认证中心（FastAPI）是标准 OIDC Provider，提供授权端点、令牌端点、用户信息端点、JWKS 公钥发布，并维护应用注册表。</li>
+  <li><strong>数据层</strong>：外部共享 PostgreSQL，存用户、应用注册、授权码、刷新令牌与认证日志。</li>
+  <li><strong>身份源层</strong>：可插拔用户来源（Local 默认 / LDAP / Okta），策略模式、可降级。</li>
+</ol>
+
+<h2 id="components">组件清单与端口</h2>
+<table>
+  <thead>
+    <tr><th>组件</th><th>容器</th><th>端口</th><th>职责</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>认证中心</td><td><code>authentication-auth-backend</code></td><td>8002</td><td>OIDC Provider + 门户 BFF（同进程）</td></tr>
+    <tr><td>门户</td><td><code>authentication-portal</code></td><td>5175</td><td>React SPA + nginx（静态资源 + 反代）</td></tr>
+    <tr><td>统一网关</td><td><code>authentication-gateway</code></td><td>28001/28080/8004</td><td>Traefik forwardAuth 统一鉴权</td></tr>
+    <tr><td>OIDC 演示客户端</td><td><code>authentication-oidc-demo</code></td><td>8005</td><td>标准 OIDC 授权码 + PKCE 客户端演示</td></tr>
+    <tr><td>演示应用</td><td><code>authentication-mock-app</code></td><td>8081</td><td>经网关 forwardAuth 接入的示例</td></tr>
+    <tr><td>直连示例</td><td><code>authentication-direct-app</code></td><td>8003</td><td>JWKS 本地验签接入示例</td></tr>
+    <tr><td>试点应用</td><td><code>authentication-pilot-app</code></td><td>8004</td><td>模拟真实系统接入模板</td></tr>
+    <tr><td>数据库（外部）</td><td><code>devops-postgres</code></td><td>5432</td><td>外部共享 PostgreSQL（devops_auth 库）</td></tr>
+  </tbody>
+</table>
+<div class="note">
+  LDAP（<code>openldap</code>）是可选项，通过 <code>docker compose --profile ldap up -d</code> 启用；默认全栈不依赖它，身份源为本地用户库。
+</div>
+
+<h2 id="directories">目录结构</h2>
+<pre><code>Authentication/
+├── backend/                 # 认证中心（FastAPI）
+│   ├── app/
+│   │   ├── main.py          # 应用入口，注册各路由
+│   │   ├── config.py        # 配置（issuer/audience/数据库/身份源）
+│   │   ├── models.py        # ORM 模型（用户/应用/授权码/刷新令牌/日志）
+│   │   ├── migrate.py       # 老库 schema 迁移
+│   │   ├── seed.py          # 种子数据（4 用户 / 11 应用）
+│   │   ├── security.py      # JWT 签发/验签、PKCE、id_token、刷新令牌哈希
+│   │   ├── core/            # 会话、依赖注入、身份源策略
+│   │   ├── api/             # oauth(Provider) / portal(BFF) / auth / apps / users / system / docs / jwks
+│   │   └── system_docs/     # 系统文档 HTML 库（本板块数据源）
+│   └── requirements.txt
+├── frontend/                # 门户 SPA（React + antd）
+│   ├── src/
+│   │   ├── pages/           # PortalPage / LoginPage / PresentationHub / SystemDocsHub ...
+│   │   ├── components/      # AppHeader / PresentationVisuals ...
+│   │   ├── data/            # 系统宣讲场景数据
+│   │   └── docker/nginx.conf# 静态资源 + API/OIDC/Portal/SystemDocs 反代
+├── oidc-demo/               # 标准 OIDC 客户端演示
+├── docker-compose.yml       # 全栈编排
+└── README.md                # 项目说明（含 OIDC 标准实现表）
+</code></pre>
+
+<h2 id="tech">技术栈与分工</h2>
+<table>
+  <thead>
+    <tr><th>层</th><th>技术</th><th>理由</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>前端</td><td>React 19 + Ant Design</td><td>组件生态成熟，后台系统高效</td></tr>
+    <tr><td>认证后端</td><td>Python FastAPI</td><td>异步高性能，自动 OpenAPI</td></tr>
+    <tr><td>认证协议</td><td>OAuth 2.1 + PKCE + OIDC</td><td>企业级标准，非自研私有协议</td></tr>
+    <tr><td>令牌</td><td>RS256 + JWKS</td><td>非对称，公钥可分发给异构系统</td></tr>
+    <tr><td>网关</td><td>Traefik forwardAuth</td><td>配置即接入，验证逻辑可扩展</td></tr>
+    <tr><td>数据</td><td>PostgreSQL（外部共享库）</td><td>数据安全、贴近生产</td></tr>
+    <tr><td>部署</td><td>Docker Compose + OrbStack</td><td>一键全栈，域名自动解析</td></tr>
+  </tbody>
+</table>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>四层架构：接入 / 认证 / 数据 / 身份源，职责解耦。</li>
+  <li>门户 = SPA + BFF，认证中心 = OIDC Provider，网关负责统一 JWT 验签。</li>
+  <li>标准协议 + 外部共享库 + 容器化，符合企业级定位。</li>
+</ul>

@@ -1,0 +1,131 @@
+{
+  "categories": [
+    { "id": "concept", "name": "核心概念", "color": "#3b82f6" },
+    { "id": "architecture", "name": "架构与部署", "color": "#10b981" },
+    { "id": "integration", "name": "接入指南", "color": "#8b5cf6" },
+    { "id": "protocol", "name": "协议详解", "color": "#f59e0b" },
+    { "id": "security", "name": "安全设计", "color": "#ef4444" }
+  ],
+  "docs": [
+    {
+      "id": "spa",
+      "title": "SPA 单页应用",
+      "description": "什么是单页应用、为什么门户用 SPA、与多页应用的区别、SPA 的认证难点",
+      "category": "concept",
+      "icon": "🎨",
+      "color": "#3b82f6",
+      "order": 1,
+      "file": "spa.html"
+    },
+    {
+      "id": "bff",
+      "title": "BFF 后端前置",
+      "description": "Backend for Frontend 是什么、为什么 OIDC 场景必须有 BFF、本系统的 BFF 实现",
+      "category": "concept",
+      "icon": "🧩",
+      "color": "#3b82f6",
+      "order": 2,
+      "file": "bff.html"
+    },
+    {
+      "id": "direct-connect",
+      "title": "直连接入与 JWKS 验签",
+      "description": "不经网关的应用如何本地验签统一 JWT、JWKS 公钥机制、direct-app 示例",
+      "category": "concept",
+      "icon": "🔗",
+      "color": "#3b82f6",
+      "order": 3,
+      "file": "direct-connect.html"
+    },
+    {
+      "id": "shared-database",
+      "title": "外部共享数据库",
+      "description": "为什么数据库独立于应用容器、PostgreSQL 表结构、连接与迁移",
+      "category": "concept",
+      "icon": "🗄️",
+      "color": "#3b82f6",
+      "order": 4,
+      "file": "shared-database.html"
+    },
+    {
+      "id": "architecture",
+      "title": "系统架构总览",
+      "description": "分层架构、组件清单与端口、目录结构、技术栈与职责分工",
+      "category": "architecture",
+      "icon": "🏗️",
+      "color": "#10b981",
+      "order": 1,
+      "file": "architecture.html"
+    },
+    {
+      "id": "docker-deploy",
+      "title": "Docker 部署指南",
+      "description": "docker compose 全栈服务、环境变量、数据库依赖、常见启动问题",
+      "category": "architecture",
+      "icon": "🐳",
+      "color": "#10b981",
+      "order": 2,
+      "file": "docker-deploy.html"
+    },
+    {
+      "id": "gateway-vs-direct",
+      "title": "经网关 vs 不经网关接入",
+      "description": "两种接入方式的核心区别、适用场景、如何选择、统一 JWT 传递链路",
+      "category": "integration",
+      "icon": "🛡️",
+      "color": "#8b5cf6",
+      "order": 1,
+      "file": "gateway-vs-direct.html"
+    },
+    {
+      "id": "oidc-client-guide",
+      "title": "OIDC 客户端接入指南",
+      "description": "在门户注册应用、配置 redirect_uri 白名单、授权码 + PKCE 接入步骤与常见错误",
+      "category": "integration",
+      "icon": "🎫",
+      "color": "#8b5cf6",
+      "order": 2,
+      "file": "oidc-client-guide.html"
+    },
+    {
+      "id": "oauth-oidc",
+      "title": "OAuth 2.0 / 2.1 / OIDC 关系",
+      "description": "OAuth 演进历史、OAuth 2.1 收紧了什么、OIDC 在 OAuth 之上加什么、本系统遵循",
+      "category": "protocol",
+      "icon": "📜",
+      "color": "#f59e0b",
+      "order": 1,
+      "file": "oauth-oidc.html"
+    },
+    {
+      "id": "authcode-pkce",
+      "title": "授权码 + PKCE 详解",
+      "description": "授权码流程逐步拆解、PKCE 防什么攻击、为什么 OAuth 2.1 强制 PKCE",
+      "category": "protocol",
+      "icon": "🔐",
+      "color": "#f59e0b",
+      "order": 2,
+      "file": "authcode-pkce.html"
+    },
+    {
+      "id": "token-model",
+      "title": "Token 体系详解",
+      "description": "id_token / access_token / refresh_token 三权分离、refresh 轮换与复用检测",
+      "category": "protocol",
+      "icon": "🎟️",
+      "color": "#f59e0b",
+      "order": 3,
+      "file": "token-model.html"
+    },
+    {
+      "id": "security-design",
+      "title": "安全设计",
+      "description": "协议层四重防护、认证失败不降级、凭证传递规范、审计",
+      "category": "security",
+      "icon": "🛡️",
+      "color": "#ef4444",
+      "order": 1,
+      "file": "security-design.html"
+    }
+  ]
+}

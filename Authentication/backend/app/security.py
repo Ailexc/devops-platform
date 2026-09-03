@@ -1,7 +1,10 @@
-"""安全工具：bcrypt 密码哈希、RSA 密钥管理、JWT 签发/验证、JWKS。"""
+"""安全工具：bcrypt 密码哈希、RSA 密钥管理、JWT 签发/验证、JWKS、PKCE。"""
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -78,7 +81,13 @@ def _load_public():
 
 # ---------- JWT ----------
 def create_access_token(user_id: int, username: str, name: str = "", email: str = "",
-                        department: str = "", source: str = "local", aud: str | None = None) -> str:
+                        department: str = "", source: str = "local", aud: str | None = None,
+                        scope: str = "") -> str:
+    """签发 access_token（授权凭证）。
+
+    - 门户/统一 JWT：aud=settings.audience（devops-portal），携带 profile claims（内部信任域共享）
+    - OIDC access_token：aud=client_id，scope=请求的 scope，仅含最小授权信息（身份走 userinfo）
+    """
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
@@ -90,10 +99,42 @@ def create_access_token(user_id: int, username: str, name: str = "", email: str 
         "iss": settings.issuer,
         # OIDC 场景 aud 用 client_id（访问哪个应用）；默认门户 audience
         "aud": aud or settings.audience,
+        "type": "access",
         "iat": now,
         "exp": now + timedelta(minutes=settings.jwt_access_expire_minutes),
         "jti": str(uuid.uuid4()),
     }
+    if scope:
+        payload["scope"] = scope
+    return jwt.encode(payload, _load_private(), algorithm=settings.jwt_algorithm, headers={"kid": _KID})
+
+
+def create_id_token(user_id: int, username: str, aud: str, nonce: str = "",
+                    name: str = "", email: str = "", department: str = "", source: str = "local") -> str:
+    """签发 id_token（OIDC 身份断言）。
+
+    与 access_token 职责分离：id_token 证明「用户是谁」（含 nonce 防重放），
+    access_token 授权「能访问什么」（aud=client_id）。详细信息由 userinfo 按 scope 提供。
+    """
+    now = datetime.now(timezone.utc)
+    payload = {
+        "iss": settings.issuer,
+        "sub": str(user_id),
+        "aud": aud,
+        "iat": now,
+        "exp": now + timedelta(minutes=settings.jwt_access_expire_minutes),
+        "nonce": nonce,
+        "jti": str(uuid.uuid4()),
+    }
+    # OIDC Core 允许 id_token 携带基础 profile claims；敏感/详细信息走 userinfo
+    if username:
+        payload["preferred_username"] = username
+    if name:
+        payload["name"] = name
+    if email:
+        payload["email"] = email
+    if department:
+        payload["department"] = department
     return jwt.encode(payload, _load_private(), algorithm=settings.jwt_algorithm, headers={"kid": _KID})
 
 
@@ -152,3 +193,34 @@ def _b64_int(value: int) -> str:
 
 def public_key_pem() -> str:
     return _PUBLIC_KEY
+
+
+# ---------- PKCE（OAuth 2.1 / RFC 9700 强制） ----------
+def generate_code_verifier() -> str:
+    """生成 PKCE code_verifier（43~128 字符，base64url）。"""
+    return base64.urlsafe_b64encode(secrets.token_bytes(48)).rstrip(b"=").decode("ascii")
+
+
+def pkce_challenge(verifier: str) -> str:
+    """S256：code_challenge = base64url(sha256(code_verifier))。"""
+    digest = hashlib.sha256(verifier.encode("utf-8")).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def verify_pkce(verifier: str, challenge: str, method: str = "S256") -> bool:
+    """校验 code_verifier 与授权时保存的 code_challenge 是否匹配。"""
+    if method.upper() == "S256":
+        return secrets.compare_digest(pkce_challenge(verifier), challenge)
+    if method.upper() == "plain":
+        return secrets.compare_digest(verifier, challenge)
+    return False
+
+
+# ---------- OIDC refresh token（入库存哈希，轮换 + 复用检测） ----------
+def generate_oauth_refresh_token() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def hash_oauth_token(token: str) -> str:
+    """refresh token 只存哈希（泄露数据库不泄露令牌本身）。"""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

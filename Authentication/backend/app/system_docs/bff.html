@@ -1,0 +1,60 @@
+<h2 id="what">什么是 BFF</h2>
+<p>BFF（Backend for Frontend，面向前端后端）是一种架构模式：为前端单独提供一个<strong>专属后端</strong>，前端只跟它对话，由它去调用下游服务、处理认证、聚合数据。</p>
+<p>为什么需要它？因为前端（尤其 SPA）暴露在浏览器里，放不下机密（client_secret、私钥）；而直接让前端对接一堆微服务又会造成耦合。BFF 把"前端想要的样子"和"后端真实能力"之间做一层适配：</p>
+<ul>
+  <li><strong>藏机密</strong>：client_secret、令牌只存在 BFF 服务端；</li>
+  <li><strong>简化前端</strong>：前端只调自己的 BFF 接口，不用懂 OAuth/OIDC 细节；</li>
+  <li><strong>聚合数据</strong>：一个页面要多个服务的数据时，BFF 统一编排。</li>
+</ul>
+
+<h2 id="oidc-why">为什么 OIDC 场景必须有 BFF</h2>
+<p>OIDC 授权码 + PKCE 流程中，<strong>client_secret 只能放在后端</strong>（纯前端放 secret 等于把门钥匙贴门上）。门户要作为 OIDC 客户端接入认证中心，就必须有一个后端来：</p>
+<ol>
+  <li>生成 PKCE code_verifier / code_challenge 与 state / nonce；</li>
+  <li>接收授权码回跳并校验 state；</li>
+  <li>用 <code>code + code_verifier + client_secret</code> 到令牌端点换 token；</li>
+  <li>把用户身份包装成前端可用的会话。</li>
+</ol>
+<p>这个"门户专属后端"就是门户 BFF。它是本项目 OIDC 标准化的关键一环：<strong>门户 = SPA（前端） + BFF（OIDC 客户端）</strong>，二者合起来才是一个完整的 OIDC 客户端。</p>
+
+<h2 id="implementation">本系统的 BFF 实现</h2>
+<p>门户 BFF 由后端 <code>portal.py</code> 实现（路由前缀 <code>/portal</code>），主要端点：</p>
+<table>
+  <thead>
+    <tr><th>端点</th><th>作用</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>GET /portal/oauth/login</code></td><td>生成 PKCE 挑战值 + state + nonce，302 跳认证中心 <code>/authorize</code></td></tr>
+    <tr><td><code>GET /portal/oauth/callback</code></td><td>接收授权码回跳，校验 state，换 token，建立 HttpOnly 会话，302 回门户</td></tr>
+    <tr><td><code>GET /portal/api/me</code></td><td>从门户会话解析当前用户（SPA 恢复登录态用）</td></tr>
+    <tr><td><code>POST /portal/api/logout</code></td><td>清门户 BFF 会话（IdP 会话由 <code>/oauth/logout</code> end_session 负责）</td></tr>
+  </tbody>
+</table>
+<p>会话用 <strong>HttpOnly Cookie（portal_session）</strong> 保存：浏览器 JS 读不到，只能由同源请求自动携带。SPA 请求 <code>/portal/api/me</code> 即可无感恢复登录态。</p>
+
+<pre><code># 一次完整登录的时序（浏览器视角，全部经 nginx 同源反代）
+浏览器       门户SPA        门户BFF       认证中心(IdP)
+  │ 点击登录    │             │              │
+  │──────────▶│  /portal/oauth/login      │
+  │           │             │─────────────▶│  /oauth/authorize?client_id&PKCE&state&nonce
+  │           │             │◀─────────────│  302 登录页
+  │◀───────────────────────────────────────│  用户输入账密
+  │           │             │◀─────────────│  302 回 callback?code=&state=
+  │           │             │  code+verifier+secret 换 token
+  │           │             │─────────────▶│  /oauth/token
+  │           │             │◀─────────────│  id/access/refresh token
+  │           │             │  建立 HttpOnly 会话
+  │◀──────────│  302 回门户  │             │
+  │  /portal/api/me 无感恢复用户            │
+</code></pre>
+
+<div class="note">
+  <strong>本项目落地：</strong>Demo 中门户 BFF 与认证中心（IdP）同进程部署（都是 auth-backend），便于演示；生产上 BFF 应独立成服务，甚至直接用成熟的 OIDC 客户端库，这是已明确的演进方向。
+</div>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>BFF = 面向前端专属后端，藏机密、简化前端、聚合数据。</li>
+  <li>OIDC 场景必须有 BFF：client_secret 只能放后端。</li>
+  <li>门户 = SPA + BFF 组合，登录态走 HttpOnly Cookie 会话。</li>
+</ul>

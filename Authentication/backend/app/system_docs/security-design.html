@@ -1,0 +1,57 @@
+<h2 id="principle">安全设计原则</h2>
+<p>本项目的安全设计遵循一个核心思想：<strong>安全不是自己发明，而是用标准协议内置的防护，并对高风险点做纵深加固</strong>。没有凭感觉"搞一套"，每一层都有明确的对抗目标和实现。</p>
+
+<h2 id="protocol">协议层四重防护</h2>
+<table>
+  <thead>
+    <tr><th>防护</th><th>对抗的攻击</th><th>实现</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>state</code></td><td>CSRF（伪造授权回调）</td><td>发起时生成随机 state，回调时严格比对，不一致即拒绝</td></tr>
+    <tr><td><code>nonce</code></td><td>id_token 重放</td><td>id_token 内嵌 nonce，客户端校验与发起时一致</td></tr>
+    <tr><td><code>PKCE</code></td><td>授权码被截获后冒用</td><td>code_verifier 只有申请方持有，换 token 时校验</td></tr>
+    <tr><td>授权码一次性 + 短时效</td><td>授权码被重用</td><td>5 分钟有效、用过即废、以哈希入库</td></tr>
+  </tbody>
+</table>
+
+<h2 id="credential">凭证安全</h2>
+<ul>
+  <li><strong>Token 不落浏览器</strong>：门户 BFF 模式下，id/access/refresh 三种 token 只存在于服务端；浏览器只有 HttpOnly 会话 Cookie（JS 读不到，防 XSS 窃取）；</li>
+  <li><strong>client_secret 只在后端</strong>：应用注册时一次性展示，后续不可查看，支持重置；</li>
+  <li><strong>密码 bcrypt 哈希</strong>：本地用户库密码不以明文存储；</li>
+  <li><strong>授权码 / refresh_token 哈希入库</strong>：数据库泄露无法直接换取 token；</li>
+  <li><strong>RS256 非对称</strong>：私钥只在认证中心，公钥可公开分发，谁都能验、没人能伪造。</li>
+</ul>
+
+<h2 id="transfer">凭证传递规范</h2>
+<table>
+  <thead>
+    <tr><th>传递方式</th><th>安全等级</th><th>本项目用法</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>OIDC 授权码 + PKCE</td><td>最安全</td><td>门户 / oidc-demo 登录主流程</td></tr>
+    <tr><td>HttpOnly Cookie</td><td>推荐</td><td>门户 BFF 会话（portal_session）</td></tr>
+    <tr><td>Authorization: Bearer</td><td>推荐</td><td>业务 API / userinfo 调用</td></tr>
+    <tr><td>URL 参数 ?token=</td><td>Demo 简化</td><td>应用广场 SSO 跳转瞬间（生产应替换）</td></tr>
+  </tbody>
+</table>
+
+<h2 id="failover">认证失败不降级</h2>
+<p>身份源支持降级链（Local → LDAP → Okta），但降级有严格的边界：</p>
+<ul>
+  <li><strong>只降"不可用"</strong>：身份源连接超时 / 服务宕机时才降级到下一个，保证登录不中断（高可用）；</li>
+  <li><strong>绝不降"认证失败"</strong>：用户不存在 / 密码错误是明确失败，直接 401——防止攻击者穿透到弱身份源。</li>
+</ul>
+<div class="warn">
+  <strong>安全边界：</strong>"认证失败不降级"是必须坚守的底线。如果密码错误也能降级，攻击者就能用弱口令逐一探测所有身份源。
+</div>
+
+<h2 id="audit">审计</h2>
+<p>每次登录都写入认证日志（<code>auth_logs</code> 表）：来源（local/ldap/okta）、结果（成功/失败）、IP、时间戳。管理员可在「系统 → 认证日志」查看，安全事件可追溯。</p>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>协议层：state / nonce / PKCE / 一次性授权码四重防护。</li>
+  <li>凭证层：token 不进浏览器、secret 只在后端、哈希入库、RS256。</li>
+  <li>身份层：认证失败绝不降级 + 全量审计。</li>
+</ul>

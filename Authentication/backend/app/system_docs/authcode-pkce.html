@@ -1,0 +1,53 @@
+<h2 id="why">为什么是授权码 + PKCE</h2>
+<p>授权码（Authorization Code）+ PKCE（Proof Key for Code Exchange）是 OAuth 2.1 / OIDC 推荐的<strong>标准登录流程</strong>。它把登录过程分成两个阶段，让 <strong>token 永远不经过浏览器</strong>，从而把最敏感的凭证锁在服务端。</p>
+
+<h2 id="flow">流程逐步拆解</h2>
+<p>以门户为例（门户 SPA → 门户 BFF → 认证中心），完整六步：</p>
+<ol>
+  <li><strong>发起</strong>：门户 BFF 生成 PKCE 验证值 <code>code_verifier</code>，算出挑战值 <code>code_challenge = SHA256(verifier) 的 base64url</code>；同时生成 <code>state</code>（防 CSRF）与 <code>nonce</code>（防重放）；</li>
+  <li><strong>跳转授权端点</strong>：302 到 <code>/oauth/authorize</code>，携带 <code>client_id</code>、<code>redirect_uri</code>、<code>scope=openid</code>、<code>state</code>、<code>nonce</code>、<code>code_challenge</code>、<code>code_challenge_method=S256</code>；</li>
+  <li><strong>用户登录</strong>：认证中心要求用户登录并确认；</li>
+  <li><strong>回一次性授权码</strong>：302 回 <code>redirect_uri</code>，携带 <code>code</code>（5 分钟有效、一次性）与 <code>state</code>；</li>
+  <li><strong>换 token</strong>：BFF 用 <code>code + code_verifier + client_secret</code> 调 <code>/oauth/token</code>，换取 id_token / access_token / refresh_token；</li>
+  <li><strong>校验并建会话</strong>：校验 id_token 的 nonce 与签名，建立 HttpOnly 会话。</li>
+</ol>
+
+<pre><code># PKCE 生成（示意）
+verifier   = secrets.token_urlsafe(48)                       # 随机验证值
+challenge  = base64url( sha256( verifier ) )                 # 挑战值
+# 发起时只把 challenge 交给认证中心；换 token 时才用 verifier
+</code></pre>
+
+<h2 id="why-pkce">PKCE 到底防什么</h2>
+<p>授权码模式有一个经典风险：<strong>授权码在回跳过程中可能被截获</strong>（如恶意应用注册了类似回调、或中间人）。截获者拿到 code 后，若没有额外保护，就能直接去换 token。</p>
+<p>PKCE 的解法是把"授权码 → token"绑定到发起方：</p>
+<ul>
+  <li>发起方自己生成 <code>code_verifier</code>（只有它知道）；</li>
+  <li>授权端点只登记它的 <code>code_challenge</code>（哈希值，即使泄露也无法反推 verifier）；</li>
+  <li>换 token 时必须同时给出 <code>code_verifier</code>，认证中心用同一哈希算法比对 challenge。</li>
+</ul>
+<p>因此，<strong>截获到授权码的攻击者没有 verifier，换不到 token</strong>。这就是 OAuth 2.1 把 PKCE 从"可选"变为"强制"的原因——它让即使没有 client_secret 的纯前端 SPA 也能安全使用授权码流程。</p>
+
+<div class="note">
+  <strong>本项目落地：</strong>认证中心对授权码做 PKCE 强制校验（缺失 code_verifier 直接拒绝）、授权码 5 分钟有效、一次性、以哈希入库；门户 BFF 与 oidc-demo 均完整实现 PKCE。
+</div>
+
+<h2 id="two-stage">为什么分两阶段</h2>
+<p>对比"隐式流程（直接把 token 发到前端）"，授权码流程的核心收益：</p>
+<table>
+  <thead>
+    <tr><th>对比</th><th>授权码 + PKCE</th><th>隐式流程（已废弃）</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>token 落点</td><td>只在应用后端</td><td>直接出现在浏览器 URL / 前端</td></tr>
+    <tr><td>泄露风险</td><td>低（token 不进浏览器）</td><td>高（URL 历史、日志、XSS 均可窃取）</td></tr>
+    <tr><td>标准地位</td><td>OAuth 2.1 唯一推荐</td><td>已从 2.1 删除</td></tr>
+  </tbody>
+</table>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>授权码 + PKCE = 两阶段换票，token 永不进浏览器。</li>
+  <li>PKCE 把授权码绑定到发起方，防截获冒用，是 OAuth 2.1 强制项。</li>
+  <li>本项目六步全链路实现并有 oidc-demo 演示。</li>
+</ul>

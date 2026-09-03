@@ -168,6 +168,8 @@ CORS_ALLOW_CREDENTIALS = True
 # REST Framework 配置
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        # 统一网关 forwardAuth 接入：信任 X-Auth-Username 身份头（优先）
+        'accounts.gateway_auth.GatewayAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (

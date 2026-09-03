@@ -1,0 +1,71 @@
+<h2 id="what">OIDC 客户端接入是什么</h2>
+<p>OIDC 客户端（Relying Party，RP）是接入统一认证的<strong>标准协议级</strong>方式。应用注册为客户端后，通过 <strong>OIDC 授权码 + PKCE</strong> 流程让用户登录，拿到 id_token / access_token。门户自身（通过 BFF）和 <code>oidc-demo</code> 都是 OIDC 客户端。</p>
+
+<h2 id="register">第一步：注册应用</h2>
+<p>在门户的「应用管理」中注册应用，关键配置：</p>
+<ul>
+  <li><strong>接入方式</strong>：选择 OIDC 客户端（token_mode = OIDC）；</li>
+  <li><strong>回调地址 redirect_uri</strong>：授权码回跳的地址，必须精确登记；</li>
+  <li>系统自动发放 <code>client_id</code> 与 <code>client_secret</code>（secret 仅展示一次，务必保存）。</li>
+</ul>
+<div class="warn">
+  <strong>redirect_uri 是安全关键：</strong>认证中心按<strong>精确白名单</strong>匹配回调地址（前缀匹配已被禁止）。若回调地址可被篡改，攻击者可把授权码导向自己。登记时必须与实际回调完全一致。
+</div>
+
+<h2 id="flow">第二步：授权码 + PKCE 流程</h2>
+<ol>
+  <li>前端跳 <code>/oauth/authorize</code>，携带：<code>response_type=code</code>、<code>client_id</code>、<code>redirect_uri</code>、<code>scope=openid profile</code>、<code>state</code>（防 CSRF）、<code>nonce</code>（防重放）、<code>code_challenge</code> + <code>code_challenge_method=S256</code>（PKCE）；</li>
+  <li>认证中心要求用户登录，确认后 302 回回调地址，携带一次性 <code>code</code> 与原样 <code>state</code>；</li>
+  <li>应用后端校验 state，用 <code>code + code_verifier + client_secret</code> 调 <code>/oauth/token</code> 换取 token；</li>
+  <li>校验 id_token 的 <code>nonce</code> 与签名，用 access_token 调 <code>/userinfo</code> 获取用户信息。</li>
+</ol>
+
+<pre><code># 应用后端换 token（示意，oidc-demo 的完整实现）
+POST /oauth/token
+  grant_type=authorization_code
+  &amp;code=&lt;授权码&gt;
+  &amp;redirect_uri=&lt;回调地址&gt;
+  &amp;client_id=&lt;client_id&gt;
+  &amp;client_secret=&lt;client_secret&gt;
+  &amp;code_verifier=&lt;PKCE 验证值&gt;
+</code></pre>
+
+<h2 id="verify">第三步：验证令牌</h2>
+<ul>
+  <li><strong>id_token</strong>：JWT，用 <code>/.well-known/jwks.json</code> 公钥验签名，校验 <code>iss / aud / nonce / exp</code>；</li>
+  <li><strong>access_token</strong>：调 <code>/userinfo</code> 或业务 API 用，短时效；</li>
+  <li><strong>refresh_token</strong>：后端持有，到期后用于无感续期（会轮换）。</li>
+</ul>
+
+<h2 id="demo">参考实现：oidc-demo</h2>
+<p>项目自带标准 OIDC 客户端演示（端口 8005），完整展示六步流程：</p>
+<ol>
+  <li>生成 PKCE code_verifier + state + nonce，跳认证中心 /authorize；</li>
+  <li>认证中心 302 带回一次性 code + state；</li>
+  <li>校验 state（防 CSRF）；</li>
+  <li>后端用 code + code_verifier + client_secret 换 token；</li>
+  <li>解码 id_token 并校验 nonce（防重放）；</li>
+  <li>用 Bearer access_token 调 /userinfo。</li>
+</ol>
+<p>启动后访问 <code>http://localhost:8005</code>，点"通过统一认证登录"即可走完整流程。</p>
+
+<h2 id="errors">常见错误排查</h2>
+<table>
+  <thead>
+    <tr><th>错误</th><th>原因</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>invalid_redirect_uri</code></td><td>回调地址与登记白名单不完全一致（含协议/端口/路径）</td></tr>
+    <tr><td><code>invalid_grant</code></td><td>授权码已过期（5 分钟）或已被使用（一次性）</td></tr>
+    <tr><td><code>invalid_client</code></td><td>client_id / client_secret 错误</td></tr>
+    <tr><td>id_token nonce 校验失败</td><td>未携带 nonce 或与应用生成的不一致</td></tr>
+    <tr><td>state 不匹配</td><td>回调 state 与发起时不一致（可能被篡改或流程中断）</td></tr>
+  </tbody>
+</table>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>OIDC 客户端接入 = 注册应用（redirect_uri 白名单）→ 授权码 + PKCE → 换 token → 验 id_token。</li>
+  <li>client_secret 只在后端，token 不进浏览器。</li>
+  <li>oidc-demo 提供可直接跑通的参考实现。</li>
+</ul>

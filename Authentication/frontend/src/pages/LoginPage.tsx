@@ -1,41 +1,35 @@
-import { LockOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
-import { App as AntApp, Button, Form, Input } from 'antd'
-import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { authApi } from '../api/client'
+import { LoadingOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { Button } from 'antd'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { portalApi } from '../api/client'
 import { useAuthStore } from '../store/auth'
-
-interface LoginForm {
-  username: string
-  password: string
-}
 
 export default function LoginPage() {
   const nav = useNavigate()
-  const [searchParams] = useSearchParams()
-  const { message } = AntApp.useApp()
-  const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true)
 
-  const onFinish = async (values: LoginForm) => {
-    setLoading(true)
-    try {
-      const { data } = await authApi.login(values.username, values.password)
-      useAuthStore.getState().setAuth(data.access_token, data.refresh_token, data.user)
-      message.success(`欢迎回来，${data.user.display_name || data.user.username}`)
-      // OIDC/SSO 回跳：登录成功后携带统一 JWT 跳回原 authorize 地址
-      const ret = searchParams.get('return')
-      if (ret) {
-        const sep = ret.includes('?') ? '&' : '?'
-        window.location.href = `${ret}${sep}token=${encodeURIComponent(data.access_token)}`
-        return
-      }
-      nav('/', { replace: true })
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      message.error(detail || '登录失败，请检查用户名和密码')
-    } finally {
-      setLoading(false)
+  // 若已有 OIDC 会话（HttpOnly Cookie），直接恢复登录态回首页
+  useEffect(() => {
+    let mounted = true
+    portalApi
+      .me()
+      .then(({ data }) => {
+        if (!mounted) return
+        useAuthStore.getState().setUser(data)
+        nav('/', { replace: true })
+      })
+      .catch(() => {
+        if (mounted) setChecking(false)
+      })
+    return () => {
+      mounted = false
     }
+  }, [nav])
+
+  const goLogin = () => {
+    // 门户作为 OIDC 客户端发起授权码流（BFF：/portal/oauth/login → 认证中心 /oauth/authorize）
+    window.location.href = '/portal/oauth/login'
   }
 
   return (
@@ -46,19 +40,21 @@ export default function LoginPage() {
         </div>
         <h1 className="login-title">统一认证中心</h1>
         <p className="login-subtitle">DevOps Platform · 单点登录（SSO）统一入口</p>
-        <Form<LoginForm> onFinish={onFinish} size="large" autoComplete="off">
-          <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
-            <Input prefix={<UserOutlined />} placeholder="用户名" />
-          </Form.Item>
-          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="密码" />
-          </Form.Item>
-          <Form.Item style={{ marginBottom: 0 }}>
-            <Button type="primary" htmlType="submit" block loading={loading}>
-              登 录
-            </Button>
-          </Form.Item>
-        </Form>
+        {checking ? (
+          <div style={{ textAlign: 'center', color: '#667085', padding: '24px 0' }}>
+            <LoadingOutlined style={{ fontSize: 20 }} />
+            <div style={{ marginTop: 10, fontSize: 13 }}>正在检查登录状态…</div>
+          </div>
+        ) : (
+          <Button type="primary" size="large" block onClick={goLogin} style={{ marginTop: 8 }}>
+            前往统一认证中心登录
+          </Button>
+        )}
+        {!checking && (
+          <p className="login-subtitle" style={{ marginTop: 12, fontSize: 12 }}>
+            将跳转到 OIDC 授权端点（OAuth 2.1 Authorization Code + PKCE）
+          </p>
+        )}
         <div className="login-footer">
           演示账号：admin / admin1234（管理员）<br />
           zhangsan / demo1234（普通用户）

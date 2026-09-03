@@ -194,7 +194,9 @@ def verify(request: Request, db: Session = Depends(get_db)):
     if not token:
         return JSONResponse(status_code=401, content={"code": 401, "user": None})
     try:
-        payload = decode_token(token)
+        # 网关 forwardAuth：接受认证中心签发的任意有效 access token（aud 为签发时对应
+        # 的 client_id，而非门户 audience，故此处不校验 aud）
+        payload = decode_token(token, verify_aud=False)
     except pyjwt.PyJWTError:
         return JSONResponse(status_code=401, content={"code": 401, "user": None})
     if payload.get("type") == "refresh":

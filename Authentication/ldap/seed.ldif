@@ -1,11 +1,29 @@
 # OpenLDAP 演示目录树（osixia/openldap 启动时通过 entrypoint 复制到 custom 目录导入）
-# 顶层域名：dc=devops,dc=com；组织单元 ou=people 下放置演示用户
+# 顶层域名：dc=devops,dc=com；组织单元 ou=people 下放置全家桶统一用户
+# 统一身份目录：认证中心作为 LDAP 认证源，所有业务系统共享该目录（身份统一、授权分散）
 # 演示用户密码均为明文 demo1234（Demo 用；生产必须用 {SSHA}/{SSHA512} 哈希）
+# 组织归属（departmentNumber）：用户隶属于组织，不隶属于任何系统
 
 dn: ou=people,dc=devops,dc=com
 objectClass: organizationalUnit
 ou: people
 
+# ---- 平台组 / 超管 ----
+dn: uid=admin,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: admin
+cn: 系统管理员
+sn: 管理
+displayName: 系统管理员
+mail: admin@devops.com
+departmentNumber: 平台组
+uidNumber: 1004
+gidNumber: 1004
+homeDirectory: /home/admin
+userPassword: demo1234
+
+# ---- 研发部 ----
 dn: uid=zhangsan,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
@@ -20,6 +38,35 @@ gidNumber: 1001
 homeDirectory: /home/zhangsan
 userPassword: demo1234
 
+dn: uid=xiaoming,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: xiaoming
+cn: 小明
+sn: 小
+displayName: 小明
+mail: xiaoming@devops.com
+departmentNumber: 研发部
+uidNumber: 1008
+gidNumber: 1008
+homeDirectory: /home/xiaoming
+userPassword: demo1234
+
+dn: uid=readonly,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: readonly
+cn: 只读用户
+sn: 只读
+displayName: 只读用户
+mail: readonly@devops.com
+departmentNumber: 研发部
+uidNumber: 1007
+gidNumber: 1007
+homeDirectory: /home/readonly
+userPassword: demo1234
+
+# ---- 运维部 ----
 dn: uid=lisi,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
@@ -34,6 +81,35 @@ gidNumber: 1002
 homeDirectory: /home/lisi
 userPassword: demo1234
 
+dn: uid=ops_user,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: ops_user
+cn: 运维工程师
+sn: 运维
+displayName: 运维工程师
+mail: ops_user@devops.com
+departmentNumber: 运维部
+uidNumber: 1006
+gidNumber: 1006
+homeDirectory: /home/ops_user
+userPassword: demo1234
+
+dn: uid=xiaoli,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: xiaoli
+cn: 小李
+sn: 小
+displayName: 小李
+mail: xiaoli@devops.com
+departmentNumber: 运维部
+uidNumber: 1009
+gidNumber: 1009
+homeDirectory: /home/xiaoli
+userPassword: demo1234
+
+# ---- 测试部 ----
 dn: uid=wangwu,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
@@ -46,4 +122,63 @@ departmentNumber: 测试部
 uidNumber: 1003
 gidNumber: 1003
 homeDirectory: /home/wangwu
+userPassword: demo1234
+
+# ---- 云平台组（云管 CloudManager 专属用户） ----
+dn: uid=cloud_admin,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: cloud_admin
+cn: 云管理员
+sn: 云
+displayName: 云管理员
+mail: cloud_admin@devops.com
+departmentNumber: 云平台组
+uidNumber: 1005
+gidNumber: 1005
+homeDirectory: /home/cloud_admin
+userPassword: demo1234
+
+# ---- 研发中心（权限中心 PermissionCenter 用户） ----
+dn: uid=alice,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: alice
+cn: 爱丽丝
+sn: 爱
+displayName: 爱丽丝
+mail: alice@devops.com
+departmentNumber: 研发中心
+uidNumber: 1010
+gidNumber: 1010
+homeDirectory: /home/alice
+userPassword: demo1234
+
+dn: uid=bob,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: bob
+cn: 鲍勃
+sn: 鲍
+displayName: 鲍勃
+mail: bob@devops.com
+departmentNumber: 研发中心
+uidNumber: 1011
+gidNumber: 1011
+homeDirectory: /home/bob
+userPassword: demo1234
+
+# ---- 运维平台（权限中心 PermissionCenter 用户） ----
+dn: uid=erin,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: erin
+cn: 艾琳
+sn: 艾
+displayName: 艾琳
+mail: erin@devops.com
+departmentNumber: 运维平台
+uidNumber: 1012
+gidNumber: 1012
+homeDirectory: /home/erin
 userPassword: demo1234
