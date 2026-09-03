@@ -26,15 +26,16 @@ docker logs authentication-auth-backend
     <tr><td><code>direct-app</code></td><td>直连 JWKS 验签演示，端口 8003</td></tr>
     <tr><td><code>pilot-app</code></td><td>试点接入模板，端口 8004</td></tr>
     <tr><td><code>openldap</code>（可选）</td><td>LDAP 身份源，需 <code>--profile ldap</code> 启用</td></tr>
+    <tr><td><code>lam</code>（可选）</td><td>LDAP 可视化管理界面（LDAP Account Manager），端口 8083，随 <code>--profile ldap</code> 启用；登录：用户 <code>cn=admin,dc=devops,dc=com</code> / 密码 <code>adminpass</code></td></tr>
   </tbody>
 </table>
 
 <h2 id="env">关键环境变量</h2>
 <pre><code># .env（compose 自动读取）
 COMPOSE_PROJECT_NAME=authentication   # 项目名/容器前缀
-AUTH_PROVIDER_ORDER=local             # 身份源顺序（当前仅本地库）
+AUTH_PROVIDER_ORDER=ldap,local         # 身份源顺序（LDAP 优先，本地库兜底）
 AUTH_PROVIDER_LOCAL_ENABLED=true      # 本地身份源启用
-AUTH_PROVIDER_LDAP_ENABLED=false      # LDAP 身份源默认关闭
+AUTH_PROVIDER_LDAP_ENABLED=true       # LDAP 身份源默认启用
 
 # 认证中心容器内
 DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_auth
@@ -65,6 +66,6 @@ DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_auth
 <h2 id="summary">小结</h2>
 <ul>
   <li><code>docker compose build &amp;&amp; up -d</code> 一键全栈，7 容器 + 外部共享库。</li>
-  <li>身份源默认 local，LDAP 可选 profile。</li>
+  <li>身份源默认 LDAP 优先（本地库兜底），LDAP 相关服务经 <code>--profile ldap</code> 启用。</li>
   <li>数据库迁移/种子自动执行，日志可追溯。</li>
 </ul>

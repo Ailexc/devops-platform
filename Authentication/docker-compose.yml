@@ -37,14 +37,23 @@ services:
       start_period: 15s
 
   # OpenLDAP 可视化管理界面（与 openldap 同 profile，随 --profile ldap 一起启动）
-  phpldapadmin:
-    image: osixia/phpldapadmin:0.9.0
+  # LDAP Account Manager (LAM) - 现代化 Web 界面，替代已停更的 phpLDAPadmin
+  # 登录：用户 lam / 密码 ${LDAP_ADMIN_PASSWORD}（LAM 预配置将 LAM 密码与 LDAP admin 密码保持一致）
+  lam:
+    image: ldapaccountmanager/lam:stable
     profiles: ["ldap"]
-    container_name: authentication-phpldapadmin
+    container_name: authentication-lam
+    restart: unless-stopped
     environment:
-      - PHPLDAPADMIN_LDAP_HOSTS=openldap
-      - PHPLDAPADMIN_HTTPS=false
-      - PHPLDAPADMIN_TRUSTED_PROXY_IPS=127.0.0.1
+      - LAM_SKIP_PRECONFIGURE=false
+      - LAM_PASSWORD=${LDAP_ADMIN_PASSWORD:-adminpass}
+      - LAM_LANG=zh_CN
+      - LDAP_SERVER=ldap://openldap:389
+      - LDAP_DOMAIN=devops.com
+      - LDAP_BASE_DN=dc=devops,dc=com
+      - LDAP_USERS_DN=ou=people,dc=devops,dc=com
+      - LDAP_GROUPS_DN=ou=groups,dc=devops,dc=com
+      - LDAP_USER=cn=admin,dc=devops,dc=com
     ports:
       - "8083:80"
     depends_on:

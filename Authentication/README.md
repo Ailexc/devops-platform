@@ -95,34 +95,40 @@ docker compose up -d --build
 | 认证中心 API | http://localhost:8002/docs | Swagger 文档 |
 | 统一网关（forwardAuth） | http://localhost:8001 | 受保护演示应用入口 |
 | Traefik Dashboard | http://localhost:8080 | 网关面板 |
-| OpenLDAP（可选） | ldap://localhost:389 | 演示目录树（`--profile ldap` 启用） |
+| OpenLDAP（LDAP 身份源） | ldap://localhost:389 | 统一身份目录（`--profile ldap` 启用） |
+| LDAP 管理界面（LAM） | http://localhost:8083 | LDAP Account Manager，登录 `cn=admin,dc=devops,dc=com` / `adminpass` |
 
 OrbStack 域名（`dev.orbstack.domains` 自动解析）：`portal.authentication.orb.local`、`api.authentication.orb.local`、`mock.authentication.orb.local`。
 
 ### 演示账号
 
-| 用户名 | 密码 | 身份源 | 说明 |
-|--------|------|--------|------|
-| `admin` | `admin1234` | 本地用户库 | 管理员（可管理用户/应用） |
-| `zhangsan` | `demo1234` | 本地用户库 | 普通用户 |
-| `lisi` / `wangwu` | `demo1234` | 本地用户库 | 普通用户 |
+统一身份目录（OpenLDAP，密码统一 `demo1234`）：全家桶 12 个用户，登录页「选择系统 → 选择用户」下拉演示切换。核心账号：
 
-> LDAP 演示用户（`zhangsan`/`lisi`/`wangwu`，密码 `demo1234`）见 [`ldap/seed.ldif`](ldap/seed.ldif)。
+| 用户名 | 组织 | 演示系统分组 |
+|--------|------|--------------|
+| `admin` | 平台组 | 全部 6 系统 |
+| `cloud_admin` | 云平台组 | 多云管理 |
+| `zhangsan` | 研发部 | 云管 / 工单 / 任务 / 事件 |
+| `lisi` | 运维部 | 云管 / 工单 / 任务 / 事件 |
+| `ops_user` | 运维部 | 云管 / 事件 |
+| `alice` | 研发中心 | 权限中心 / 云管 |
+| `bob` | 研发中心 | 权限中心 |
+| `erin` | 运维平台 | 权限中心 / 事件 |
 
-## 切换 / 演示 LDAP 认证
+> LDAP 完整目录见 [`ldap/seed.ldif`](ldap/seed.ldif)；管理界面（LAM）`http://ldapadmin.authentication.orb.local`（localhost:8083），登录 `cn=admin,dc=devops,dc=com` / `adminpass`。
 
-OpenLDAP 是**可选服务**（compose profile `ldap`），默认全栈不依赖它。演示 LDAP：
+## LDAP 统一身份目录
+
+LDAP 为**默认启用**身份源（compose 默认 `AUTH_PROVIDER_ORDER=ldap,local`，本地库兜底）。相关服务经 `--profile ldap` 启用：
 
 ```bash
-# 1. .env 中开启并调整降级链
-AUTH_PROVIDER_ORDER=ldap,local
-AUTH_PROVIDER_LDAP_ENABLED=true
-
-# 2. 启用 LDAP 服务并重建认证后端
 docker compose --profile ldap up -d --build
 ```
 
-然后用 `zhangsan / demo1234` 登录，个人中心的「认证来源」会显示 **LDAP**；查看 `http://localhost:8002/api/system/health` 可看到降级链中各身份源可用性。
+- 登录页「选择系统 → 选择用户 → 固定密码 demo1234」下拉式，演示切换方便；
+- 用户隶属于**组织**（研发部 / 运维部…），`demo_systems` 分组仅为登录下拉索引，不进 LDAP；
+- 个人中心「认证来源」显示 LDAP；`/api/system/health` 可查降级链中各身份源可用性；
+- LAM（LDAP Account Manager）管理界面替代旧 phpLDAPadmin，支持目录树 / 用户管理 / 可视化。
 
 > 💡 OpenLDAP 使用 `osixia/openldap:1.5.0` 镜像，`ldap/seed.ldif` 在首次启动（数据卷为空）时自动导入演示目录树（`dc=devops,dc=com` / `ou=people`）。若需重置数据：`docker compose --profile ldap down -v` 后重新 up。
 
