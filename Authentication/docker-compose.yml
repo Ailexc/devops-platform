@@ -86,10 +86,10 @@ services:
       # 应用跳转地址（云端部署用 APP_URL_<APP_ID> 覆盖为统一网关地址，默认本地统一入口）
       - APP_URL_TASK_MANAGER=${APP_URL_TASK_MANAGER:-http://cmdb.devops.orb.local}
       - APP_URL_CLOUD_MANAGER=${APP_URL_CLOUD_MANAGER:-http://cloud.authentication.orb.local}
-      - APP_URL_WORKFLOW_CENTER=${APP_URL_WORKFLOW_CENTER:-http://workflow.devops.orb.local}
+      - APP_URL_WORKFLOW_CENTER=${APP_URL_WORKFLOW_CENTER:-http://workflow.authentication.orb.local}
       - APP_URL_EVENT_MANAGER=${APP_URL_EVENT_MANAGER:-http://event.devops.orb.local}
       - APP_URL_RELEASE_MANAGER=${APP_URL_RELEASE_MANAGER:-http://release.devops.orb.local}
-      - APP_URL_PERMISSION_CENTER=${APP_URL_PERMISSION_CENTER:-http://iam.devops.orb.local}
+      - APP_URL_PERMISSION_CENTER=${APP_URL_PERMISSION_CENTER:-http://iam.authentication.orb.local}
       # Demo 应用跳转地址（云端由 .env.cloud 覆盖为 114.55.244.220:809X）
       - APP_URL_MOCK_APP=${APP_URL_MOCK_APP:-http://mock.authentication.orb.local}
       - APP_URL_DIRECT_APP=${APP_URL_DIRECT_APP:-http://direct.authentication.orb.local}
@@ -190,7 +190,7 @@ services:
       - auth-backend
       - mock-app
     labels:
-      - "dev.orbstack.domains=mock.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,traefik.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,cloud.authentication.orb.local"
+      - "dev.orbstack.domains=mock.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,traefik.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,cloud.authentication.orb.local,workflow.authentication.orb.local,iam.authentication.orb.local"
     networks:
       - default
       - devops-net

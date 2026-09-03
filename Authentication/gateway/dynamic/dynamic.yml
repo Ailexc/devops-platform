@@ -20,8 +20,10 @@ http:
 
   routers:
     # 受保护的业务 API：统一网关 forwardAuth 鉴权
+    # 注意：mock-app 路由必须限定 Host，避免无 Host 的 PathPrefix 兜底抢占
+    # 各业务系统域名（workflow/cloud/iam.authentication.orb.local 等）的请求
     mock-app-api:
-      rule: "PathPrefix(`/api/`)"
+      rule: "Host(`mock.authentication.orb.local`) && PathPrefix(`/api/`)"
       entryPoints: ["web"]
       service: mock-app-service
       middlewares:
@@ -30,7 +32,7 @@ http:
 
     # SPA 首页：免鉴权（加载页面，前端读取 SSO token 后携 header 调 API）
     mock-app-home:
-      rule: "PathPrefix(`/`)"
+      rule: "Host(`mock.authentication.orb.local`) && PathPrefix(`/`)"
       entryPoints: ["web"]
       service: mock-app-service
       priority: 1
@@ -59,7 +61,7 @@ http:
       service: cloud-manager-service
       middlewares:
         - auth-forward
-      priority: 10
+      priority: 100
 
     # 云管前端页面：免鉴权（加载 SPA，前端读取 SSO token 后携 header 调 API）
     cloud-manager-home:
@@ -68,22 +70,36 @@ http:
       service: cloud-manager-frontend-service
       priority: 10
 
-    # 工单中心 WorkFlowCenter：后端 API 经网关鉴权
+    # 工单中心 WorkFlowCenter：统一入口（前端经网关）→ 后端 API 经网关鉴权
     workflow-center-api:
-      rule: "Host(`workflow.devops.orb.local`) && PathPrefix(`/api/v1/`)"
+      rule: "(Host(`workflow.authentication.orb.local`) || Host(`workflow.devops.orb.local`)) && PathPrefix(`/api/v1/`)"
       entryPoints: ["web"]
       service: workflow-center-service
       middlewares:
         - auth-forward
+      priority: 100
+
+    # 工单中心前端页面：免鉴权（加载 SPA，前端读取 SSO token 后携 header 调 API）
+    workflow-center-home:
+      rule: "Host(`workflow.authentication.orb.local`) && PathPrefix(`/`)"
+      entryPoints: ["web"]
+      service: workflow-center-frontend-service
       priority: 10
 
-    # 权限中心 PermissionCenter：后端 API 经网关鉴权
+    # 权限中心 PermissionCenter：统一入口（前端经网关）→ 后端 API 经网关鉴权
     permission-center-api:
-      rule: "Host(`iam.devops.orb.local`) && PathPrefix(`/api/v1/`)"
+      rule: "(Host(`iam.authentication.orb.local`) || Host(`iam.devops.orb.local`)) && PathPrefix(`/api/v1/`)"
       entryPoints: ["web"]
       service: permission-center-service
       middlewares:
         - auth-forward
+      priority: 100
+
+    # 权限中心前端页面：免鉴权（加载 SPA，前端读取 SSO token 后携 header 调 API）
+    permission-center-home:
+      rule: "Host(`iam.authentication.orb.local`) && PathPrefix(`/`)"
+      entryPoints: ["web"]
+      service: permission-center-frontend-service
       priority: 10
 
   services:
@@ -114,7 +130,19 @@ http:
         servers:
           - url: "http://workflow-api:8000"
 
+    # 工单中心前端（SPA 静态，经统一网关按 Host 分发）
+    workflow-center-frontend-service:
+      loadBalancer:
+        servers:
+          - url: "http://workflow-frontend:80"
+
     permission-center-service:
       loadBalancer:
         servers:
           - url: "http://permission-center-iam-server-1:8080"
+
+    # 权限中心前端（SPA 静态，经统一网关按 Host 分发）
+    permission-center-frontend-service:
+      loadBalancer:
+        servers:
+          - url: "http://permission-center-frontend:80"
