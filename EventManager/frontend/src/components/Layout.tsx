@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { getBackendMode, switchBackend, type BackendMode } from '../api'
+import { getBackendMode, switchBackend, fetchCurrentUser, type BackendMode } from '../api'
 
 const navItems = [
   { to: '/dashboard', icon: '📊', label: '仪表盘' },
@@ -16,6 +16,20 @@ export default function Layout() {
   // 收缩状态持久化到 localStorage
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === '1')
   const [backend, setBackend] = useState<BackendMode>(() => getBackendMode())
+  const [username, setUsername] = useState<string>(() => localStorage.getItem('event.user') || '')
+
+  // 加载当前用户（统一认证 SSO 方式二：直连 JWKS 验签）
+  useEffect(() => {
+    if (!localStorage.getItem('event.token')) return
+    fetchCurrentUser()
+      .then((me) => {
+        setUsername(me.username)
+        localStorage.setItem('event.user', me.username)
+      })
+      .catch(() => {
+        /* 未认证则保持匿名 */
+      })
+  }, [])
 
   const toggleCollapsed = () => {
     setCollapsed((c) => {
@@ -104,6 +118,17 @@ export default function Layout() {
 
         {/* Footer */}
         <div className="p-3 border-t border-slate-200">
+          {username && (
+            <div
+              className={`flex items-center gap-2 py-2 text-xs font-medium text-slate-600 ${
+                collapsed ? 'justify-center px-0' : 'px-3'
+              }`}
+              title="当前登录用户（统一认证 SSO）"
+            >
+              <span className="flex-shrink-0">👤</span>
+              {!collapsed && <span className="truncate">{username}</span>}
+            </div>
+          )}
           <div
             className={`flex items-center gap-2 py-2 text-xs text-slate-400 ${
               collapsed ? 'justify-center px-0' : 'px-3'

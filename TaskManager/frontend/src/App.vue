@@ -15,6 +15,7 @@
           <option value="python">Python 后端 (Django + Celery)</option>
           <option value="go">Go 后端 (Gin + asynq)</option>
         </select>
+        <span class="user-chip" v-if="username" title="当前登录用户（统一认证 SSO）">👤 {{ username }}</span>
         <span><span class="hl"></span>系统运行中</span>
         <span>Redis 正常 · 3 Worker 在线</span>
         <span>上次全量: 2026-07-25 04:00</span>
@@ -40,21 +41,25 @@
 </template>
 
 <script>
-import { getCurrentBackend, switchBackend } from './api/index.js'
+import { getCurrentBackend, switchBackend, fetchCurrentUser } from './api/index.js'
 
 export default {
   name: 'App',
   data() {
     return {
       backendKey: getCurrentBackend(),
+      username: localStorage.getItem('cmdb.user') || '',
       tabs: [
         { path: '/dashboard', icon: '📊', label: '监控大盘' },
         { path: '/tasks', icon: '⚙️', label: '任务管理' },
         { path: '/history', icon: '📋', label: '执行历史' },
         { path: '/docs', icon: '📄', label: '系统文档' },
-        { path: '/interview', icon: '🎓', label: '面试手册' },
+        { path: '/interview', icon: '🎤', label: '面试手册' },
       ],
     }
+  },
+  mounted() {
+    this.loadUser()
   },
   methods: {
     onBackendSwitch() {
@@ -62,9 +67,20 @@ export default {
       // 切换后重新加载，全部请求走新后端
       location.reload()
     },
+    async loadUser() {
+      if (!localStorage.getItem('cmdb.token')) return
+      try {
+        const res = await fetchCurrentUser()
+        this.username = res.data.username
+        localStorage.setItem('cmdb.user', res.data.username)
+      } catch {
+        /* 未认证则保持匿名 */
+      }
+    },
   },
 }
 </script>
+
 
 <style>
 :root {

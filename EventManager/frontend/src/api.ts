@@ -25,8 +25,13 @@ export function switchBackend(mode: BackendMode): string {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('event.token')
   const res = await fetch(`${getApiBase()}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
     ...options,
   })
   if (!res.ok) {
@@ -34,6 +39,17 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(err.detail || res.statusText)
   }
   return res.json()
+}
+
+// ── 统一认证（SSO，方式二：直连 JWKS 验签）────────────────────
+export interface MeInfo {
+  username: string
+  is_active: boolean
+  auth_source: string
+}
+
+export function fetchCurrentUser(): Promise<MeInfo> {
+  return request<MeInfo>('/auth/me')
 }
 
 export interface Event {

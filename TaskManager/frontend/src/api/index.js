@@ -43,6 +43,19 @@ const api = axios.create({
   },
 })
 
+// 统一认证令牌（方式二：直连 JWKS 验签）——请求统一携带 Bearer
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('cmdb.token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+// ── 统一认证（SSO）─────────────────────────────────────────────
+export function fetchCurrentUser() {
+  return api.get('/auth/me/')
+}
+
+
 // ── Dashboard ──────────────────────────────────────────────────────
 
 export function fetchDashboardStats() {
