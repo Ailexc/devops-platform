@@ -88,6 +88,16 @@
       "file": "oidc-client-guide.html"
     },
     {
+      "id": "family-bucket-sso",
+      "title": "全家桶统一认证接入实战",
+      "description": "六大系统如何按三种方式（网关/JWKS/OIDC）接入统一认证、身份统一到 LDAP、前端闭环与网关踩坑",
+      "category": "integration",
+      "icon": "🏘️",
+      "color": "#8b5cf6",
+      "order": 3,
+      "file": "family-bucket-sso.html"
+    },
+    {
       "id": "oauth-oidc",
       "title": "OAuth 2.0 / 2.1 / OIDC 关系",
       "description": "OAuth 演进历史、OAuth 2.1 收紧了什么、OIDC 在 OAuth 之上加什么、本系统遵循",

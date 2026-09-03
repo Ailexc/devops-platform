@@ -1,0 +1,77 @@
+<h2 id="question">要回答的核心问题</h2>
+<p>认证中心（OIDC Provider）造好之后，<strong>全家桶真实系统到底怎么接进来？</strong>本项目把六大业务系统全部接入了统一认证，并按三类真实场景分配了三种接入方式——这是"统一认证落地"的实战总览。</p>
+
+<h2 id="panorama">三种接入方式全景</h2>
+<table>
+  <thead>
+    <tr><th>方式</th><th>谁验签</th><th>业务鉴权代码</th><th>适合场景</th><th>本项目系统</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>① 经网关 forwardAuth</strong></td><td>网关转认证中心</td><td>零（读注入头）</td><td>网关可覆盖的内部应用</td><td>云管 / 工单 / 权限中心</td></tr>
+    <tr><td><strong>② 直连 JWKS</strong></td><td>业务后端本地拉公钥</td><td>实现一次验签中间件</td><td>跨网络 / 网关覆盖不到</td><td>任务管理 / 事件管理</td></tr>
+    <tr><td><strong>③ 标准 OIDC 客户端</strong></td><td>协议级（授权码 + PKCE）</td><td>标准客户端库</td><td>外部第三方系统</td><td>发布系统</td></tr>
+  </tbody>
+</table>
+<p>三种方式共用同一种"统一 JWT"（认证中心 RS256 签发），区别在于<strong>验签发生在哪</strong>、以及<strong>业务系统写多少代码</strong>。详见《<a class="doc-link" href="#" data-doc="gateway-vs-direct">经网关 vs 不经网关接入</a>》《<a class="doc-link" href="#" data-doc="direct-connect">直连接入与 JWKS 验签</a>》。</p>
+
+<h2 id="mapping">系统映射</h2>
+<table>
+  <thead>
+    <tr><th>业务名</th><th>项目</th><th>接入方式</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>工单中心</td><td>WorkFlowCenter</td><td>方式一 · 网关</td></tr>
+    <tr><td>云管</td><td>CloudManager</td><td>方式一 · 网关（样板先行）</td></tr>
+    <tr><td>权限中心</td><td>PermissionCenter</td><td>方式一 · 网关</td></tr>
+    <tr><td>任务管理</td><td>TaskManager</td><td>方式二 · 直连 JWKS</td></tr>
+    <tr><td>事件管理</td><td>EventManager</td><td>方式二 · 直连 JWKS</td></tr>
+    <tr><td>发布系统</td><td>ReleaseManager</td><td>方式三 · OIDC 客户端</td></tr>
+  </tbody>
+</table>
+
+<h2 id="identity">身份统一：LDAP</h2>
+<ul>
+  <li>12 个全家桶用户灌入 <strong>OpenLDAP</strong>，密码统一 <code>demo1234</code>；</li>
+  <li>用户隶属<strong>组织</strong>（研发部 / 运维部…），<strong>不隶属某个系统</strong>；</li>
+  <li>认证中心启用 LDAP 认证源（<code>AUTH_PROVIDER_ORDER=ldap,local</code>）；</li>
+  <li>登录页：<strong>选择系统 → 选择用户（按组织分组）→ 固定密码</strong>；</li>
+  <li>管理界面：LDAP Account Manager（LAM）可视化运维。</li>
+</ul>
+
+<h2 id="frontend">前端闭环</h2>
+<p>接入不只是"后端 API 验签通过"，还要<strong>前端真正串起来</strong>：每个系统前端都要消费统一令牌并展示当前用户。统一模式：</p>
+<div class="flow"><span class="step">门户带 <code>?token=</code> 跳转</span><span class="arrow">→</span><span class="step">读令牌存本地</span><span class="arrow">→</span><span class="step">立即清理 URL</span><span class="arrow">→</span><span class="step">请求带 Bearer</span><span class="arrow">→</span><span class="step">拉当前用户</span><span class="arrow">→</span><span class="step">界面展示</span></div>
+<table>
+  <thead>
+    <tr><th>系统</th><th>框架</th><th>令牌 key</th><th>用户显示</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>云管</td><td>Vue 3</td><td><code>access_token</code></td><td>顶部导航（含中文显示名）</td></tr>
+    <tr><td>工单</td><td>Vue 3</td><td><code>token</code></td><td>侧边栏</td></tr>
+    <tr><td>权限中心</td><td>Vue 3</td><td><code>iam_token</code></td><td>布局顶部</td></tr>
+    <tr><td>任务管理</td><td>Vue 3</td><td><code>cmdb.token</code></td><td>顶栏</td></tr>
+    <tr><td>事件管理</td><td>React</td><td><code>event.token</code></td><td>侧边栏底部</td></tr>
+  </tbody>
+</table>
+<div class="warn"><strong>认证 / 授权分离：</strong>登录后全局可进所有系统；某系统没权限则空白，走权限中心申请即可——这是设计如此，不是 bug。</div>
+
+<h2 id="gateway">网关踩坑（实战价值最高）</h2>
+<p>内部系统前端纳入统一网关后，两个路由坑必须处理：</p>
+<table>
+  <thead>
+    <tr><th>现象</th><th>根因</th><th>修复</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>新域名 <code>/api/</code> 被后端拒</td><td>mock-app 是无 Host 的 <code>PathPrefix(/api/)</code> 兜底路由，抢占业务域名请求</td><td>mock-app 路由限定 <code>Host(mock.authentication.orb.local)</code></td></tr>
+    <tr><td>加 Host 后仍绕过 forwardAuth</td><td>API 路由与前端 home 路由 <strong>priority 相同</strong>，<code>/api/</code> 被 home（前端 nginx 同源反代）抢占，直连后端绕网关</td><td>业务 API 路由 priority 提到 <strong>100</strong></td></tr>
+  </tbody>
+</table>
+<p>这两个坑<strong>只有新域名会踩</strong>（老域名因不匹配 home 的 Host 反而"侥幸正常"），任何环境都可能出现，是网关路由配置的通用问题。</p>
+
+<h2 id="summary">小结</h2>
+<ul>
+  <li>统一认证不是"一个接口接所有"，而是按系统场景选方式：网关 / JWKS / OIDC；</li>
+  <li>身份统一到 LDAP，用户隶属组织而非系统；</li>
+  <li>前端闭环（令牌消费 + 用户展示）才是"串起来"的完成标准；</li>
+  <li>三种方式、五系统闭环、网关踩坑与修复——都是面试可展开的实战素材。</li>
+</ul>

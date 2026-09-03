@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>统一认证中心 · 全家桶统一认证接入报告</title>
+<style>
+  :root{
+    --text:#1A1B1C; --secondary:#6B7280; --bg:#F4F3EE; --card:#FFFFFF;
+    --border:#E4E3DD; --accent:#2b4a8f; --accent-soft:#eef3fb;
+    --green:#3a8a14; --green-soft:#edf7ed; --amber:#9a6a00; --amber-soft:#fef3e2;
+    --red:#c0392b; --red-soft:#fdeeec;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'PingFang SC','Roboto','Segoe UI','Microsoft YaHei',sans-serif;line-height:1.65;padding:0 0 64px;}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px;}
+  header{background:linear-gradient(135deg,#12203a,#2b4a8f);color:#fff;padding:40px 20px 34px;}
+  header .wrap{max-width:1000px;}
+  header h1{font-size:26px;font-weight:700;letter-spacing:.5px;}
+  header .sub{margin-top:8px;font-size:14px;color:#c6d4ef;}
+  header .meta{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;font-size:12px;}
+  header .meta span{background:rgba(255,255,255,.14);padding:3px 10px;border-radius:12px;}
+  h2{font-size:19px;font-weight:700;margin:42px 0 4px;color:var(--accent);}
+  h2 .no{color:#9db4e6;font-weight:700;margin-right:8px;}
+  h3{font-size:15px;font-weight:600;margin:18px 0 6px;color:#1A1B1C;}
+  p{font-size:14px;margin:6px 0;color:#333;}
+  .lead{font-size:14.5px;color:#333;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin:12px 0;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid #F0EFE9;vertical-align:top;}
+  th{background:#F3F6FC;color:var(--accent);font-weight:600;font-size:12.5px;white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;white-space:nowrap;}
+  .b-green{background:var(--green-soft);color:var(--green);}
+  .b-amber{background:var(--amber-soft);color:var(--amber);}
+  .b-red{background:var(--red-soft);color:var(--red);}
+  .b-blue{background:var(--accent-soft);color:var(--accent);}
+  ul,ol{margin:6px 0 6px 20px;font-size:14px;color:#333;}
+  li{margin:4px 0;}
+  code{background:#EEF0F4;border:1px solid #E4E6EC;border-radius:5px;padding:1px 6px;font-size:12.5px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#333;}
+  .box{border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin:8px 0;font-size:13px;background:#FAFAF8;}
+  .box b{color:var(--accent);}
+  .flow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;margin:10px 0;}
+  .flow .node{background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;min-width:120px;text-align:center;}
+  .flow .node b{display:block;font-size:12px;color:var(--accent);}
+  .flow .node span{font-size:11px;color:var(--secondary);}
+  .flow .arrow{color:var(--secondary);font-size:14px;}
+  .flow .ok{border-color:#C6E5C6;background:var(--green-soft);}
+  .flow .warn{border-color:#F0D9A8;background:var(--amber-soft);}
+  .diff{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;}
+  .diff .col{flex:1 1 340px;min-width:0;border-radius:12px;padding:14px 16px;border:1px solid var(--border);background:#fff;}
+  .diff .col h4{font-size:13.5px;margin-bottom:8px;}
+  .diff .before h4{color:var(--red);}
+  .diff .after h4{color:var(--green);}
+  .diff .col ul{margin-left:16px;font-size:12.5px;}
+  .check{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:12px 0;}
+  .check .item{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12.5px;}
+  .check .item .t{font-weight:600;color:var(--green);}
+  .stat{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0;}
+  .stat .cell{flex:1 1 180px;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;}
+  .stat .cell .n{font-size:28px;font-weight:700;color:var(--accent);}
+  .stat .cell .l{font-size:12px;color:var(--secondary);margin-top:4px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>统一认证中心 · 全家桶统一认证接入报告</h1>
+    <div class="sub">六大业务系统全部接入统一认证：三种接入方式各就各位，前端 SSO 令牌消费全部闭环，用户身份统一到 LDAP。</div>
+    <div class="meta">
+      <span>阶段：后端 API + 前端闭环全部完成</span>
+      <span>用途：面试展示 + 学习</span>
+      <span>三种接入方式：网关 / JWKS / OIDC</span>
+      <span>身份源：OpenLDAP + LAM</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2><span class="no">01</span>一句话结论</h2>
+<p class="lead">认证中心完成 OIDC 标准改造后，本轮把 <strong>六大真实业务系统（云管 / 工单 / 权限 / 任务 / 事件 / 发布）</strong>全部接入统一认证：其中三个内部系统走<strong>网关 forwardAuth</strong>（方式一）、两个走<strong>直连 JWKS 验签</strong>（方式二）、发布系统走<strong>标准 OIDC 客户端</strong>（方式三）——<strong>三种企业级接入模式在一个项目里全部落地</strong>。身份统一到 OpenLDAP（12 个用户、固定演示密码、按组织归属），并补齐了每个系统的<strong>前端 SSO 令牌消费与用户可见性</strong>，做到"门户登录一次、全家桶到处通"。</p>
+
+<h2><span class="no">02</span>背景与目标</h2>
+<p>此前各业务系统是独立开发、独立登录（各自维护一套模拟用户，互不相同），与"统一入口 + 单点登录 + 多点访问"的设计目标割裂。本轮目标是：</p>
+<ul>
+  <li><strong>身份统一</strong>：全家桶用户集中到统一身份源（OpenLDAP），登录一次全局通行；</li>
+  <li><strong>接入规范</strong>：按系统特点分配三种标准接入方式，而不是自研一套；</li>
+  <li><strong>前端闭环</strong>：每个系统前端都要真正消费统一令牌并展示当前用户，而不是"API 通了但界面没串起来"；</li>
+  <li><strong>认证 / 授权分离</strong>：认证统一到认证中心；授权（权限申请）仍在各系统/权限中心自治。</li>
+</ul>
+
+<h2><span class="no">03</span>系统映射与接入方式分配</h2>
+<table>
+  <thead>
+    <tr><th>系统</th><th>项目</th><th>接入方式</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>工单中心</td><td>WorkFlowCenter</td><td><span class="badge b-blue">方式一 · 网关 forwardAuth</span></td><td>内部系统，网关可覆盖</td></tr>
+    <tr><td>云管</td><td>CloudManager</td><td><span class="badge b-blue">方式一 · 网关 forwardAuth</span></td><td>内部系统，网关可覆盖（样板先行）</td></tr>
+    <tr><td>权限中心</td><td>PermissionCenter</td><td><span class="badge b-blue">方式一 · 网关 forwardAuth</span></td><td>内部系统，网关可覆盖</td></tr>
+    <tr><td>任务管理</td><td>TaskManager</td><td><span class="badge b-green">方式二 · 直连 JWKS</span></td><td>不经网关，本地拉公钥验签</td></tr>
+    <tr><td>事件管理</td><td>EventManager</td><td><span class="badge b-green">方式二 · 直连 JWKS</span></td><td>不经网关，本地拉公钥验签</td></tr>
+    <tr><td>发布系统</td><td>ReleaseManager</td><td><span class="badge b-amber">方式三 · 标准 OIDC</span></td><td>模拟外部系统，授权码 + PKCE 客户端</td></tr>
+  </tbody>
+</table>
+<div class="box"><b>设计意图：</b>三种方式各模拟一类真实企业场景——<strong>网关可覆盖的内部应用</strong>（方式一，业务零鉴权代码）、<strong>网关覆盖不到/跨网络的应用</strong>（方式二，自己实现一次验签）、<strong>标准第三方系统</strong>（方式三，走 OIDC 协议）。面试时"为什么这么分"是一道很好的论述题。</div>
+
+<h2><span class="no">04</span>身份统一：OpenLDAP + LAM</h2>
+<div class="diff">
+  <div class="col before">
+    <h4>改造前（各系统独立用户）</h4>
+    <ul>
+      <li>每个系统各自一套模拟用户，互不相同、互不通用</li>
+      <li>演示时要在每个系统分别登录、记多套账号密码</li>
+      <li>没有"一个人的统一身份"概念</li>
+    </ul>
+  </div>
+  <div class="col after">
+    <h4>改造后（统一身份源）</h4>
+    <ul>
+      <li>12 个全家桶用户灌入 <strong>OpenLDAP</strong>，密码统一 <code>demo1234</code></li>
+      <li>用户隶属<strong>组织</strong>（研发部/运维部…），不隶属某个系统</li>
+      <li>认证中心启用 LDAP 认证源（<code>AUTH_PROVIDER_ORDER=ldap,local</code>）</li>
+      <li>登录页：<strong>选择系统 → 选择用户（按组织分组）→ 固定密码</strong></li>
+      <li>管理界面：LDAP Account Manager（LAM，替换过时的 phpLDAPadmin）</li>
+    </ul>
+  </div>
+</div>
+<div class="box"><b>设计要点：</b>用户"隶属于组织而非系统"——<code>demo_systems</code> 字段仅用于登录下拉按系统分组，方便演示快速切换用户，不改变"用户属于组织"的身份语义。</div>
+
+<h2><span class="no">05</span>三种接入方式的链路</h2>
+<h3>方式一 · 经网关 forwardAuth（工单/云管/权限）</h3>
+<ol>
+  <li>用户经门户/统一入口访问业务系统（域名由统一网关接管）；</li>
+  <li>前端消费 SSO 令牌（<code>?token=</code> → localStorage → 请求带 <code>Authorization: Bearer</code>）；</li>
+  <li>网关 Traefik forwardAuth 拦截，转发认证中心 <code>/api/auth/verify</code> 验签；</li>
+  <li>通过后注入 <code>X-Auth-User / X-Auth-Username / X-Auth-Name / X-Auth-Source</code> 头放行；</li>
+  <li>业务后端 <strong>零鉴权代码</strong>，读注入头即知当前用户（on-the-fly 映射本地用户）。</li>
+</ol>
+
+<h3>方式二 · 直连 JWKS 验签（任务/事件）</h3>
+<ol>
+  <li>前端消费 SSO 令牌，请求直接到业务后端（不经网关）；</li>
+  <li>后端从 <code>/.well-known/jwks.json</code> 拉取公钥（5 分钟缓存）；</li>
+  <li>本地验 RS256 签名 + kid + 有效期（<code>verify_aud=False</code>）；</li>
+  <li>通过后从载荷读 <code>uid</code> 映射本地用户。</li>
+</ol>
+
+<h3>方式三 · 标准 OIDC 客户端（发布）</h3>
+<p>发布系统作为标准 OIDC 客户端，走<strong>授权码 + PKCE</strong>：门户注册应用、配置 redirect_uri 白名单、换取令牌建立用户会话——完整模拟外部第三方系统接入。</p>
+
+<h2><span class="no">06</span>前端闭环改造清单（5 个系统）</h2>
+<table>
+  <thead>
+    <tr><th>系统</th><th>框架</th><th>令牌 key</th><th>用户显示位置</th><th>改造点</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>云管</td><td>Vue 3</td><td><code>access_token</code></td><td>顶部导航</td><td>main.ts 消费 SSO + 网关同步显示名（unquote）+ URL 清理</td></tr>
+    <tr><td>工单</td><td>Vue 3</td><td><code>token</code></td><td>侧边栏</td><td>main.js 消费 SSO + fetchUser + URL 清理</td></tr>
+    <tr><td>权限中心</td><td>Vue 3</td><td><code>iam_token</code></td><td>布局顶部</td><td>main.ts 消费 SSO + 写用户信息 + URL 清理</td></tr>
+    <tr><td>任务管理</td><td>Vue 3</td><td><code>cmdb.token</code></td><td>顶栏（新增）</td><td>main.js 消费 + 拦截器带 Bearer + App.vue 用户显示</td></tr>
+    <tr><td>事件管理</td><td>React</td><td><code>event.token</code></td><td>侧边栏底部（新增）</td><td>main.tsx 消费 + api.ts 带 Bearer + Layout 用户显示</td></tr>
+  </tbody>
+</table>
+<div class="box"><b>统一模式：</b>读 <code>?token=</code> → 写入本地令牌 → <strong>立即清理地址栏 JWT</strong>（不留在 URL 历史）→ 请求统一带 Bearer → 拉取当前用户 → 界面展示。<strong>认证 / 授权分离</strong>：登录后全局可进所有系统；某系统没权限则空白，演示"申请权限"流程即可。</div>
+
+<h2><span class="no">07</span>网关关键配置与踩坑</h2>
+<h3>域名接管</h3>
+<p>内部系统前端纳入统一网关后，改用 <code>*.authentication.orb.local</code> 域（网关 label 声明）：</p>
+<ul>
+  <li><code>cloud / workflow / iam .authentication.orb.local</code> → 统一网关按 Host 分发到各前端；</li>
+  <li>后端 API 也走同一网关路由并挂 <code>auth-forward</code> 鉴权；</li>
+  <li>老域名 <code>*.devops.orb.local</code> 由 OrbStack 默认直连各前端容器，网关 label 抢不过（实测），故新域名更可控。</li>
+</ul>
+<h3>两个必须修的坑</h3>
+<table>
+  <thead>
+    <tr><th>现象</th><th>根因</th><th>修复</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>新域名 <code>/api/</code> 请求被后端当"invalid token"拒</td><td><code>mock-app-api</code> 是无 Host 的 <code>PathPrefix(/api/)</code> 兜底路由，抢占了业务系统域名请求</td><td>mock-app 路由限定 <code>Host(mock.authentication.orb.local)</code></td></tr>
+    <tr><td>加了 Host 仍绕过 forwardAuth</td><td>业务 <strong>API 路由与前端 home 路由 priority 相同（10）</strong>，<code>/api/</code> 被 home（前端 nginx 同源反代）抢占，直连后端绕过网关鉴权</td><td>业务 API 路由 priority 提到 <strong>100</strong></td></tr>
+  </tbody>
+</table>
+<div class="box"><b>教训：</b>这两个坑<strong>只有新域名会踩</strong>——老域名因不匹配 home 路由的 Host 反而"侥幸正常"，这就是为什么老域名验证全通、接新域名才暴露。此类问题<strong>任何环境（含 Linux 直接 Docker 部署）都可能出现</strong>，与 OrbStack 无关，是网关路由配置的通用问题。</div>
+
+<h2><span class="no">08</span>验证结果</h2>
+<div class="stat">
+  <div class="cell"><div class="n">5</div><div class="l">前端闭环系统</div></div>
+  <div class="cell"><div class="n">3</div><div class="l">接入方式</div></div>
+  <div class="cell"><div class="n">12</div><div class="l">LDAP 统一用户</div></div>
+  <div class="cell"><div class="n">200</div><div class="l">各系统 me/profile 验签</div></div>
+</div>
+<table>
+  <thead>
+    <tr><th>验证项</th><th>结果</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>工单 <code>GET /api/v1/users/me/</code>（统一 token 经网关）</td><td><span class="badge b-green">200 · alice</span></td></tr>
+    <tr><td>权限中心 <code>GET /api/v1/users/me</code>（经网关）</td><td><span class="badge b-green">200</span></td></tr>
+    <tr><td>云管 <code>GET /api/auth/profile/</code>（经网关，显示名 unquote）</td><td><span class="badge b-green">200 · 爱丽丝</span></td></tr>
+    <tr><td>任务管理 <code>GET /api/v1/auth/me/</code>（直连 JWKS）</td><td><span class="badge b-green">200 · alice / unified-jwks</span></td></tr>
+    <tr><td>事件管理 <code>GET /api/v1/auth/me</code>（直连 JWKS）</td><td><span class="badge b-green">200 · alice / unified-jwks</span></td></tr>
+    <tr><td>各前端 dist 含 SSO 消费 + URL 清理代码</td><td><span class="badge b-green">已确认</span></td></tr>
+    <tr><td>浏览器端到端（工单首轮实测 + 其余人工点验）</td><td><span class="badge b-amber">页面显示 alice、URL 无 token</span></td></tr>
+  </tbody>
+</table>
+
+<h2><span class="no">09</span>面试叙事要点</h2>
+<ul>
+  <li><strong>为什么三种方式？</strong>统一认证不是"一个接口接所有"，企业里内部应用、跨网应用、外部第三方天然分三类；本项目每种都真实落地，讲得出选择依据。</li>
+  <li><strong>认证 / 授权分离</strong>：认证中心只回答"你是谁"，权限中心回答"你能做什么"——这是企业 IAM 的基本架构观。</li>
+  <li><strong>身份源选型</strong>：LDAP 是企业的身份目录事实标准（AD/OpenLDAP），配 LAM 可视化运维，比"数据库存用户"更贴近生产。</li>
+  <li><strong>网关 forwardAuth 的价值</strong>：业务系统零鉴权代码，网关统一拦截/审计——内部系统首选。</li>
+  <li><strong>直连 JWKS 的取舍</strong>：不经网关但要多写一次验签，认证中心宕机不影响已发令牌——跨网络/高可用场景。</li>
+  <li><strong>前端闭环的工程细节</strong>：令牌放 localStorage 的取舍、URL 清理防泄漏、异步 bootstrap 防竞态、中文显示名 HTTP 头 latin-1 必须 quote/unquote。</li>
+</ul>
+
+<h2><span class="no">10</span>如何运行验证</h2>
+<ol>
+  <li>在 Authentication 目录 <code>docker compose up -d --build</code> 启动认证中心、统一网关、LDAP + LAM；</li>
+  <li>启动各业务系统（各自 docker compose），确认域名接管与网关路由生效；</li>
+  <li>门户登录（如 alice / demo1234）→ 应用广场点各系统 → 应直接进入并显示 alice；</li>
+  <li>地址栏不应残留 <code>?token=</code>；无权限系统空白，走权限中心申请即可。</li>
+</ol>
+
+<h2><span class="no">11</span>边界与后续（诚实声明）</h2>
+<ul>
+  <li>LDAP 为演示级（12 个用户、固定密码），未做密码策略/审计等生产能力；</li>
+  <li>部分系统浏览器端到端由人工点验完成，工具自动化验证覆盖 API 层与代码层；</li>
+  <li>后续可做：统一登出（logout 广播）、token 刷新统一处理、权限中心与各系统授权打通演示、发布系统 OIDC 客户端完整流程端到端验证。</li>
+</ul>
+
+</div>
+</body>
+</html>
