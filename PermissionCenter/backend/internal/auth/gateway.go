@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,6 +20,15 @@ func GatewayTrust() gin.HandlerFunc {
 		if username == "" {
 			c.Next() // 无网关头 → 交给原 jwtMiddleware 走 Bearer 解析
 			return
+		}
+		// 账号作用域收口：iam_ 前缀账号剥前缀映射本地（iam_alice→alice），admin 为全局超管；
+		// 其它系统账号（release_/workflow_/cloud_…）无权进入权限中心 → 明确拒绝
+		if username != "admin" {
+			if !strings.HasPrefix(username, "iam_") {
+				c.AbortWithStatusJSON(403, gin.H{"error": "账号未在权限中心开通"})
+				return
+			}
+			username = strings.TrimPrefix(username, "iam_")
 		}
 		c.Set("claims", &Claims{
 			SubjectType: 1,        // 用户

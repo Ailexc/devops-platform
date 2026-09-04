@@ -85,10 +85,18 @@ def oidc_callback(request):
     username = claims.get('uid') or claims.get('preferred_username') or claims.get('sub')
     if not username:
         return Response({'code': 400, 'message': 'id_token 缺少用户名'}, status=400)
-    user, _ = User.objects.get_or_create(
-        username=username,
-        defaults={'display_name': claims.get('name', username), 'is_active': True},
+    # 账号作用域收口：release_ 前缀账号 → 剥前缀映射本地（release_zhangsan→zhangsan）；
+    # admin 为全局超管；本地未开通/不存在的账号 → 明确拒绝（授权由发布系统本地自治）
+    local = 'admin' if username == 'admin' else (
+        username[len('release_'):] if username.startswith('release_') else None
     )
+    if local is None:
+        return Response({'code': 403, 'message': f'该账号（{username}）未在发布系统开通'},
+                        status=403)
+    user = User.objects.filter(username=local, is_active=True).first()
+    if user is None:
+        return Response({'code': 403, 'message': f'该账号（{username}）未在发布系统开通'},
+                        status=403)
     refresh = RefreshToken.for_user(user)
     # 标准 OIDC 授权码闭环：成功后 302 回前端 /login?token=<本地JWT>（SPA 读取后清理 URL，随后拉用户/权限）
     base = os.environ.get("APP_URL_RELEASE_MANAGER", "http://release.devops.orb.local").rstrip("/")

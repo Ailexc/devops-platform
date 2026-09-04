@@ -70,7 +70,10 @@ class UnifiedJWTAuthentication(BaseAuthentication):
         username = payload.get("uid") or payload.get("preferred_username") or payload.get("sub")
         if not username:
             raise AuthenticationFailed("令牌缺少用户名")
+        # 账号作用域收口：任务管理演示仅限全局超管 admin（本系统无切换用户场景）
+        if username != "admin":
+            raise AuthenticationFailed("任务管理演示仅限系统管理员（admin）")
         user, _ = get_user_model().objects.get_or_create(
-            username=username, defaults={"is_active": True}
+            username="admin", defaults={"is_active": True}
         )
         return (user, None)

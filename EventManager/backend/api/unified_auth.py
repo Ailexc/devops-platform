@@ -63,7 +63,10 @@ class UnifiedJWTAuth(HttpBearer):
         username = payload.get("uid") or payload.get("preferred_username") or payload.get("sub")
         if not username:
             return None
+        # 账号作用域收口：事件管理演示仅限全局超管 admin（本系统无切换用户场景）
+        if username != "admin":
+            return None
         user, _ = get_user_model().objects.get_or_create(
-            username=username, defaults={"is_active": True}
+            username="admin", defaults={"is_active": True}
         )
         return user

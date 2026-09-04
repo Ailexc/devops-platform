@@ -11,21 +11,38 @@
 """
 from django.contrib.auth import get_user_model
 from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
 
 User = get_user_model()
 
 
 class GatewayAuthentication(BaseAuthentication):
-    """信任统一网关注入的 X-Auth-Username 身份头。"""
+    """信任统一网关注入的 X-Auth-Username 身份头。
+
+    账号作用域收口：网关注入用户名为「workflow_前缀 + 本名」（workflow_xiaoming），
+    admin 为全局超管；本地已开通才放行，未开通明确拒绝。
+    """
 
     keyword = "Gateway"
+    # 本系统账号前缀
+    PREFIX = "workflow_"
+
+    @staticmethod
+    def map_local(raw: str) -> str | None:
+        if raw == "admin":
+            return "admin"  # 全局超管
+        if raw.startswith(GatewayAuthentication.PREFIX):
+            return raw[len(GatewayAuthentication.PREFIX):]  # workflow_xiaoming → xiaoming
+        return None
 
     def authenticate(self, request):
         username = request.META.get("HTTP_X_AUTH_USERNAME")
         if not username:
             return None  # 无网关头 → 交回原认证链
-        user, _ = User.objects.get_or_create(
-            username=username,
-            defaults={"is_active": True},
-        )
+        local = self.map_local(username)
+        if local is None:
+            raise AuthenticationFailed("该账号未在工单系统开通")
+        user = User.objects.filter(username=local, is_active=True).first()
+        if user is None:
+            raise AuthenticationFailed("该账号未在工单系统开通")
         return (user, None)
