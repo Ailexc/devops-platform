@@ -7,6 +7,7 @@
 """
 import base64
 import hashlib
+import os
 import secrets
 import time
 
@@ -14,10 +15,17 @@ import jwt
 import requests
 
 # 统一认证中心（发布系统后端与认证中心同处 devops-net）
-AUTH_ISSUER = "http://auth-backend:8000"
+#  - AUTH_ISSUER：后端换 token / 拉 JWKS 用的内网地址（容器间直连，浏览器不可达）
+#  - AUTH_AUTHORIZE_URL：302 跳转给浏览器的认证中心授权地址
+#    （服务器 = http://<SERVER_IP>:8099/oauth/authorize；本地 = 内网后端）
+#  - OIDC_REDIRECT_URI：授权码回跳地址，必须与认证中心注册的白名单一致
+#    （服务器由 APP_URL_RELEASE_MANAGER 派生 = http://<SERVER_IP>:8093/oauth/callback）
+AUTH_ISSUER = os.environ.get("AUTH_ISSUER", "http://auth-backend:8000")
 OIDC_CLIENT_ID = "release-manager-app"
 OIDC_CLIENT_SECRET = "release-secret-123456"
-OIDC_REDIRECT_URI = "http://release.devops.orb.local/oauth/callback"
+_RELEASE_BASE = os.environ.get("APP_URL_RELEASE_MANAGER", "http://release.devops.orb.local")
+OIDC_REDIRECT_URI = f"{_RELEASE_BASE.rstrip('/')}/oauth/callback"
+AUTH_AUTHORIZE_URL = os.environ.get("AUTH_AUTHORIZE_URL", f"{AUTH_ISSUER}/oauth/authorize")
 JWKS_URL = f"{AUTH_ISSUER}/.well-known/jwks.json"
 
 _jwks_cache = {"keys": None, "fetched": 0.0}
@@ -98,4 +106,4 @@ def build_authorize_url(state: str, code_challenge: str) -> str:
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
     })
-    return f"{AUTH_ISSUER}/oauth/authorize?{q}"
+    return f"{AUTH_AUTHORIZE_URL}?{q}"

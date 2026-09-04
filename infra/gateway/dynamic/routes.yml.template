@@ -1,8 +1,10 @@
 # ============================================================
 # 统一网关动态路由：Host 规则 → 各系统 frontend（devops-net 服务名）
 # 各目标容器必须已加入 devops-net 网络
-# 方案 B：另加多端口纯 IP 路由，每个 entryPoint 对应一个系统，
-#         面试官无需 hosts 映射，http://114.55.244.220:<port> 直达
+#
+# ⚠️  本文件是模板，部署时由 scripts/generate-routes.sh 自动生成 routes.yml
+#     IP 地址由 deploy/<env>/.env.<env> 中的 SERVER_IP 变量注入
+#     请勿手动编辑 routes.yml，应修改本模板后重新生成
 # ============================================================
 http:
   middlewares:
@@ -20,7 +22,7 @@ http:
 
   routers:
     portal:
-      rule: "Host(`devops.orb.local`) || Host(`portal.devops.orb.local`) || Host(`114.55.244.220`)"
+      rule: "Host(`devops.orb.local`) || Host(`portal.devops.orb.local`) || Host(`__SERVER_IP__`)"
       entryPoints: ["web"]
       service: portal
 
@@ -54,36 +56,63 @@ http:
       entryPoints: ["web"]
       service: workflow
 
-    # ===== 方案 B：多端口纯 IP 路由（对外预览，免 hosts 映射）=====
+    # ===== 多端口纯 IP 路由（对外预览，免 hosts 映射）=====
     cmdb-ip:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-cmdb"]
       service: cmdb
 
     cloud-ip:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-cloud"]
       service: cloud
 
+    # 方式一「统一网关 forwardAuth」：/api 由网关校验统一 JWT → 注入 X-Auth-* 后直达后端（后端零鉴权，只读 X-Auth-*）
+    cloud-ip-api:
+      rule: "Host(`__SERVER_IP__`) && PathPrefix(`/api/`)"
+      entryPoints: ["web-cloud"]
+      service: cloud-backend
+      middlewares:
+        - auth-forward
+      priority: 100
+
     workflow-ip:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-workflow"]
       service: workflow
 
+    # 方式一「统一网关 forwardAuth」：工单中心 /api/v1 鉴权后直达后端
+    workflow-ip-api:
+      rule: "Host(`__SERVER_IP__`) && PathPrefix(`/api/v1/`)"
+      entryPoints: ["web-workflow"]
+      service: workflow-backend
+      middlewares:
+        - auth-forward
+      priority: 100
+
     event-ip:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-event"]
       service: event
 
     release-ip:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-release"]
       service: release
 
     iam-ip:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-iam"]
       service: iam
+
+    # 方式一「统一网关 forwardAuth」：权限中心 /api/v1 鉴权后直达后端
+    iam-ip-api:
+      rule: "Host(`__SERVER_IP__`) && PathPrefix(`/api/v1/`)"
+      entryPoints: ["web-iam"]
+      service: iam-backend
+      middlewares:
+        - auth-forward
+      priority: 100
 
     # 认证 API 直连（调试/演示用）
     api-auth:
@@ -92,9 +121,8 @@ http:
       service: auth-api
 
     # ===== Demo 应用 + 认证 API：多端口纯 IP 路由 =====
-    # mock-app / pilot-app 的 /api/* 经 forwardAuth 鉴权，首页免鉴权（SPA 读 token）
     mock-ip-api:
-      rule: "Host(`114.55.244.220`) && PathPrefix(`/api/`)"
+      rule: "Host(`__SERVER_IP__`) && PathPrefix(`/api/`)"
       entryPoints: ["web-mock"]
       service: mock-app
       middlewares:
@@ -102,13 +130,13 @@ http:
       priority: 10
 
     mock-ip-home:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-mock"]
       service: mock-app
       priority: 1
 
     pilot-ip-api:
-      rule: "Host(`114.55.244.220`) && PathPrefix(`/api/`)"
+      rule: "Host(`__SERVER_IP__`) && PathPrefix(`/api/`)"
       entryPoints: ["web-pilot"]
       service: pilot-app
       middlewares:
@@ -116,23 +144,23 @@ http:
       priority: 10
 
     pilot-ip-home:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-pilot"]
       service: pilot-app
       priority: 1
 
     direct-ip:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-direct"]
       service: direct-app
 
     oidc-ip:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-oidc"]
       service: oidc-demo
 
     auth-api-ip:
-      rule: "Host(`114.55.244.220`)"
+      rule: "Host(`__SERVER_IP__`)"
       entryPoints: ["web-auth-api"]
       service: auth-api
 
@@ -140,6 +168,13 @@ http:
     traefik:
       rule: "Host(`traefik.devops.orb.local`)"
       entryPoints: ["web"]
+      service: api@internal
+
+    # Traefik Dashboard —— 独立端口纯 IP 直达（免 hosts）：http://<SERVER_IP>:8086/dashboard/
+    # 放独立 entryPoint(web-dash)，不与门户 8088 的 /api 冲突
+    dashboard-ip:
+      rule: "Host(`__SERVER_IP__`)"
+      entryPoints: ["web-dash"]
       service: api@internal
 
   services:
@@ -152,6 +187,22 @@ http:
       loadBalancer:
         servers:
           - url: "http://cloud_manager_nginx:80"
+
+    # 方式一「统一网关 forwardAuth」直达后端（多端口纯 IP，devops-net 服务名）
+    cloud-backend:
+      loadBalancer:
+        servers:
+          - url: "http://cloud_manager_backend:8000"
+
+    workflow-backend:
+      loadBalancer:
+        servers:
+          - url: "http://workflow-api:8000"
+
+    iam-backend:
+      loadBalancer:
+        servers:
+          - url: "http://permission-center-iam-server-1:8080"
 
     event:
       loadBalancer:

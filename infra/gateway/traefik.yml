@@ -27,6 +27,10 @@ entryPoints:
     address: ":8098"
   web-auth-api:
     address: ":8099"
+  # Traefik Dashboard 独立入口（纯 IP：http://<SERVER_IP>:8086/dashboard/）
+  # 不与门户共用 8088（dashboard 的 /api/* 与门户 /api 冲突）
+  web-dash:
+    address: ":8086"
 
 providers:
   file:

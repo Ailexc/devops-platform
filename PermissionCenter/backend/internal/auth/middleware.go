@@ -19,6 +19,12 @@ var AdminRoleSet = []string{RoleUser, RoleAppOwner, RoleAuditAdmin}
 // Middleware 管理 API 认证：解析 Bearer token，注入 claims 到 context
 func Middleware(m *Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 网关 forwardAuth 已校验统一 JWT 并注入身份（见 GatewayTrust）：
+		// 身份已由网关统一认证，本地无需再解析 Bearer，直接放行本地授权
+		if c.GetBool("gateway_trusted") {
+			c.Next()
+			return
+		}
 		h := c.GetHeader("Authorization")
 		if !strings.HasPrefix(h, "Bearer ") {
 			c.AbortWithStatusJSON(401, gin.H{"error": "missing token"})

@@ -1,11 +1,11 @@
 package seed
+
 // Package seed 提供 EventManager Go 栈的统一幂等种子逻辑。
 //
 // 设计目标（对齐"启动时幂等种子"标准，替换独立 go-seed 容器）：
 //   - go-api 启动时调用 EnsureDemoData，空库自动灌入演示数据，非空跳过（不覆盖真实/运行数据）
 //   - Handler 配置用 FirstOrCreate 幂等同步
 //   - 需要强制重灌时（make reset / 手动），先清空库或传 force=true
-package seed
 
 import (
 	"encoding/json"

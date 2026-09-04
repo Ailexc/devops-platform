@@ -108,8 +108,7 @@ services:
   portal:
     build: ./frontend
     container_name: authentication-portal
-    ports:
-      - "5175:80"
+    # 不对外暴露端口，通过统一网关（:8088）访问
     depends_on:
       - auth-backend
     labels:

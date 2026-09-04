@@ -1,3 +1,5 @@
+import os
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -88,15 +90,9 @@ def oidc_callback(request):
         defaults={'display_name': claims.get('name', username), 'is_active': True},
     )
     refresh = RefreshToken.for_user(user)
-    return Response({
-        'code': 200,
-        'data': {
-            'token': str(refresh.access_token),
-            'user': UserSerializer(user).data,
-            'permissions': get_user_effective_permissions(user),
-            'sso': 'oidc',
-        }
-    })
+    # 标准 OIDC 授权码闭环：成功后 302 回前端 /login?token=<本地JWT>（SPA 读取后清理 URL，随后拉用户/权限）
+    base = os.environ.get("APP_URL_RELEASE_MANAGER", "http://release.devops.orb.local").rstrip("/")
+    return redirect(f"{base}/login?token={str(refresh.access_token)}")
 
 
 @api_view(['GET'])

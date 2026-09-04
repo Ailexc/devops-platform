@@ -93,7 +93,12 @@ fi
 log "冒烟测试：验证各系统 HTTP 可达 ..."
 
 # 等待统一网关就绪（端口可连，避免 up 后立即探测返回 000）
-HOST_HEADER="${DEMO_RESET_HOST:-114.55.244.220}"
+# Host 头按环境适配：cloud=公网 IP / server=服务器 IP / local=OrbStack 域名（可被 DEMO_RESET_HOST 覆盖）
+case "${ENV:-local}" in
+  cloud)  HOST_HEADER="${DEMO_RESET_HOST:-114.55.244.220}" ;;
+  server) HOST_HEADER="${DEMO_RESET_HOST:-${SERVER_IP:-192.168.3.155}}" ;;
+  *)      HOST_HEADER="${DEMO_RESET_HOST:-portal.devops.orb.local}" ;;
+esac
 GATEWAY_PORT="${DEMO_RESET_GATEWAY_PORT:-8088}"
 log "等待网关（${GATEWAY_PORT}）就绪 ..."
 GATEWAY_OK=0
@@ -145,6 +150,9 @@ if [ "$FAIL" = "0" ]; then
     if [ "$ENV" = "cloud" ]; then
       # 云端：ECS 公网 IP 直达
       PORTAL_URL="http://${HOST_HEADER}:${GATEWAY_PORT}/"
+    elif [ "$ENV" = "server" ]; then
+      # 自建服务器：SERVER_IP 直达（纯 IP 多端口）
+      PORTAL_URL="http://${SERVER_IP:-${HOST_HEADER}}:${GATEWAY_PORT}/"
     else
       # 本地：OrbStack 自动 DNS 域名（经统一网关 8088）
       PORTAL_URL="http://portal.devops.orb.local:${GATEWAY_PORT}/"

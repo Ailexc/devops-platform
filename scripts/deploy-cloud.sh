@@ -85,15 +85,23 @@ echo ""
 echo "── 统一基础设施健康 ──"
 docker ps --format '{{.Names}}\t{{.Status}}' | grep -E 'devops-postgres|devops-redis|devops-rabbitmq' | grep healthy || echo "（部分基础设施未 healthy）"
 echo ""
-echo "── 门户 + 7 系统（Host 头直测）──"
-BASE="http://localhost:8088"
-for h in devops portal cloud event iam release cmdb workflow api.auth; do
-  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${h}.devops.orb.local" "$BASE/" 2>/dev/null || echo ERR)
-  echo "  ${h}.devops.orb.local  →  ${code}"
-done
-echo ""
-echo "── IP 直达门户 ──"
-echo "  http://114.55.244.220:8088 → $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/ 2>/dev/null || echo ERR)"
+echo "── 门户 + 7 系统（纯 IP 多端口直测，免 hosts 映射）──"
+PUBLIC_HOST="${PORTAL_URL#*//}"; PUBLIC_HOST="${PUBLIC_HOST%%:*}"
+# 网关按 Host(<公网IP>) 匹配路由 → Host 头 + localhost 直测，规避 NAT hairpin 不可达
+check_port() {
+  local name="$1" port="$2"
+  local code
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${PUBLIC_HOST}" "http://localhost:${port}/" 2>/dev/null || echo ERR)
+  printf "  %-6s  %-18s HTTP %s\n" "${PUBLIC_HOST}:${port}" "${name}" "${code}"
+}
+check_port "8088 门户 Portal"        8088
+check_port "8089 任务 TaskManager"   8089
+check_port "8090 多云 CloudManager"  8090
+check_port "8091 流程 WorkFlowCenter" 8091
+check_port "8092 事件 EventManager"  8092
+check_port "8093 发布 ReleaseManager" 8093
+check_port "8094 权限 PermissionCenter" 8094
 echo ""
 echo "=================================================="
-ok "部署完成！公网访问：http://114.55.244.220:8088（各系统见 docs/commands.md Host 头映射）"
+ok "部署完成！门户：http://${PUBLIC_HOST}:8088"
+ok "各系统多端口直连：8089 任务 / 8090 多云 / 8091 流程 / 8092 事件 / 8093 发布 / 8094 权限"

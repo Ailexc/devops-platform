@@ -69,15 +69,29 @@ ps: status ## 同 status
 logs: ## 查看单项目日志（make logs P=auth）
 	@bash scripts/compose.sh logs "$(P)"
 
-portal: ## 打开统一门户（本地 Authentication Portal）
-	@open http://portal.authentication.orb.local 2>/dev/null || echo "门户地址：http://portal.authentication.orb.local"
+portal: ## 打开统一门户（本地 OrbStack 用 orb.local；服务器用 SERVER_IP:8088）
+	@SERVER_IP=$$(grep '^SERVER_IP=' deploy/server/.env.server 2>/dev/null | cut -d= -f2); \
+	if [ -n "$$SERVER_IP" ]; then \
+		echo "门户地址：http://$$SERVER_IP:8088"; \
+	else \
+		open http://portal.authentication.orb.local 2>/dev/null || echo "门户地址：http://portal.authentication.orb.local"; \
+	fi
 
 gateway-up: ## 启动统一网关（Traefik 聚合 7 系统，入口 *.devops.orb.local）
+	@bash scripts/generate-routes.sh
 	@$(DC) -f infra/gateway/docker-compose.yml up -d
-	@echo "统一入口：http://portal.devops.orb.local （Dashboard: http://traefik.devops.orb.local）"
+	@SERVER_IP=$$(grep '^SERVER_IP=' deploy/server/.env.server 2>/dev/null | cut -d= -f2); \
+	if [ -n "$$SERVER_IP" ]; then \
+		echo "统一入口：http://$$SERVER_IP:8088 （Dashboard: http://$$SERVER_IP:8086/dashboard/）"; \
+	else \
+		echo "统一入口：http://portal.devops.orb.local （Dashboard: http://traefik.devops.orb.local）"; \
+	fi
 
 gateway-down: ## 停止统一网关
 	@$(DC) -f infra/gateway/docker-compose.yml down
 
 gateway-ps: ## 查看统一网关状态与路由
 	@$(DC) -f infra/gateway/docker-compose.yml ps
+
+deploy-server: ## 一键部署到本地/自建服务器（构建 iam 镜像 + bootstrap + start + gateway + 验证）
+	@bash scripts/deploy-server.sh $(RESET)

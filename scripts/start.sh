@@ -69,4 +69,9 @@ else
   log "全部项目已启动"
 fi
 
-log "启动完成。统一门户: http://portal.authentication.orb.local"
+# 就绪提示按环境区分：本地 OrbStack 用 orb.local 域名；服务器用 SERVER_IP:8088
+if [ "${ENV:-}" = "server" ] || [ "${ENV:-}" = "cloud" ]; then
+  log "启动完成。统一门户: ${PORTAL_URL:-http://${SERVER_IP:-localhost}:8088}"
+else
+  log "启动完成。统一门户: http://portal.authentication.orb.local"
+fi

@@ -56,7 +56,7 @@ export default function LoginPage() {
           </p>
         )}
         <div className="login-footer">
-          演示账号：admin / admin1234（管理员）<br />
+          演示账号：admin / demo1234（管理员）<br />
           zhangsan / demo1234（普通用户）
         </div>
       </div>

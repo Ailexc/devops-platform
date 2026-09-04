@@ -48,9 +48,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: workflow-frontend
-    ports:
-      - "80:80"
-      - "443:443"
+    # 不对外暴露端口，通过统一网关（:8088）访问
     labels:
       dev.orbstack.domains: frontend.workflow.orb.local
     depends_on:

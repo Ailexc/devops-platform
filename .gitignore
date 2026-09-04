@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !.env.cloud
+!.env.server
 # 演示环境 .env 允许提交（无真实密钥，便于 git clone 后一键部署）
 !Authentication/.env
 !CloudManager/.env
@@ -50,5 +51,12 @@ EventManager/backend-go/*.out
 *.log
 *.tmp
 
+# ---- 镜像打包产物（服务器 docker load 导入用，勿入仓）----
+devops-images.tar
+._devops-images.tar
+
 # ---- 容器编排缓存 ----
 .dockerignore-generated/
+
+# ---- 网关路由（模板生成，不入仓）----
+infra/gateway/dynamic/routes.yml

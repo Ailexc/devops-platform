@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Select, Button, Card, Typography, Space } from 'antd';
-import { UserOutlined } from '@ant-design/icons';
+import { Form, Select, Button, Card, Typography, Space, Divider } from 'antd';
+import { SafetyOutlined, UserOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApi } from '../../api';
 import { useState } from 'react';
@@ -17,8 +17,19 @@ interface UserOption {
 export default function LoginPage() {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuthStore();
+  const { login, loadUser } = useAuthStore();
   const navigate = useNavigate();
+
+  // SSO(OIDC) 回调：认证中心授权后后端 302 回 /login?token=<本地JWT> → 存 localStorage 并清理 URL
+  useEffect(() => {
+    const tok = new URLSearchParams(window.location.search).get('token');
+    if (!tok) return;
+    localStorage.setItem('access_token', tok);
+    window.history.replaceState({}, '', window.location.pathname);
+    useAuthStore.setState({ token: tok, user: null });
+    loadUser().finally(() => navigate('/dashboard', { replace: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     userApi.list().then((res: any) => {
@@ -82,6 +93,17 @@ export default function LoginPage() {
               </Button>
             </Form.Item>
           </Form>
+          <Divider>或</Divider>
+          <Button
+            type="primary"
+            block
+            size="large"
+            ghost
+            icon={<SafetyOutlined />}
+            href="/oauth/login"
+          >
+            统一认证登录（SSO · OIDC）
+          </Button>
         </Space>
       </Card>
     </div>
