@@ -171,7 +171,7 @@ def sso_url(app_id: str, request: Request, user: User = Depends(get_current_user
         raise HTTPException(status.HTTP_404_NOT_FOUND, "应用不存在或未启用")
     # 无需签发统一 JWT / ?token= 注入的应用：
     #  - sso_type=oidc（方式三 OIDC 标准客户端：由应用侧发起授权码流完成登录，token 不经 URL）
-    #  - access_mode=external（独立管理入口，如 LDAP Account Manager，独立登录）
+    #  - access_mode=external（独立管理界面如 LAM，有自身登录体系，纯入口跳转）
     if app.sso_type == "oidc" or app.access_mode == "external":
         # Release 后端已提供 /oauth/login 作为 OIDC 授权码流入口（nginx → 认证中心）→ 一键直达
         url = f"{app.home_url.rstrip('/')}/oauth/login" if app.app_id == "release-manager" else app.home_url

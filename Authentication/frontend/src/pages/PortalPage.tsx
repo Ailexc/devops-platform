@@ -110,9 +110,9 @@ export default function PortalPage() {
                     >
                       <Tag
                         style={{ position: 'absolute', top: 12, right: 12, margin: 0 }}
-                        color={app.access_mode === 'direct' ? 'purple' : 'blue'}
+                        color={app.access_mode === 'direct' ? 'purple' : app.access_mode === 'external' ? 'orange' : 'blue'}
                       >
-                        {app.access_mode === 'direct' ? '直连接入' : '网关接入'}
+                        {app.access_mode === 'direct' ? '直连接入' : app.access_mode === 'external' ? '独立管理' : '网关接入'}
                       </Tag>
                       <div className="app-icon" style={{ background: color }}>
                         {icon}

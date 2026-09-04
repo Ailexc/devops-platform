@@ -70,7 +70,8 @@ def _portal_url(default: str = "http://portal.authentication.orb.local") -> str:
 
 
 # 应用注册表（门户应用广场）
-# access_mode：gateway=经统一网关 forwardAuth；direct=业务后端 JWKS 自验签 / OIDC 客户端
+# access_mode：gateway=经统一网关 forwardAuth；direct=业务后端 JWKS 自验签 / OIDC 客户端；
+#              external=独立管理界面（如 LAM），门户仅提供入口跳转（sso-url 不签发统一 JWT）
 # home_url 说明：
 #   - 6 个业务系统 → 统一网关 *.devops.orb.local（Phase 3，本地 OrbStack 自动 DNS）
 #   - mock/direct（认证中心自带演示应用）→ authentication.orb.local 真实域名
@@ -98,6 +99,8 @@ SEED_APPS = [
      "icon": "ApiOutlined", "home_url": _home_url("direct-app", "http://direct.authentication.orb.local"), "sort_order": 8, "access_mode": "direct", "redirect_uris": []},
     {"app_id": "pilot-app", "name": "工单中心 PilotApp", "description": "试点接入示例：模拟真实业务系统接入统一认证",
      "icon": "DatabaseOutlined", "home_url": _home_url("pilot-app", "http://localhost:8004"), "sort_order": 9, "access_mode": "gateway", "redirect_uris": []},
+    {"app_id": "lam", "name": "LDAP 目录管理 LAM", "description": "OpenLDAP 可视化管理界面（身份目录运维，独立登录）",
+     "icon": "ContactsOutlined", "home_url": _home_url("lam", "http://ldapadmin.authentication.orb.local"), "sort_order": 11, "access_mode": "external", "redirect_uris": []},
     {"app_id": "oidc-demo", "name": "OIDC 演示应用", "description": "演示 OIDC 授权码模式接入（code+client_secret 换 token）",
      "icon": "CodeOutlined", "home_url": _home_url("oidc-demo", "http://localhost:8005"), "sort_order": 10, "sso_type": "oidc", "access_mode": "direct",
      "client_id": "oidc-demo-app", "client_secret": "oidc-demo-secret-123456",
