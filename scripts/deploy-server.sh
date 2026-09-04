@@ -66,6 +66,31 @@ fi
 log "初始化 PermissionCenter 数据（iam-server seed：用户/应用/授权模型）..."
 docker compose -f PermissionCenter/deploy/docker-compose.yml run --rm iam-server iam-server seed
 
+# ---------- 5.6 LDAP 身份目录 + LAM 管理台（统一身份源演示，profile ldap）----------
+# 注：daocloud 加速白名单不含 osixia/ldapaccountmanager → 用 docker.1ms.run 拉取后 tag 成本名
+ensure_image() {
+  local img="$1" src="$2"
+  docker image inspect "$img" >/dev/null 2>&1 && return 0
+  log "拉取镜像 $img（源：$src）..."
+  if docker pull "$src"; then docker tag "$src" "$img"; else docker pull "$img" || return 1; fi
+}
+ensure_image "osixia/openldap:1.5.0" "docker.1ms.run/osixia/openldap:1.5.0"
+ensure_image "ldapaccountmanager/lam:stable" "docker.1ms.run/ldapaccountmanager/lam:stable"
+log "启动 LDAP 身份目录 + LAM 管理台（:8083）..."
+( cd Authentication && docker compose --profile ldap up -d )
+
+# ---------- 5.7 ReleaseManager 演示数据（身份走 OIDC、授权/数据本地自治）----------
+# 发布系统 RBAC/应用/发布等本地数据由 management command 种入；
+# 若不 seed，本地用户无角色/无业务数据（张三看不到任何应用，曾踩坑）
+log "初始化 ReleaseManager 演示数据（init_seed：RBAC/应用；seed_releases：发布流水线）..."
+docker exec release-backend python manage.py init_seed 2>/dev/null || true
+docker exec release-backend python manage.py seed_releases 2>/dev/null || true
+
+# ---------- 5.8 WorkFlowCenter 工单演示数据（用户/工单/待办/审批）----------
+log "初始化 WorkFlowCenter 演示数据（seed_data + seed_demo_data）..."
+docker exec workflow-api python manage.py seed_data 2>/dev/null || true
+docker exec workflow-api python manage.py seed_demo_data 2>/dev/null || true
+
 # ---------- 6. 统一网关（8088）----------
 log "启动统一网关（入口 :8088）"
 make gateway-up

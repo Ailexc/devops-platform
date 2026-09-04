@@ -4,58 +4,61 @@ import os
 import secrets
 
 from .db import SessionLocal
-from .models import AppRegistration, User
+from .models import AppRegistration, AuthCode, RefreshToken, User
 from .security import hash_password
 
 logger = logging.getLogger("auth.seed")
 
-# 统一演示账号（全家桶固定用户体系，与 LDAP 目录一致；密码统一 demo1234）
+# 统一演示账号（账号作用域化：每个业务系统使用「系统前缀 + 本名」的独立账号，
+# 从根上避免 admin/张三 等通用名跨系统撞车；密码统一 demo1234）
+#  - admin：全局门户超管（demo_systems=全部系统，SSO 进各系统映射为本地 admin 超管）
+#  - 其余：<系统前缀>_<本名>，demo_systems 白名单 = 仅该系统（登录分组/可访问性严格隔离）
 # source=ldap：身份来自统一 LDAP 目录（本地保留同密码哈希，作为 LDAP 不可用时的 local 兜底）
-# demo_systems：仅登录页下拉「按系统分组」的演示索引（用户真正归属是 department 组织，非系统）
 SEED_USERS = [
-    # 平台组 / 超管
+    # 全局超管（门户/各系统管理员）
     {"username": "admin", "password": "demo1234", "display_name": "系统管理员",
      "email": "admin@devops.com", "department": "平台组", "is_admin": True, "source": "ldap",
      "demo_systems": ["cloud-manager", "workflow-center", "permission-center", "task-manager", "event-manager", "release-manager"]},
-    # 研发部
-    {"username": "zhangsan", "password": "demo1234", "display_name": "张三",
+    # 发布系统 ReleaseManager
+    {"username": "release_zhangsan", "password": "demo1234", "display_name": "张三",
      "email": "zhangsan@devops.com", "department": "研发部", "source": "ldap",
-     "demo_systems": ["cloud-manager", "workflow-center", "task-manager", "event-manager"]},
-    {"username": "xiaoming", "password": "demo1234", "display_name": "小明",
+     "demo_systems": ["release-manager"]},
+    {"username": "release_lisi", "password": "demo1234", "display_name": "李四",
+     "email": "lisi@devops.com", "department": "运维部", "source": "ldap",
+     "demo_systems": ["release-manager"]},
+    {"username": "release_wangwu", "password": "demo1234", "display_name": "王五",
+     "email": "wangwu@devops.com", "department": "测试部", "source": "ldap",
+     "demo_systems": ["release-manager"]},
+    # 工单系统 WorkFlowCenter
+    {"username": "workflow_xiaoming", "password": "demo1234", "display_name": "小明",
      "email": "xiaoming@devops.com", "department": "研发部", "source": "ldap",
      "demo_systems": ["workflow-center"]},
-    {"username": "readonly", "password": "demo1234", "display_name": "只读用户",
-     "email": "readonly@devops.com", "department": "研发部", "source": "ldap",
-     "demo_systems": ["cloud-manager"]},
-    # 运维部
-    {"username": "lisi", "password": "demo1234", "display_name": "李四",
-     "email": "lisi@devops.com", "department": "运维部", "source": "ldap",
-     "demo_systems": ["cloud-manager", "workflow-center", "task-manager", "event-manager"]},
-    {"username": "ops_user", "password": "demo1234", "display_name": "运维工程师",
-     "email": "ops_user@devops.com", "department": "运维部", "source": "ldap",
-     "demo_systems": ["cloud-manager", "event-manager"]},
-    {"username": "xiaoli", "password": "demo1234", "display_name": "小李",
+    {"username": "workflow_xiaoli", "password": "demo1234", "display_name": "小李",
      "email": "xiaoli@devops.com", "department": "运维部", "source": "ldap",
      "demo_systems": ["workflow-center"]},
-    # 测试部
-    {"username": "wangwu", "password": "demo1234", "display_name": "王五",
-     "email": "wangwu@devops.com", "department": "测试部", "source": "ldap",
-     "demo_systems": ["task-manager", "event-manager"]},
-    # 云平台组（云管 CloudManager 专属）
+    {"username": "workflow_xiaohong", "password": "demo1234", "display_name": "小红",
+     "email": "xiaohong@devops.com", "department": "研发部", "source": "ldap",
+     "demo_systems": ["workflow-center"]},
+    # 云管系统 CloudManager（cloud_admin 原名已带系统语义且唯一，不重复加前缀）
     {"username": "cloud_admin", "password": "demo1234", "display_name": "云管理员",
      "email": "cloud_admin@devops.com", "department": "云平台组", "source": "ldap",
      "demo_systems": ["cloud-manager"]},
-    # 研发中心（权限中心 PermissionCenter）
-    {"username": "alice", "password": "demo1234", "display_name": "爱丽丝",
+    {"username": "cloud_ops_user", "password": "demo1234", "display_name": "运维工程师",
+     "email": "ops_user@devops.com", "department": "运维部", "source": "ldap",
+     "demo_systems": ["cloud-manager"]},
+    {"username": "cloud_readonly", "password": "demo1234", "display_name": "只读用户",
+     "email": "readonly@devops.com", "department": "研发部", "source": "ldap",
+     "demo_systems": ["cloud-manager"]},
+    # 权限中心 PermissionCenter
+    {"username": "iam_alice", "password": "demo1234", "display_name": "爱丽丝",
      "email": "alice@devops.com", "department": "研发中心", "source": "ldap",
-     "demo_systems": ["permission-center", "cloud-manager"]},
-    {"username": "bob", "password": "demo1234", "display_name": "鲍勃",
+     "demo_systems": ["permission-center"]},
+    {"username": "iam_bob", "password": "demo1234", "display_name": "鲍勃",
      "email": "bob@devops.com", "department": "研发中心", "source": "ldap",
      "demo_systems": ["permission-center"]},
-    # 运维平台（权限中心 PermissionCenter）
-    {"username": "erin", "password": "demo1234", "display_name": "艾琳",
+    {"username": "iam_erin", "password": "demo1234", "display_name": "艾琳",
      "email": "erin@devops.com", "department": "运维平台", "source": "ldap",
-     "demo_systems": ["permission-center", "event-manager"]},
+     "demo_systems": ["permission-center"]},
 ]
 
 
@@ -133,6 +136,16 @@ def seed_all() -> None:
                 exists.source = fields.get("source", exists.source)
                 if fields.get("demo_systems"):
                     exists.demo_systems = fields["demo_systems"]
+        # 清理废弃演示账号（账号作用域化改造：旧全局用户名不再在 SEED_USERS → 删除，避免登录目录残留旧人/旧分组）
+        keep = {u["username"] for u in SEED_USERS}
+        stale = db.query(User).filter(~User.username.in_(keep)).all()
+        if stale:
+            stale_ids = [s.id for s in stale]
+            db.query(AuthCode).filter(AuthCode.user_id.in_(stale_ids)).delete(synchronize_session=False)
+            db.query(RefreshToken).filter(RefreshToken.user_id.in_(stale_ids)).delete(synchronize_session=False)
+            for s in stale:
+                db.delete(s)
+            logger.info("清理废弃演示账号: %s", ", ".join(s.username for s in stale))
         # 应用
         for a in SEED_APPS:
             exists = db.query(AppRegistration).filter(AppRegistration.app_id == a["app_id"]).first()

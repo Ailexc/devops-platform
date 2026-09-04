@@ -8,7 +8,7 @@ dn: ou=people,dc=devops,dc=com
 objectClass: organizationalUnit
 ou: people
 
-# ---- 平台组 / 超管 ----
+# ---- 全局超管（门户/各系统管理员）----
 dn: uid=admin,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
@@ -18,113 +18,98 @@ sn: 管理
 displayName: 系统管理员
 mail: admin@devops.com
 departmentNumber: 平台组
-uidNumber: 1004
-gidNumber: 1004
+uidNumber: 1001
+gidNumber: 1001
 homeDirectory: /home/admin
 userPassword: demo1234
 
-# ---- 研发部 ----
-dn: uid=zhangsan,ou=people,dc=devops,dc=com
+# ---- 发布系统 ReleaseManager ----
+dn: uid=release_zhangsan,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
-uid: zhangsan
+uid: release_zhangsan
 cn: 张三
 sn: 张
 displayName: 张三
 mail: zhangsan@devops.com
 departmentNumber: 研发部
-uidNumber: 1001
-gidNumber: 1001
-homeDirectory: /home/zhangsan
+uidNumber: 1002
+gidNumber: 1002
+homeDirectory: /home/release_zhangsan
 userPassword: demo1234
 
-dn: uid=xiaoming,ou=people,dc=devops,dc=com
+dn: uid=release_lisi,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
-uid: xiaoming
-cn: 小明
-sn: 小
-displayName: 小明
-mail: xiaoming@devops.com
-departmentNumber: 研发部
-uidNumber: 1008
-gidNumber: 1008
-homeDirectory: /home/xiaoming
-userPassword: demo1234
-
-dn: uid=readonly,ou=people,dc=devops,dc=com
-objectClass: inetOrgPerson
-objectClass: posixAccount
-uid: readonly
-cn: 只读用户
-sn: 只读
-displayName: 只读用户
-mail: readonly@devops.com
-departmentNumber: 研发部
-uidNumber: 1007
-gidNumber: 1007
-homeDirectory: /home/readonly
-userPassword: demo1234
-
-# ---- 运维部 ----
-dn: uid=lisi,ou=people,dc=devops,dc=com
-objectClass: inetOrgPerson
-objectClass: posixAccount
-uid: lisi
+uid: release_lisi
 cn: 李四
 sn: 李
 displayName: 李四
 mail: lisi@devops.com
 departmentNumber: 运维部
-uidNumber: 1002
-gidNumber: 1002
-homeDirectory: /home/lisi
+uidNumber: 1003
+gidNumber: 1003
+homeDirectory: /home/release_lisi
 userPassword: demo1234
 
-dn: uid=ops_user,ou=people,dc=devops,dc=com
+dn: uid=release_wangwu,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
-uid: ops_user
-cn: 运维工程师
-sn: 运维
-displayName: 运维工程师
-mail: ops_user@devops.com
-departmentNumber: 运维部
-uidNumber: 1006
-gidNumber: 1006
-homeDirectory: /home/ops_user
-userPassword: demo1234
-
-dn: uid=xiaoli,ou=people,dc=devops,dc=com
-objectClass: inetOrgPerson
-objectClass: posixAccount
-uid: xiaoli
-cn: 小李
-sn: 小
-displayName: 小李
-mail: xiaoli@devops.com
-departmentNumber: 运维部
-uidNumber: 1009
-gidNumber: 1009
-homeDirectory: /home/xiaoli
-userPassword: demo1234
-
-# ---- 测试部 ----
-dn: uid=wangwu,ou=people,dc=devops,dc=com
-objectClass: inetOrgPerson
-objectClass: posixAccount
-uid: wangwu
+uid: release_wangwu
 cn: 王五
 sn: 王
 displayName: 王五
 mail: wangwu@devops.com
 departmentNumber: 测试部
-uidNumber: 1003
-gidNumber: 1003
-homeDirectory: /home/wangwu
+uidNumber: 1004
+gidNumber: 1004
+homeDirectory: /home/release_wangwu
 userPassword: demo1234
 
-# ---- 云平台组（云管 CloudManager 专属用户） ----
+# ---- 工单系统 WorkFlowCenter ----
+dn: uid=workflow_xiaoming,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: workflow_xiaoming
+cn: 小明
+sn: 小
+displayName: 小明
+mail: xiaoming@devops.com
+departmentNumber: 研发部
+uidNumber: 1005
+gidNumber: 1005
+homeDirectory: /home/workflow_xiaoming
+userPassword: demo1234
+
+dn: uid=workflow_xiaoli,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: workflow_xiaoli
+cn: 小李
+sn: 小
+displayName: 小李
+mail: xiaoli@devops.com
+departmentNumber: 运维部
+uidNumber: 1006
+gidNumber: 1006
+homeDirectory: /home/workflow_xiaoli
+userPassword: demo1234
+
+dn: uid=workflow_xiaohong,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: workflow_xiaohong
+cn: 小红
+sn: 小
+displayName: 小红
+mail: xiaohong@devops.com
+departmentNumber: 研发部
+uidNumber: 1007
+gidNumber: 1007
+homeDirectory: /home/workflow_xiaohong
+userPassword: demo1234
+
+# ---- 云管系统 CloudManager（cloud_admin 原名已带系统语义且唯一，不重复加前缀）----
 dn: uid=cloud_admin,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
@@ -134,51 +119,78 @@ sn: 云
 displayName: 云管理员
 mail: cloud_admin@devops.com
 departmentNumber: 云平台组
-uidNumber: 1005
-gidNumber: 1005
+uidNumber: 1008
+gidNumber: 1008
 homeDirectory: /home/cloud_admin
 userPassword: demo1234
 
-# ---- 研发中心（权限中心 PermissionCenter 用户） ----
-dn: uid=alice,ou=people,dc=devops,dc=com
+dn: uid=cloud_ops_user,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
-uid: alice
+uid: cloud_ops_user
+cn: 运维工程师
+sn: 运维
+displayName: 运维工程师
+mail: ops_user@devops.com
+departmentNumber: 运维部
+uidNumber: 1009
+gidNumber: 1009
+homeDirectory: /home/cloud_ops_user
+userPassword: demo1234
+
+dn: uid=cloud_readonly,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: cloud_readonly
+cn: 只读用户
+sn: 只读
+displayName: 只读用户
+mail: readonly@devops.com
+departmentNumber: 研发部
+uidNumber: 1010
+gidNumber: 1010
+homeDirectory: /home/cloud_readonly
+userPassword: demo1234
+
+# ---- 权限中心 PermissionCenter ----
+dn: uid=iam_alice,ou=people,dc=devops,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: iam_alice
 cn: 爱丽丝
 sn: 爱
 displayName: 爱丽丝
 mail: alice@devops.com
 departmentNumber: 研发中心
-uidNumber: 1010
-gidNumber: 1010
-homeDirectory: /home/alice
+uidNumber: 1011
+gidNumber: 1011
+homeDirectory: /home/iam_alice
 userPassword: demo1234
 
-dn: uid=bob,ou=people,dc=devops,dc=com
+dn: uid=iam_bob,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
-uid: bob
+uid: iam_bob
 cn: 鲍勃
 sn: 鲍
 displayName: 鲍勃
 mail: bob@devops.com
 departmentNumber: 研发中心
-uidNumber: 1011
-gidNumber: 1011
-homeDirectory: /home/bob
+uidNumber: 1012
+gidNumber: 1012
+homeDirectory: /home/iam_bob
 userPassword: demo1234
 
-# ---- 运维平台（权限中心 PermissionCenter 用户） ----
-dn: uid=erin,ou=people,dc=devops,dc=com
+dn: uid=iam_erin,ou=people,dc=devops,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
-uid: erin
+uid: iam_erin
 cn: 艾琳
 sn: 艾
 displayName: 艾琳
 mail: erin@devops.com
 departmentNumber: 运维平台
-uidNumber: 1012
-gidNumber: 1012
-homeDirectory: /home/erin
+uidNumber: 1013
+gidNumber: 1013
+homeDirectory: /home/iam_erin
 userPassword: demo1234
