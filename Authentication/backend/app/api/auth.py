@@ -169,6 +169,9 @@ def sso_url(app_id: str, request: Request, user: User = Depends(get_current_user
     ).first()
     if app is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "应用不存在或未启用")
+    # external：独立管理界面（如 LAM），有自身登录体系，不消费统一 JWT → 纯入口跳转
+    if app.access_mode == "external":
+        return {"url": app.home_url, "app": app.name}
     token = create_access_token(
         user.id, user.username, user.display_name, user.email, user.department, user.source
     )
