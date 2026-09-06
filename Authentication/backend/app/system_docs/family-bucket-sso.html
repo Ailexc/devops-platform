@@ -39,18 +39,22 @@
 </ul>
 
 <h2 id="frontend">前端闭环</h2>
-<p>接入不只是"后端 API 验签通过"，还要<strong>前端真正串起来</strong>：每个系统前端都要消费统一令牌并展示当前用户。统一模式：</p>
-<div class="flow"><span class="step">门户带 <code>?token=</code> 跳转</span><span class="arrow">→</span><span class="step">读令牌存本地</span><span class="arrow">→</span><span class="step">立即清理 URL</span><span class="arrow">→</span><span class="step">请求带 Bearer</span><span class="arrow">→</span><span class="step">拉当前用户</span><span class="arrow">→</span><span class="step">界面展示</span></div>
+<p>接入不只是"后端 API 验签通过"，还要<strong>前端真正串起来</strong>：每个系统前端都要消费统一令牌并展示当前用户。三种接入方式的前端链路：</p>
+<div class="flow"><span class="step">方式一：网关会话 Cookie</span><span class="arrow">→</span><span class="step">网关 forwardAuth 校验</span><span class="arrow">→</span><span class="step">注入 X-Auth-* 头</span><span class="arrow">→</span><span class="step">后端读头</span><span class="arrow">→</span><span class="step">界面展示</span></div>
+<div class="flow"><span class="step">方式二：一次性授权码 ?code=</span><span class="arrow">→</span><span class="step">后端用 code 换 JWT</span><span class="arrow">→</span><span class="step">本地验 JWKS</span><span class="arrow">→</span><span class="step">界面展示</span></div>
+<div class="flow"><span class="step">方式三：OIDC 授权码 + PKCE</span><span class="arrow">→</span><span class="step">后端换 token</span><span class="arrow">→</span><span class="step">建立会话</span><span class="arrow">→</span><span class="step">界面展示</span></div>
+<div class="info"><strong>安全改造：</strong>URL 参数 ?token= 已废弃，Token 永远不进浏览器 URL。方式一用网关会话 Cookie（HttpOnly），方式二用一次性授权码（非 JWT，泄露无害），方式三走标准 OIDC。</div>
 <table>
   <thead>
-    <tr><th>系统</th><th>框架</th><th>令牌 key</th><th>用户显示</th></tr>
+    <tr><th>系统</th><th>接入方式</th><th>前端认证</th><th>用户显示</th></tr>
   </thead>
   <tbody>
-    <tr><td>云管</td><td>Vue 3</td><td><code>access_token</code></td><td>顶部导航（含中文显示名）</td></tr>
-    <tr><td>工单</td><td>Vue 3</td><td><code>token</code></td><td>侧边栏</td></tr>
-    <tr><td>权限中心</td><td>Vue 3</td><td><code>iam_token</code></td><td>布局顶部</td></tr>
-    <tr><td>任务管理</td><td>Vue 3</td><td><code>cmdb.token</code></td><td>顶栏</td></tr>
-    <tr><td>事件管理</td><td>React</td><td><code>event.token</code></td><td>侧边栏底部</td></tr>
+    <tr><td>云管</td><td>方式一 · 网关会话</td><td>Cookie 自动携带</td><td>顶部导航</td></tr>
+    <tr><td>工单</td><td>方式一 · 网关会话</td><td>Cookie 自动携带</td><td>侧边栏</td></tr>
+    <tr><td>权限中心</td><td>方式一 · 网关会话</td><td>Cookie 自动携带</td><td>布局顶部</td></tr>
+    <tr><td>任务管理</td><td>方式二 · 一次性授权码</td><td>?code= → redeem-code</td><td>顶栏</td></tr>
+    <tr><td>事件管理</td><td>方式二 · 一次性授权码</td><td>?code= → redeem-code</td><td>侧边栏底部</td></tr>
+    <tr><td>发布系统</td><td>方式三 · OIDC 客户端</td><td>授权码 + PKCE</td><td>顶栏</td></tr>
   </tbody>
 </table>
 <div class="warn"><strong>认证 / 授权分离：</strong>登录后全局可进所有系统；某系统没权限则空白，走权限中心申请即可——这是设计如此，不是 bug。</div>

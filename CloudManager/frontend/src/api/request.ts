@@ -10,15 +10,10 @@ const api = axios.create({
   },
 })
 
-// 请求拦截器：注入 Token
+// 方式一（网关会话）：Token 不进浏览器，网关 Session Cookie 自动随请求发送
+// 请求拦截器无需注入 Authorization 头，浏览器自动带 Cookie
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
+  (config) => config,
   (error) => Promise.reject(error),
 )
 
@@ -30,11 +25,12 @@ api.interceptors.response.use(
       const { status, data } = error.response
       switch (status) {
         case 401:
+          // 网关会话已过期/未建立 → 跳转门户登录
           message.error('登录已过期，请重新登录')
           localStorage.removeItem('access_token')
           localStorage.removeItem('refresh_token')
           localStorage.removeItem('user_info')
-          router.push('/login')
+          window.location.href = `${window.location.protocol}//${window.location.hostname}:8088/login`
           break
         case 403:
           message.error('没有权限执行此操作')

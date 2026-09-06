@@ -3,19 +3,34 @@ import App from './App.vue'
 import router from './router'
 import { fetchCurrentUser } from './api/index.js'
 
-// SSO 统一令牌消费：门户（统一认证中心）跳转带 ?token=<统一 JWT>
-// 本系统走方式二（直连 JWKS 验签）：前端保存令牌，请求携带 Bearer，后端本地验签
+// SSO 安全跳转：门户 ?code=xxx → 一次性授权码兑换 JWT（Token 不进 URL）
+// 本系统走方式二（直连 JWKS 验签）：后端用 code 换 JWT，前端只持有 localStorage
+const ONETIME_CODE = new URLSearchParams(window.location.search).get('code')
+
 async function bootstrap() {
-  const ssoToken = new URLSearchParams(window.location.search).get('token')
-  if (ssoToken) {
-    localStorage.setItem('cmdb.token', ssoToken)
-    // 立即清理地址栏令牌（JWT 不应留在 URL 历史中）
+  if (ONETIME_CODE) {
+    try {
+      // 用一次性授权码向认证中心兑换 JWT（后端完成，Token 不进浏览器 URL）
+      const AUTH_API = `${window.location.protocol}//${window.location.hostname}:8099`
+      const resp = await fetch(`${AUTH_API}/api/auth/redeem-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: ONETIME_CODE }),
+      })
+      if (resp.ok) {
+        const { access_token } = await resp.json()
+        localStorage.setItem('cmdb.token', access_token)
+      }
+    } catch {
+      /* 兑换失败静默处理 */
+    }
+    // 清理地址栏 code 参数
     window.history.replaceState({}, '', window.location.pathname)
-    // 预拉当前用户（供 header 显示）；失败则静默（进入页面后再尝试）
+    // 预拉当前用户（供 header 显示）
     try {
       await fetchCurrentUser()
     } catch {
-      /* 令牌无效等场景忽略，页面仍可浏览 */
+      /* 静默 */
     }
   }
 

@@ -7,11 +7,12 @@ export const useAuthStore = defineStore('auth', () => {
   // 状态
   const token = ref(localStorage.getItem('token') || '')
   const user = ref(null)
+  const initialized = ref(false)  // 是否已完成初始化（从网关会话恢复）
   
-  // 计算属性
-  const isAuthenticated = computed(() => !!token.value)
+  // 计算属性：基于 user 对象判断（网关会话模式下 localStorage 无 token）
+  const isAuthenticated = computed(() => !!user.value)
   
-  // 设置 token
+  // 设置 token（方式二/三链路用，方式一不需要）
   function setToken(newToken) {
     token.value = newToken
     if (newToken) {
@@ -21,17 +22,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
   
-  // 登录
+  // 登录（本地登录页用）
   async function login(username, password) {
     try {
       const response = await loginApi({ username, password })
-      // JWT 返回 { access, refresh }
       const { access, refresh: refreshToken } = response.data || response
       setToken(access)
       if (refreshToken) {
         localStorage.setItem('refresh_token', refreshToken)
       }
-      // 登录成功后获取用户信息
       await fetchUser()
       return { success: true }
     } catch (error) {
@@ -40,7 +39,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
   
-
   // 快速登录
   async function quickLogin(userId) {
     try {
@@ -58,19 +56,17 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 获取用户信息
+  // 获取用户信息（网关会话 Cookie 自动携带，不依赖 localStorage token）
   async function fetchUser() {
-    if (!token.value) return
-
     try {
       const response = await getProfile()
       user.value = response?.data ?? response
+      initialized.value = true
+      return true
     } catch (error) {
-      console.error('获取用户信息失败:', error)
-      // 如果 token 无效，清除登录状态
-      if (error.response?.status === 401) {
-        logout()
-      }
+      user.value = null
+      initialized.value = true
+      return false
     }
   }
   
@@ -84,6 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     token,
     user,
+    initialized,
     isAuthenticated,
     setToken,
     login,

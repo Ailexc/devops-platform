@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -201,12 +202,16 @@ const router = createRouter({
   routes,
 })
 
-// 路由守卫：未登录跳转登录页
-router.beforeEach((to, _from, next) => {
-  const token = localStorage.getItem('access_token')
-  if (to.path !== '/login' && !token) {
+// 路由守卫：从网关会话恢复用户，未登录跳转登录页
+router.beforeEach(async (to, _from, next) => {
+  const userStore = useUserStore()
+  // 首次访问：尝试从网关会话恢复用户（异步，只需一次）
+  if (!userStore.initialized) {
+    await userStore.fetchProfile()
+  }
+  if (to.path !== '/login' && !userStore.isLoggedIn) {
     next('/login')
-  } else if (to.path === '/login' && token) {
+  } else if (to.path === '/login' && userStore.isLoggedIn) {
     next('/dashboard')
   } else {
     next()

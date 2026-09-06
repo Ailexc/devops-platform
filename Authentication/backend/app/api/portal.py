@@ -25,7 +25,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
-from ..core.sessions import PORTAL_COOKIE, create_portal_session, delete_portal_session, get_portal_session
+from ..core.sessions import (
+    GW_COOKIE, PORTAL_COOKIE,
+    create_gateway_session, create_portal_session,
+    delete_gateway_session, delete_portal_session, get_portal_session,
+)
 from ..db import get_db
 from ..models import AppRegistration
 from ..security import generate_code_verifier, pkce_challenge
@@ -119,7 +123,7 @@ def portal_oauth_callback(
     if user is None:
         return HTMLResponse("<p>无法从 token 解析用户</p>", status_code=401)
 
-    sid = create_portal_session({
+    user_info = {
         "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
@@ -129,9 +133,13 @@ def portal_oauth_callback(
         "is_active": user.is_active,
         "is_admin": user.is_admin,
         "source": user.source,
-    })
+    }
+    sid = create_portal_session(user_info)
     resp = RedirectResponse(f"{origin}/", status_code=302)
     resp.set_cookie(key=PORTAL_COOKIE, value=sid, httponly=True, samesite="lax", max_age=8 * 3600)
+    # 同时创建网关会话（所有业务系统共享，替代 URL 传 token）
+    gw_sid = create_gateway_session(user_info)
+    resp.set_cookie(key=GW_COOKIE, value=gw_sid, httponly=True, samesite="lax", max_age=8 * 3600)
     return resp
 
 
@@ -163,12 +171,17 @@ def portal_me(request: Request):
     return session["user"]
 
 
-@router.post("/api/logout", summary="④ 门户登出：清门户会话")
+@router.post("/api/logout", summary="④ 门户登出：清门户会话 + 网关会话")
 def portal_logout(request: Request):
+    # 清除门户会话
     sid = request.cookies.get(PORTAL_COOKIE)
     delete_portal_session(sid)
+    # 清除网关会话（所有业务系统共享的会话）
+    gw_sid = request.cookies.get(GW_COOKIE)
+    delete_gateway_session(gw_sid)
     resp = JSONResponse({"message": "门户会话已清除"})
     resp.delete_cookie(key=PORTAL_COOKIE)
+    resp.delete_cookie(key=GW_COOKIE)
     return resp
 
 

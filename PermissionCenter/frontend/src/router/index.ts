@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { api } from '../api/client'
 
 const routes = [
   { path: '/login', component: () => import('../views/Login.vue') },
@@ -51,8 +52,22 @@ const routes = [
 
 const router = createRouter({ history: createWebHistory(), routes })
 
-router.beforeEach((to) => {
-  if (to.path !== '/login' && !localStorage.getItem('iam_token')) {
+// 网关会话模式：通过 API 调用判断登录态（Cookie 自动携带）
+let _userChecked = false
+let _isLoggedIn = false
+
+router.beforeEach(async (to) => {
+  // 首次访问：尝试从网关会话恢复用户
+  if (!_userChecked) {
+    _userChecked = true
+    try {
+      await api.me()
+      _isLoggedIn = true
+    } catch {
+      _isLoggedIn = false
+    }
+  }
+  if (to.path !== '/login' && !_isLoggedIn) {
     return '/login'
   }
 })

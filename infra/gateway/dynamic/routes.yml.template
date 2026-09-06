@@ -19,6 +19,9 @@ http:
           - "X-Auth-Username"
           - "X-Auth-Name"
           - "X-Auth-Source"
+        # 从认证服务器透传 Set-Cookie（网关会话）到浏览器
+        addAuthCookiesToResponse:
+          - "_gw_session"
 
   routers:
     portal:

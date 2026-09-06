@@ -274,8 +274,13 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+
+  // 首次访问：尝试从网关会话恢复用户（异步，只需一次）
+  if (!authStore.initialized) {
+    await authStore.fetchUser()
+  }
 
   if (to.meta.requiresAuth !== false && !authStore.isAuthenticated) {
     next({ path: '/login', query: { redirect: to.fullPath } })

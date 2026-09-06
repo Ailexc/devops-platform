@@ -42,14 +42,30 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 // ── 统一认证（SSO，方式二：直连 JWKS 验签）────────────────────
+// auth 相关请求始终走 Python 后端（Go 后端无 auth 端点）
 export interface MeInfo {
   username: string
   is_active: boolean
   auth_source: string
 }
+export async function fetchMe(): Promise<MeInfo> {
+  const token = localStorage.getItem('event.token')
+  const res = await fetch(`${PYTHON_API}/auth/me`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || res.statusText)
+  }
+  return res.json()
+}
 
 export function fetchCurrentUser(): Promise<MeInfo> {
-  return request<MeInfo>('/auth/me')
+  // auth 始终走 Python 后端（Go 后端无 auth 端点）
+  return fetchMe()
 }
 
 export interface Event {
