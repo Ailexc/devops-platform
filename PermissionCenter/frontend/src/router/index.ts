@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { api } from '../api/client'
 
 const routes = [
   { path: '/login', component: () => import('../views/Login.vue') },
@@ -60,7 +61,6 @@ router.beforeEach(async (to) => {
   if (!_userChecked) {
     _userChecked = true
     try {
-      const { api } = await import('@/api/client')
       await api.me()
       _isLoggedIn = true
     } catch {
