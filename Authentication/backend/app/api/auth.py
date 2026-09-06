@@ -256,7 +256,7 @@ def verify(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/redeem-code", summary="一次性授权码兑换 JWT（方式二：直连 JWKS 安全跳转）")
-def redeem_code(request: Request, db: Session = Depends(get_db)):
+async def redeem_code(request: Request, db: Session = Depends(get_db)):
     """业务后端用一次性授权码兑换 JWT。
 
     流程：门户 sso-url 生成 ?code=xxx → 浏览器跳转业务系统 →
@@ -267,9 +267,8 @@ def redeem_code(request: Request, db: Session = Depends(get_db)):
     # 从 JSON body 读取 code（前端发送 {"code": "xxx"}）
     code = ""
     try:
-        import json as _json
-        body = _json.loads(request._body) if hasattr(request, '_body') and request._body else {}
-        code = body.get("code", "")
+        body = await request.json()
+        code = body.get("code", "") if isinstance(body, dict) else ""
     except Exception:
         pass
     if not code:
