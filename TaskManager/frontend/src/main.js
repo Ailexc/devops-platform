@@ -11,7 +11,8 @@ async function bootstrap() {
   if (ONETIME_CODE) {
     try {
       // 用一次性授权码向认证中心兑换 JWT（后端完成，Token 不进浏览器 URL）
-      const resp = await fetch('/api/auth/redeem-code', {
+      const AUTH_API = `${window.location.protocol}//${window.location.hostname}:8099`
+      const resp = await fetch(`${AUTH_API}/api/auth/redeem-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: ONETIME_CODE }),

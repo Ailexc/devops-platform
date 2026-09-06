@@ -9,7 +9,8 @@ import './index.css'
 // 本系统走方式二（直连 JWKS 验签）：后端用 code 换 JWT，前端只持有 localStorage
 const ONETIME_CODE = new URLSearchParams(window.location.search).get('code')
 if (ONETIME_CODE) {
-  fetch('/api/auth/redeem-code', {
+  const AUTH_API = `${window.location.protocol}//${window.location.hostname}:8099`
+  fetch(`${AUTH_API}/api/auth/redeem-code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code: ONETIME_CODE }),
