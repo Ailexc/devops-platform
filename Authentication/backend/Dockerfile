@@ -6,7 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+# BuildKit 缓存挂载：pip 缓存存 builder 不进镜像层（rebuild 命中缓存秒过，镜像体积不变）
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
 COPY app ./app
 

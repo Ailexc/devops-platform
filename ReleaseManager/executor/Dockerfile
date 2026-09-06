@@ -28,7 +28,9 @@ WORKDIR /app
 
 # 安装 Python 依赖
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# BuildKit 缓存挂载：pip 缓存存 builder 不进镜像层（rebuild 命中缓存秒过，镜像体积不变）
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
 # 复制项目代码
 COPY . .

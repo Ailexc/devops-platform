@@ -1,7 +1,7 @@
 # 权限中心（IAM）全栈 Compose —— OrbStack 统一管理
 # 基础设施：postgres / redis / openfga / traefik（PEP 网关）
 # 应用服务：iam-server(PDP) / mock-cmdb / mock-identity / iam-agent / frontend(管理台)
-# 镜像：backend 由 Makefile 宿主机预编译构建 iam-backend（golang 镜像源不可用）；
+# 镜像：backend 由 compose build 构建 iam-backend（GOARCH 按环境注入，见 iam-server.build.args）；
 #       frontend 多阶段构建（node 构建 → nginx 反代 /api /v1 → iam-server）
 # 域名（OrbStack 自动 DNS + 反代，dev.orbstack.domains 标签）：
 #   frontend.permission-center.orb.local  管理台
@@ -55,9 +55,16 @@ services:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic.yml:/etc/traefik/dynamic/dynamic.yml:ro
 
-  # ---- 应用服务（iam-backend 镜像：宿主机预编译 4 个二进制）----
+  # ---- 应用服务（iam-backend：容器内多阶段编译 4 个二进制，4 服务共用一镜像）----
+  # GOARCH 按部署环境注入（.env.server=amd64 / .env.local=arm64），make start 自动构建
   iam-server:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.build
+      args:
+        GOARCH: ${GOARCH:-amd64}
     image: iam-backend:latest
+    pull_policy: build   # 本地构建镜像，跳过 pull（避免 docker.io/library/iam-backend 报错噪音）
     command: ["iam-server"]
     labels:
       - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"
@@ -82,6 +89,7 @@ services:
 
   mock-cmdb:
     image: iam-backend:latest
+    pull_policy: build
     command: ["mock-cmdb"]
     environment:
       CMDB_HTTP_ADDR: ":8090"
@@ -94,6 +102,7 @@ services:
 
   mock-identity:
     image: iam-backend:latest
+    pull_policy: build
     command: ["mock-identity"]
     environment:
       IDENTITY_HTTP_ADDR: ":8091"
@@ -103,6 +112,7 @@ services:
   # 本地 PDP agent（sidecar 形态，轮询 bundle 做本地动作级决策）
   iam-agent:
     image: iam-backend:latest
+    pull_policy: build
     command: ["iam-agent"]
     environment:
       IAM_SERVER_URL: "http://iam-server:8080"
@@ -121,6 +131,7 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
     image: iam-frontend:latest
+    pull_policy: build
     container_name: permission-center-frontend
     labels:
       - "dev.orbstack.domains=frontend.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"

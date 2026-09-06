@@ -37,6 +37,24 @@ else
   bash scripts/bootstrap.sh
 fi
 
+# ---- 1.5 OpenFGA 数据库迁移（幂等：已迁移则秒过）----
+# openfga v1.8.7 首次部署需 migrate（revision 0→5），否则持续 500 NOT_SERVING、
+# iam-server init 重试 10 次全失败（2026-09-06 实测踩坑）。
+# migrate 状态持久化在 devops_openfga.goose_db_version 表，重复执行无副作用。
+# ⚠️ 必须用 devops-postgres:5432（compose run 容器挂 devops-net，infra 网络内直连）；
+#    不能用宿主机 IP:25432——容器→宿主机发布端口被 UFW INPUT 链拦截（conventions.md 坑），
+#    实测表现为 migrate 容器静默挂起（TCP 重试无超时）。
+if [ -z "${P}" ] || [ "${P}" = "iam" ]; then
+  log "OpenFGA 数据库迁移检查（幂等）"
+  ( cd PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm \
+      openfga migrate \
+      --datastore-engine postgres \
+      --datastore-uri "postgresql://devops:devops@devops-postgres:5432/devops_openfga?sslmode=disable" \
+      < /dev/null > /tmp/openfga-migrate.log 2>&1 ) \
+    && ok "openfga migrate 就绪" \
+    || { err "openfga migrate 失败（详见 /tmp/openfga-migrate.log）"; exit 1; }
+fi
+
 # ---- 2. 可选：RESET_ON_START=true → 先重置（回到出厂态）----
 if is_reset; then
   log "RESET_ON_START=true：先重置数据（回到出厂态）"
