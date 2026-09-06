@@ -5,13 +5,24 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './index.css'
 
-// SSO 统一令牌消费：门户（统一认证中心）跳转带 ?token=<统一 JWT>
-// 本系统走方式二（直连 JWKS 验签）：前端保存令牌，请求携带 Bearer，后端本地验签
-const ssoToken = new URLSearchParams(window.location.search).get('token')
-if (ssoToken) {
-  localStorage.setItem('event.token', ssoToken)
-  // 立即清理地址栏令牌（JWT 不应留在 URL 历史中）
-  window.history.replaceState({}, '', window.location.pathname)
+// SSO 安全跳转：门户 ?code=xxx → 一次性授权码兑换 JWT（Token 不进 URL）
+// 本系统走方式二（直连 JWKS 验签）：后端用 code 换 JWT，前端只持有 localStorage
+const ONETIME_CODE = new URLSearchParams(window.location.search).get('code')
+if (ONETIME_CODE) {
+  fetch('/api/auth/redeem-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: ONETIME_CODE }),
+  })
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then(({ access_token }) => {
+      localStorage.setItem('event.token', access_token)
+    })
+    .catch(() => { /* 兑换失败静默处理 */ })
+    .finally(() => {
+      // 清理地址栏 code 参数
+      window.history.replaceState({}, '', window.location.pathname)
+    })
 }
 
 const queryClient = new QueryClient({

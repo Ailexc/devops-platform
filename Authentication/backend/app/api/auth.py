@@ -27,6 +27,7 @@ from ..schemas import (
     TokenRefreshRequest,
     UserOut,
 )
+from ..core.sessions import GW_COOKIE, SESSION_TTL, create_gateway_session, get_gateway_session
 from ..security import (
     create_access_token,
     create_refresh_token,
@@ -161,7 +162,7 @@ def change_password(req: ChangePasswordRequest, user: User = Depends(get_current
     return {"message": "密码已修改"}
 
 
-@router.get("/sso-url", summary="获取某应用的 SSO 跳转地址（携带 JWT）")
+@router.get("/sso-url", summary="获取某应用的 SSO 跳转地址")
 def sso_url(app_id: str, request: Request, user: User = Depends(get_current_user),
             db: Session = Depends(get_db)):
     app = db.query(AppRegistration).filter(
@@ -169,40 +170,71 @@ def sso_url(app_id: str, request: Request, user: User = Depends(get_current_user
     ).first()
     if app is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "应用不存在或未启用")
-    # 无需签发统一 JWT / ?token= 注入的应用：
-    #  - sso_type=oidc（方式三 OIDC 标准客户端：由应用侧发起授权码流完成登录，token 不经 URL）
-    #  - access_mode=external（独立管理界面如 LAM，有自身登录体系，纯入口跳转）
-    if app.sso_type == "oidc" or app.access_mode == "external":
-        # Release 后端已提供 /oauth/login 作为 OIDC 授权码流入口（nginx → 认证中心）→ 一键直达
+
+    # --- 方式三：OIDC 标准客户端（发布系统）---
+    # 由应用侧发起授权码流完成登录，token 不经 URL
+    if app.sso_type == "oidc":
         url = f"{app.home_url.rstrip('/')}/oauth/login" if app.app_id == "release-manager" else app.home_url
         return {"url": url, "app": app.name}
-    token = create_access_token(
-        user.id, user.username, user.display_name, user.email, user.department, user.source
-    )
+
+    # --- 独立管理界面（如 LAM）---
+    if app.access_mode == "external":
+        return {"url": app.home_url, "app": app.name}
+
+    # --- 方式一：网关会话（云管/工单/权限/mock/pilot）---
+    # 返回干净 URL，网关 Session Cookie 自动随请求发送，token 不进 URL
+    if app.access_mode == "gateway":
+        return {"url": app.home_url, "app": app.name}
+
+    # --- 方式二：一次性授权码（任务/事件/直连应用）---
+    # 携带一次性 code（非 JWT，60s 有效期，用完即毁），业务后端用 code 换 JWT
+    from ..core.sessions import create_onetime_code
+    code = create_onetime_code(user)
     sep = "&" if "?" in app.home_url else "?"
-    return {"url": f"{app.home_url}{sep}token={token}", "app": app.name}
+    return {"url": f"{app.home_url}{sep}code={code}", "app": app.name}
+
+
+def _build_verify_response(user: User) -> JSONResponse:
+    """构建 verify 200 响应（注入 X-Auth-* 头）。"""
+    return JSONResponse(
+        status_code=200,
+        content={"code": 200, "user": UserOut.model_validate(user).model_dump()},
+        headers={
+            "X-Auth-User": str(user.id),
+            "X-Auth-Username": user.username,
+            "X-Auth-Name": quote(user.display_name),
+            "X-Auth-Source": user.source,
+        },
+    )
 
 
 @router.get("/verify", summary="统一网关 forwardAuth 校验端点")
 def verify(request: Request, db: Session = Depends(get_db)):
-    """供 Traefik forwardAuth 使用：校验 Bearer JWT。
+    """供 Traefik forwardAuth 使用：校验网关会话或 Bearer JWT。
+
+    认证优先级：
+    1. 网关 Session Cookie（_gw_session）—— 门户登录时签发，所有系统共享
+    2. Authorization: Bearer <JWT> —— 直连 JWKS / OIDC 链路兜底
 
     - 200：放行，并通过 X-Auth-* 响应头回传用户信息（Traefik 转给下游）
     - 401：拦截
-
-    Demo 便利：兼容从 query 参数 `token` 读取 JWT（用于门户 SSO 跳转
-    `home_url?token=xxx` 场景）。真实生产应仅用 Authorization 头。
     """
+    # ---- 1. 优先检查网关 Session Cookie ----
+    gw_sid = request.cookies.get(GW_COOKIE)
+    session = get_gateway_session(gw_sid)
+    if session:
+        user = db.get(User, session["user_id"])
+        if user is not None and user.is_active:
+            return _build_verify_response(user)
+
+    # ---- 2. 无 Session → 退回 Bearer JWT 验证（兼容直连 JWKS 链路）----
     auth = request.headers.get("Authorization", "")
+    token = ""
     if auth.lower().startswith("bearer "):
         token = auth[7:].strip()
-    else:
-        token = request.query_params.get("token", "")
     if not token:
         return JSONResponse(status_code=401, content={"code": 401, "user": None})
     try:
-        # 网关 forwardAuth：接受认证中心签发的任意有效 access token（aud 为签发时对应
-        # 的 client_id，而非门户 audience，故此处不校验 aud）
         payload = decode_token(token, verify_aud=False)
     except pyjwt.PyJWTError:
         return JSONResponse(status_code=401, content={"code": 401, "user": None})
@@ -211,14 +243,43 @@ def verify(request: Request, db: Session = Depends(get_db)):
     user = db.get(User, int(payload.get("sub", 0)))
     if user is None or not user.is_active:
         return JSONResponse(status_code=401, content={"code": 401, "user": None})
-    return JSONResponse(
-        status_code=200,
-        content={"code": 200, "user": UserOut.model_validate(user).model_dump()},
-        headers={
-            "X-Auth-User": str(user.id),
-            "X-Auth-Username": user.username,
-            # HTTP 头仅支持 latin-1，中文等需 URL 编码
-            "X-Auth-Name": quote(user.display_name),
-            "X-Auth-Source": user.source,
-        },
+
+    # JWT 有效 → 自动创建网关 Session（后续请求走 Cookie，不再依赖 JWT）
+    sid = create_gateway_session({
+        "id": user.id, "username": user.username,
+        "display_name": user.display_name, "email": user.email,
+        "department": user.department, "source": user.source,
+    })
+    resp = _build_verify_response(user)
+    resp.set_cookie(GW_COOKIE, sid, httponly=True, samesite="lax", max_age=SESSION_TTL)
+    return resp
+
+
+@router.post("/redeem-code", summary="一次性授权码兑换 JWT（方式二：直连 JWKS 安全跳转）")
+def redeem_code(request: Request, db: Session = Depends(get_db)):
+    """业务后端用一次性授权码兑换 JWT。
+
+    流程：门户 sso-url 生成 ?code=xxx → 浏览器跳转业务系统 →
+    业务后端调此端点用 code 换 JWT → JWT 不进浏览器。
+    请求体：{"code": "一次性授权码"}
+    """
+    from ..core.sessions import redeem_onetime_code
+    # 从 JSON body 读取 code（前端发送 {"code": "xxx"}）
+    code = ""
+    try:
+        import json as _json
+        body = _json.loads(request._body) if hasattr(request, '_body') and request._body else {}
+        code = body.get("code", "")
+    except Exception:
+        pass
+    if not code:
+        # 兜底：尝试从 query 参数读取
+        code = request.query_params.get("code", "")
+    info = redeem_onetime_code(code)
+    if not info:
+        raise HTTPException(status_code=401, detail="授权码无效或已过期")
+    access_token = create_access_token(
+        info["user_id"], info["username"], info["display_name"],
+        info["email"], info["department"], info["source"],
     )
+    return {"access_token": access_token, "token_type": "bearer"}

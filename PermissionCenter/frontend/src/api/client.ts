@@ -1,19 +1,19 @@
-// 轻量 API 客户端（fetch 封装，自动带 JWT）
+// 方式一（网关会话）：Token 不进浏览器，网关 Session Cookie 自动随请求发送
 const BASE = ''
 
 // 约定：request(url, method = 'GET', body?)
 export async function request<T = any>(url: string, method: string = 'GET', body?: any): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  const token = localStorage.getItem('iam_token')
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  // 无需注入 Authorization 头，网关 Session Cookie 自动随请求发送
   const res = await fetch(BASE + url, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   })
   if (res.status === 401) {
+    // 网关会话已过期/未建立 → 跳转门户登录
     localStorage.removeItem('iam_token')
-    window.location.href = '/login'
+    window.location.href = `${window.location.protocol}//${window.location.hostname}:8088/login`
     throw new Error('未登录')
   }
   const data = await res.json().catch(() => ({}))
