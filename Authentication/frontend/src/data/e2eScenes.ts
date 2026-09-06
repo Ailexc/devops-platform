@@ -198,8 +198,10 @@ export const e2eScenes: E2eSceneDef[] = [
         method: 'GET',
         api: '/api/auth/sso-url?app_id=pilot-app',
         principle:
-          '认证中心为已登录用户生成该应用的跳转 URL（home_url?token=<统一JWT>）。' +
-          '用户点击后，业务系统 SPA 读取 token 存好，后续调 API 时带 Authorization 头，实现"点一下免登录进入"。',
+          '认证中心为已登录用户生成该应用的跳转地址。' +
+          '方式一（网关会话）：返回干净 URL（无 token），浏览器通过网关会话 Cookie 自动认证。' +
+          '方式二（一次性授权码）：返回 URL 带一次性 code（非 JWT，60s 过期），业务后端用 code 换 JWT。' +
+          '方式三（OIDC）：返回 /oauth/login 跳转授权端点。',
         inputs: [{ label: '应用标识 app_id', value: 'pilot-app' }],
         run: (ctx) => jsonCall(ctx, 'GET', '/api/auth/sso-url?app_id=pilot-app'),
         extract: (resp) => {

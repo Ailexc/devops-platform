@@ -148,27 +148,32 @@ export const scenes: PScene[] = [
         title: 'SSO 单点登录',
         narration:
           '门户登录后，BFF 建立 HttpOnly 会话 Cookie，SPA 无感恢复用户。应用广场点击应用时，' +
-          '门户向认证中心换取带统一 JWT 的跳转地址（sso-url），业务系统用该 JWT 作为内部链路凭证。' +
-          '统一 JWT 是内部模拟链路的凭证（RS256 签名、aud 区分应用），与 OIDC 标准登录解耦。',
-        highlight: '门户走 OIDC 会话，业务链路走统一 JWT',
-        points: ['门户：BFF 会话，SPA 不持有 token', '应用广场：sso-url 统一 JWT 透传', '统一 JWT：内部链路凭证（Demo 模拟）'],
+          '方式一（网关会话）：门户签发网关会话 Cookie（_gw_session），业务系统通过网关 forwardAuth 校验 Cookie，Token 不进浏览器 URL。' +
+          '方式二（一次性授权码）：门户生成一次性 code（非 JWT，60s 过期），业务后端用 code 向认证中心兑换 JWT，Token 不进浏览器。' +
+          '方式三（OIDC 客户端）：标准授权码 + PKCE 流程，Token 只在后端。' +
+          '三种方式均保证 Token 不暴露在浏览器 URL 上。',
+        highlight: '三种接入方式，Token 均不进浏览器 URL',
+        points: ['门户：BFF 会话，SPA 不持有 token', '方式一：网关会话 Cookie，浏览器无 JWT', '方式二：一次性授权码换 JWT，code 非 JWT 泄露无害', '方式三：标准 OIDC 授权码 + PKCE'],
       },
       {
-        title: '方式一：经统一网关',
+        title: '方式一：网关会话（经统一网关）',
         narration:
-          '业务 API 挂在统一网关后面，网关用 forwardAuth 把 JWT 转发给认证中心校验，' +
-          '通过后注入 X-Auth-* 头再放行。业务后端零鉴权代码，直接读头就知道是谁。',
-        highlight: '网关统一验票 · 业务零鉴权',
-        flow: ['请求带 JWT', '网关 forwardAuth', '认证中心验签', '注入 X-Auth-* 头', '业务后端读头'],
-        points: ['无 token → 401 拦截', '带 token → 200 + 注入身份', '适合网关能覆盖的应用'],
+          '业务 API 挂在统一网关后面，网关用 forwardAuth 校验网关会话 Cookie（_gw_session），' +
+          'Cookie 由门户登录时签发，HttpOnly + SameSite=Lax，同 IP 所有端口共享（RFC 6265）。' +
+          '校验通过后注入 X-Auth-* 头再放行。业务后端零鉴权代码，直接读头就知道是谁。' +
+          '若 Cookie 不存在，退回 Bearer JWT 验证（兼容直连 JWKS 链路），并自动创建网关会话。',
+        highlight: '网关会话 Cookie · 业务零鉴权 · Token 不进 URL',
+        flow: ['请求带 Cookie', '网关 forwardAuth', '验证会话/注入 X-Auth-*', '业务后端读头'],
+        points: ['无 Cookie 且无 JWT → 401 拦截', '有 Cookie → 200 + 注入身份', 'addAuthCookiesToResponse 透传 Set-Cookie'],
       },
       {
-        title: '方式二：直连 JWKS 自验签',
+        title: '方式二：一次性授权码 + 直连 JWKS',
         narration:
-          '不经网关的应用（外部部署 / 内部服务），自己拉取认证中心公钥（JWKS）本地验签统一 JWT，' +
-          '不用每次回源、认证中心挂了已发 token 仍可验。direct-app 里就有个 20 行的验签中间件。',
-        highlight: '本地验签 · 无状态 · 高可用',
-        points: ['从 /.well-known/jwks.json 拉公钥缓存', '本地验 RS256 签名与有效期', '适合网关覆盖不到的应用'],
+          '不经网关的应用（跨网络 / 网关覆盖不到），门户生成一次性授权码（非 JWT，UUID，60s 有效期，用完即毁），' +
+          '业务后端用授权码向认证中心兑换 JWT（后端完成，Token 不进浏览器），再从 JWKS 拉取公钥本地验签。' +
+          '不用每次回源、认证中心挂了已发 token 仍可验。授权码泄露无害（非 JWT、一次性、短时效）。',
+        highlight: '一次性授权码换 JWT · 本地验签 · Token 不进 URL',
+        points: ['门户签发一次性 code（非 JWT，60s 过期）', '业务后端用 code 调 /api/auth/redeem-code 换 JWT', 'JWT 不进浏览器，后端本地验 JWKS'],
       },
       {
         title: '方式三：OIDC 客户端接入',

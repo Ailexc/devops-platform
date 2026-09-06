@@ -29,12 +29,16 @@
     <tr><th>传递方式</th><th>安全等级</th><th>本项目用法</th></tr>
   </thead>
   <tbody>
-    <tr><td>OIDC 授权码 + PKCE</td><td>最安全</td><td>门户 / oidc-demo 登录主流程</td></tr>
-    <tr><td>HttpOnly Cookie</td><td>推荐</td><td>门户 BFF 会话（portal_session）</td></tr>
-    <tr><td>Authorization: Bearer</td><td>推荐</td><td>业务 API / userinfo 调用</td></tr>
-    <tr><td>URL 参数 ?token=</td><td>Demo 简化</td><td>应用广场 SSO 跳转瞬间（生产应替换）</td></tr>
+    <tr><td>OIDC 授权码 + PKCE</td><td>最安全</td><td>门户 / oidc-demo 登录主流程（方式三）</td></tr>
+    <tr><td>HttpOnly Cookie</td><td>推荐</td><td>门户 BFF 会话（portal_session）+ 网关会话（_gw_session）</td></tr>
+    <tr><td>一次性授权码</td><td>推荐</td><td>方式二安全跳转（非 JWT，60s 过期，用完即毁）</td></tr>
+    <tr><td><del>URL 参数 ?token=</del></td><td><del>Demo 简化</del></td><td><del>已废弃</del> → 网关会话 Cookie / 一次性授权码替代</td></tr>
+    <tr><td>Authorization: Bearer</td><td>推荐</td><td>业务 API / userinfo 调用（方式二/三后端持有 JWT）</td></tr>
   </tbody>
 </table>
+<div class="info">
+  <strong>安全改造：</strong>URL 参数 ?token= 已废弃。方式一改用网关会话 Cookie（HttpOnly，RFC 6265 同 IP 共享），方式二改用一次性授权码（非 JWT，泄露无害）。Token 永远不进浏览器 URL。参考 RFC 9700 §4.1、draft-ietf-oauth-browser-based-apps §6.1。
+</div>
 
 <h2 id="failover">认证失败不降级</h2>
 <p>身份源支持降级链（Local → LDAP → Okta），但降级有严格的边界：</p>
