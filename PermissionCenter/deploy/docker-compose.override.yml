@@ -1,0 +1,15 @@
+# OrbStack 专属配置（仅 Mac + OrbStack 生效；Linux 上标签被忽略，无害）
+# 规范 R3：平台特有能力不放 base compose 文件
+# 注意：本文件必须与 deploy/docker-compose.yml 成对使用（scripts/lib.sh 已自动成对）
+services:
+  traefik:
+    labels:
+      - "dev.orbstack.domains=cmdb.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"
+
+  iam-server:
+    labels:
+      - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"
+
+  frontend:
+    labels:
+      - "dev.orbstack.domains=frontend.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"

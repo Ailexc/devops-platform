@@ -53,7 +53,7 @@ project_dir() {
 project_compose_opts() {
   case "$1" in
     cloud) echo "-f docker-compose.prod.yml" ;;
-    iam)   echo "-f deploy/docker-compose.yml" ;;
+    iam)   echo "-f deploy/docker-compose.yml -f deploy/docker-compose.override.yml" ;;
     *)     echo "" ;;
   esac
 }

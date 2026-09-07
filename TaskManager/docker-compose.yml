@@ -27,13 +27,12 @@ services:
       DATABASE_URL: "postgresql://devops:devops@devops-postgres:5432/devops_cmdb"
       REDIS_URL: "redis://devops-redis:6379/5"
       CELERY_BROKER_URL: "amqp://devops:devops@devops-rabbitmq:5672//"
-      # ALLOWED_HOSTS 由 .env.cloud / .env.local 插值注入（含云 IP / orb.local），默认带 * 兜底
-      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-*,localhost,127.0.0.1,api.task-management.orb.local,frontend.task-management.orb.local,.devops.orb.local}"
+      # ALLOWED_HOSTS 由 .env.<env> 插值注入；默认通配兑底（规范 R2：白名单只进 env 文件）
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-*,localhost}"
       HTTP_PROXY: "http://host.docker.internal:7897"
       HTTPS_PROXY: "http://host.docker.internal:7897"
       NO_PROXY: "localhost,127.0.0.1,devops-postgres,devops-redis,devops-rabbitmq,.orb.local"
-    labels:
-      - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-task-management}.orb.local"
+    # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
     networks:
       - default
       - devops-net
@@ -101,8 +100,7 @@ services:
     expose:
       - "80"
     # 容器内置 nginx：/ → SPA 静态文件，/api/ → 反代 backend（见 frontend/nginx.conf）
-    labels:
-      - "dev.orbstack.domains=frontend.${COMPOSE_PROJECT_NAME:-task-management}.orb.local"
+    # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
     depends_on:
       - backend
     networks:

@@ -67,7 +67,7 @@ def _home_url(app_id: str, default: str) -> str:
     return os.environ.get(f"APP_URL_{app_id.upper().replace('-', '_')}", default)
 
 
-def _portal_url(default: str = "http://portal.authentication.orb.local") -> str:
+def _portal_url(default: str = "http://localhost:8088") -> str:
     """门户地址：优先 PORTAL_URL（云端部署覆盖）。"""
     return os.environ.get("PORTAL_URL", default)
 
@@ -76,34 +76,34 @@ def _portal_url(default: str = "http://portal.authentication.orb.local") -> str:
 # access_mode：gateway=经统一网关 forwardAuth；direct=业务后端 JWKS 自验签 / OIDC 客户端；
 #              external=独立管理界面（如 LAM），门户仅提供入口跳转（sso-url 不签发统一 JWT）
 # home_url 说明：
-#   - 6 个业务系统 → 统一网关 *.devops.orb.local（Phase 3，本地 OrbStack 自动 DNS）
-#   - mock/direct（认证中心自带演示应用）→ authentication.orb.local 真实域名
+#   - 浏览器可达 URL 一律环境变量优先（规范 R1），兑底为统一网关 localhost 端口；
+#     各环境由 deploy/<env>/.env.<env> 覆盖（服务器 = SERVER_IP:port，Mac = orb.local）
 #   - pilot/oidc 保持 localhost（认证流程演示，redirect_uri 与 home_url 强关联）
 # redirect_uris：OIDC 授权码回调白名单（精确匹配）；非 OIDC 应用可留空（内部信任域 token 透传）
 SEED_APPS = [
     {"app_id": "task-manager", "name": "任务管理 TaskManager", "description": "任务管理平台（任务编排与调度）",
-     "icon": "ScheduleOutlined", "home_url": _home_url("task-manager", "http://cmdb.devops.orb.local"), "sort_order": 1, "access_mode": "direct", "redirect_uris": []},
+     "icon": "ScheduleOutlined", "home_url": _home_url("task-manager", "http://localhost:8089"), "sort_order": 1, "access_mode": "direct", "redirect_uris": []},
     {"app_id": "cloud-manager", "name": "多云管理 CloudManager", "description": "多云资源管理控制台",
-     "icon": "CloudServerOutlined", "home_url": _home_url("cloud-manager", "http://cloud.authentication.orb.local"), "sort_order": 2, "access_mode": "gateway", "redirect_uris": []},
+     "icon": "CloudServerOutlined", "home_url": _home_url("cloud-manager", "http://localhost:8090"), "sort_order": 2, "access_mode": "gateway", "redirect_uris": []},
     {"app_id": "workflow-center", "name": "工单中心 WorkFlowCenter", "description": "工单 / 流程管理平台",
-     "icon": "ApartmentOutlined", "home_url": _home_url("workflow-center", "http://workflow.authentication.orb.local"), "sort_order": 3, "access_mode": "gateway", "redirect_uris": []},
+     "icon": "ApartmentOutlined", "home_url": _home_url("workflow-center", "http://localhost:8091"), "sort_order": 3, "access_mode": "gateway", "redirect_uris": []},
     {"app_id": "event-manager", "name": "事件管理 EventManager", "description": "告警与事件处理",
-     "icon": "AlertOutlined", "home_url": _home_url("event-manager", "http://event.devops.orb.local"), "sort_order": 4, "access_mode": "direct", "redirect_uris": []},
+     "icon": "AlertOutlined", "home_url": _home_url("event-manager", "http://localhost:8092"), "sort_order": 4, "access_mode": "direct", "redirect_uris": []},
     {"app_id": "release-manager", "name": "发布管理 ReleaseManager", "description": "应用发布与部署",
-     "icon": "RocketOutlined", "home_url": _home_url("release-manager", "http://release.devops.orb.local"), "sort_order": 5, "sso_type": "oidc", "access_mode": "direct",
+     "icon": "RocketOutlined", "home_url": _home_url("release-manager", "http://localhost:8093"), "sort_order": 5, "sso_type": "oidc", "access_mode": "direct",
      "client_id": "release-manager-app", "client_secret": "release-secret-123456",
-     "redirect_uris": [f"{_home_url('release-manager', 'http://release.devops.orb.local')}/oauth/callback"],
+     "redirect_uris": [f"{_home_url('release-manager', 'http://localhost:8093')}/oauth/callback"],
      "allowed_scopes": ["openid", "profile", "email"]},
     {"app_id": "permission-center", "name": "权限中心 PermissionCenter", "description": "IAM 权限管控中心",
-     "icon": "SafetyCertificateOutlined", "home_url": _home_url("permission-center", "http://iam.authentication.orb.local"), "sort_order": 6, "access_mode": "gateway", "redirect_uris": []},
+     "icon": "SafetyCertificateOutlined", "home_url": _home_url("permission-center", "http://localhost:8094"), "sort_order": 6, "access_mode": "gateway", "redirect_uris": []},
     {"app_id": "mock-app", "name": "演示应用 MockApp", "description": "受统一网关 forwardAuth 保护的演示应用",
-     "icon": "ExperimentOutlined", "home_url": _home_url("mock-app", "http://mock.authentication.orb.local"), "sort_order": 7, "access_mode": "gateway", "redirect_uris": []},
+     "icon": "ExperimentOutlined", "home_url": _home_url("mock-app", "http://localhost:8095"), "sort_order": 7, "access_mode": "gateway", "redirect_uris": []},
     {"app_id": "direct-app", "name": "直连示例 DirectApp", "description": "不经网关，用 JWKS 公钥本地验签统一 JWT",
-     "icon": "ApiOutlined", "home_url": _home_url("direct-app", "http://direct.authentication.orb.local"), "sort_order": 8, "access_mode": "direct", "redirect_uris": []},
+     "icon": "ApiOutlined", "home_url": _home_url("direct-app", "http://localhost:8096"), "sort_order": 8, "access_mode": "direct", "redirect_uris": []},
     {"app_id": "pilot-app", "name": "工单中心 PilotApp", "description": "试点接入示例：模拟真实业务系统接入统一认证",
-     "icon": "DatabaseOutlined", "home_url": _home_url("pilot-app", "http://localhost:8004"), "sort_order": 9, "access_mode": "gateway", "redirect_uris": []},
+     "icon": "DatabaseOutlined", "home_url": _home_url("pilot-app", "http://localhost:8097"), "sort_order": 9, "access_mode": "gateway", "redirect_uris": []},
     {"app_id": "lam", "name": "LDAP 目录管理 LAM", "description": "OpenLDAP 可视化管理界面（身份目录运维，独立登录）",
-     "icon": "ContactsOutlined", "home_url": _home_url("lam", "http://ldapadmin.authentication.orb.local"), "sort_order": 11, "access_mode": "external", "redirect_uris": []},
+     "icon": "ContactsOutlined", "home_url": _home_url("lam", "http://localhost:8083"), "sort_order": 11, "access_mode": "external", "redirect_uris": []},
     {"app_id": "oidc-demo", "name": "OIDC 演示应用", "description": "演示 OIDC 授权码模式接入（code+client_secret 换 token）",
      "icon": "CodeOutlined", "home_url": _home_url("oidc-demo", "http://localhost:8005"), "sort_order": 10, "sso_type": "oidc", "access_mode": "direct",
      "client_id": "oidc-demo-app", "client_secret": "oidc-demo-secret-123456",

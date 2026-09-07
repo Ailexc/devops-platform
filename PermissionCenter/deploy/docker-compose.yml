@@ -47,8 +47,9 @@ services:
     container_name: iam-traefik
     command:
       - --configFile=/etc/traefik/traefik.yml
-    labels:
-      - "dev.orbstack.domains=cmdb.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"
+    # ⚠️ 定位说明：本 traefik 不是路由网关，是 IAM Demo 的 PEP 执行点
+    #    （forwardAuth → iam-server /v1/gateway/check），属架构组件，与 infra/gateway 职责不同。
+    # OrbStack 专属域名标签已移至 deploy/docker-compose.override.yml（规范 R3）
     ports:
       - "19080:9080"   # 网关入口（受保护业务 API），宿主机备用端口
     volumes:
@@ -66,8 +67,7 @@ services:
     image: iam-backend:latest
     pull_policy: build   # 本地构建镜像，跳过 pull（避免 docker.io/library/iam-backend 报错噪音）
     command: ["iam-server"]
-    labels:
-      - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"
+    # OrbStack 专属域名标签已移至 deploy/docker-compose.override.yml（规范 R3）
     environment:
       IAM_HTTP_ADDR: ":8080"
       PG_DSN: "postgresql://devops:devops@devops-postgres:5432/devops_iam?sslmode=disable"
@@ -133,10 +133,9 @@ services:
     image: iam-frontend:latest
     pull_policy: build
     container_name: permission-center-frontend
-    labels:
-      - "dev.orbstack.domains=frontend.${COMPOSE_PROJECT_NAME:-permission-center}.orb.local"
+    # OrbStack 专属域名标签已移至 deploy/docker-compose.override.yml（规范 R3）
     ports:
-      - "18088:80"     # 宿主访问：http://localhost:18088（或 frontend.permission-center.orb.local）
+      - "18088:80"     # 宿主访问：http://localhost:18088
     depends_on:
       iam-server:
         condition: service_started

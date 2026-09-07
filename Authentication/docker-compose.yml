@@ -1,5 +1,7 @@
-# 统一认证中心 - 全栈编排（OrbStack 原生路由 + Traefik forwardAuth 演示）
-# 服务：认证中心(api) / 统一门户(portal) / OpenLDAP / 统一网关(traefik) / 演示应用(mock-app)
+# 统一认证中心 - 全栈编排
+# 服务：认证中心(api) / 统一门户(portal) / OpenLDAP / LAM / 演示应用(mock-app)
+# 路由：浏览器流量统一走 infra/gateway（devops-gateway :8088-8099），本项目不再自带 Traefik（规范 R4）
+# OrbStack 专属域名标签在 docker-compose.override.yml（规范 R3）
 
 services:
   openldap:
@@ -27,8 +29,7 @@ services:
         mkdir -p /container/service/slapd/assets/config/bootstrap/ldif/custom
         cp /seed/seed.ldif /container/service/slapd/assets/config/bootstrap/ldif/custom/50-seed.ldif
         exec /container/tool/run --copy-service
-    labels:
-      - "dev.orbstack.domains=ldap.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
     healthcheck:
       test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -b dc=devops,dc=com -D cn=admin,dc=devops,dc=com -w $$LDAP_ADMIN_PASSWORD '(&)' | grep -q 'dc=devops,dc=com'"]
       interval: 10s
@@ -59,8 +60,7 @@ services:
     depends_on:
       openldap:
         condition: service_healthy
-    labels:
-      - "dev.orbstack.domains=ldapadmin.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
     networks:
       - default
 
@@ -81,21 +81,21 @@ services:
       - LDAP_BIND_PASSWORD=${LDAP_ADMIN_PASSWORD:-adminpass}
       - LDAP_USER_SEARCH_BASE=ou=people,dc=devops,dc=com
       - LDAP_USER_SEARCH_FILTER=(uid={username})
-      # 门户地址（云端部署用 PORTAL_URL 覆盖为公网网关入口，默认本地统一入口）
-      - PORTAL_URL=${PORTAL_URL:-http://portal.${COMPOSE_PROJECT_NAME:-authentication}.orb.local}
-      # 应用跳转地址（云端部署用 APP_URL_<APP_ID> 覆盖为统一网关地址，默认本地统一入口）
-      - APP_URL_TASK_MANAGER=${APP_URL_TASK_MANAGER:-http://cmdb.devops.orb.local}
-      - APP_URL_CLOUD_MANAGER=${APP_URL_CLOUD_MANAGER:-http://cloud.authentication.orb.local}
-      - APP_URL_WORKFLOW_CENTER=${APP_URL_WORKFLOW_CENTER:-http://workflow.authentication.orb.local}
-      - APP_URL_EVENT_MANAGER=${APP_URL_EVENT_MANAGER:-http://event.devops.orb.local}
-      - APP_URL_RELEASE_MANAGER=${APP_URL_RELEASE_MANAGER:-http://release.devops.orb.local}
-      - APP_URL_PERMISSION_CENTER=${APP_URL_PERMISSION_CENTER:-http://iam.authentication.orb.local}
+      # 门户地址（浏览器可达，各环境由 .env.<env> 覆盖；默认 localhost 兑底，规范 R1）
+      - PORTAL_URL=${PORTAL_URL:-http://localhost:8088}
+      # 应用跳转地址（浏览器可达，统一网关端口兑底；各环境由 .env.<env> 覆盖，规范 R1）
+      - APP_URL_TASK_MANAGER=${APP_URL_TASK_MANAGER:-http://localhost:8089}
+      - APP_URL_CLOUD_MANAGER=${APP_URL_CLOUD_MANAGER:-http://localhost:8090}
+      - APP_URL_WORKFLOW_CENTER=${APP_URL_WORKFLOW_CENTER:-http://localhost:8091}
+      - APP_URL_EVENT_MANAGER=${APP_URL_EVENT_MANAGER:-http://localhost:8092}
+      - APP_URL_RELEASE_MANAGER=${APP_URL_RELEASE_MANAGER:-http://localhost:8093}
+      - APP_URL_PERMISSION_CENTER=${APP_URL_PERMISSION_CENTER:-http://localhost:8094}
       - APP_URL_LAM=${APP_URL_LAM:-http://localhost:8083}
-      # Demo 应用跳转地址（云端由 .env.cloud 覆盖为 114.55.244.220:809X）
-      - APP_URL_MOCK_APP=${APP_URL_MOCK_APP:-http://mock.authentication.orb.local}
-      - APP_URL_DIRECT_APP=${APP_URL_DIRECT_APP:-http://direct.authentication.orb.local}
-      - APP_URL_PILOT_APP=${APP_URL_PILOT_APP:-http://localhost:8004}
-      - APP_URL_OIDC_DEMO=${APP_URL_OIDC_DEMO:-http://localhost:8005}
+      # Demo 应用跳转地址
+      - APP_URL_MOCK_APP=${APP_URL_MOCK_APP:-http://localhost:8095}
+      - APP_URL_DIRECT_APP=${APP_URL_DIRECT_APP:-http://localhost:8096}
+      - APP_URL_PILOT_APP=${APP_URL_PILOT_APP:-http://localhost:8097}
+      - APP_URL_OIDC_DEMO=${APP_URL_OIDC_DEMO:-http://localhost:8098}
     ports:
       - "8002:8000"
     volumes:
@@ -103,8 +103,7 @@ services:
     networks:
       - default
       - devops-net
-    labels:
-      - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
 
   portal:
     build: ./frontend
@@ -112,8 +111,7 @@ services:
     # 不对外暴露端口，通过统一网关（:8088）访问
     depends_on:
       - auth-backend
-    labels:
-      - "dev.orbstack.domains=portal.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
     networks:
       - default
       - devops-net
@@ -139,8 +137,7 @@ services:
       - "8003:8003"
     depends_on:
       - auth-backend
-    labels:
-      - "dev.orbstack.domains=direct.${COMPOSE_PROJECT_NAME:-authentication}.orb.local"
+    # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
     networks:
       - default
       - devops-net
@@ -148,7 +145,9 @@ services:
   pilot-app:
     build: ./pilot-app
     container_name: authentication-pilot-app
-    # 试点接入示例：经统一网关访问（不对外直接暴露），模拟真实业务系统接入后
+    # 试点接入示例：Mac 本地经宿主端口 8004 直达；服务器由 .env.server 覆盖为统一网关 8097
+    ports:
+      - "8004:8000"
     depends_on:
       - auth-backend
     networks:
@@ -176,24 +175,8 @@ services:
       - default
       - devops-net
 
-  traefik:
-    image: traefik:v3.2
-    container_name: authentication-gateway
-    ports:
-      - "28001:80"   # 统一网关入口（forwardAuth 保护 mock-app）；云端改高位端口避开 aianytra-api(8001)
-      - "8004:8004"  # 试点应用入口（forwardAuth 保护 pilot-app）
-      - "28080:8080" # Traefik Dashboard；云端改高位端口避开 aianytra-frontend(8080)
-    volumes:
-      - ./gateway:/etc/traefik:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    depends_on:
-      - auth-backend
-      - mock-app
-    labels:
-      - "dev.orbstack.domains=mock.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,traefik.${COMPOSE_PROJECT_NAME:-authentication}.orb.local,cloud.authentication.orb.local,workflow.authentication.orb.local,iam.authentication.orb.local"
-    networks:
-      - default
-      - devops-net
+  # 自带 Traefik（authentication-gateway）已退役：路由统一收敛到 infra/gateway（规范 R4），
+  # 其 dynamic.yml 曾引用本项目不存在的服务（cloud-manager-service 等），属 Mac 单机 Demo 遗留。
 
 volumes:
   ldap-data:

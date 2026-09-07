@@ -40,8 +40,7 @@ services:
     volumes:
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
       - ./dynamic:/etc/traefik/dynamic:ro
-    labels:
-      - "dev.orbstack.domains=devops.orb.local,portal.devops.orb.local,cloud.devops.orb.local,event.devops.orb.local,iam.devops.orb.local,release.devops.orb.local,cmdb.devops.orb.local,workflow.devops.orb.local,api.auth.devops.orb.local,traefik.devops.orb.local"
+    # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
     networks:
       - devops-net
 

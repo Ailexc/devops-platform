@@ -1,0 +1,14 @@
+# ReleaseManager OrbStack 专属配置（仅 Mac + OrbStack 生效；Linux 上无害）
+# 规范 R3：平台特有能力不放 base compose 文件
+services:
+  release-backend:
+    labels:
+      - "dev.orbstack.domains=api.${COMPOSE_PROJECT_NAME:-release-system}.orb.local"
+
+  release-frontend:
+    labels:
+      - "dev.orbstack.domains=frontend.${COMPOSE_PROJECT_NAME:-release-system}.orb.local"
+
+  release-executor:
+    labels:
+      - "dev.orbstack.domains=executor.${COMPOSE_PROJECT_NAME:-release-system}.orb.local"

@@ -20,7 +20,8 @@ services:
       - DATABASE_URL=postgresql://devops:devops@devops-postgres:5432/devops_workflow
       - REDIS_URL=redis://devops-redis:6379/6
       - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-key-change-in-production}
-      - ALLOWED_HOSTS=api.workflow.orb.local,frontend.workflow.orb.local,workflow-api,.devops.orb.local
+      # ALLOWED_HOSTS 由 .env.<env> 插值注入；默认通配兑底（规范 R2：白名单只进 env 文件）
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*,localhost}
       # AI 配置（密钥仅通过环境变量注入，不落库）
       - AI_DEFAULT_PROVIDER=${AI_DEFAULT_PROVIDER:-xiaomi}
       - AI_XIAOMI_API_KEY=${AI_XIAOMI_API_KEY:-}
@@ -34,8 +35,7 @@ services:
       - AI_QWEN_API_KEY=${AI_QWEN_API_KEY:-}
       - AI_QWEN_API_BASE=${AI_QWEN_API_BASE:-}
       - AI_OLLAMA_API_BASE=${AI_OLLAMA_API_BASE:-}
-    labels:
-      dev.orbstack.domains: api.workflow.orb.local
+    # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
     volumes:
       - ./backend:/app
     restart: unless-stopped
@@ -48,9 +48,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: workflow-frontend
-    # 不对外暴露端口，通过统一网关（:8088）访问
-    labels:
-      dev.orbstack.domains: frontend.workflow.orb.local
+    # 不对外暴露端口，通过统一网关（:8088）访问；OrbStack 标签已移至 override（规范 R3）
     depends_on:
       - api
     networks:

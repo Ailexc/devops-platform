@@ -1,0 +1,10 @@
+# WorkFlowCenter OrbStack 专属配置（仅 Mac + OrbStack 生效；Linux 上无害）
+# 规范 R3：平台特有能力不放 base compose 文件
+services:
+  api:
+    labels:
+      - "dev.orbstack.domains=api.workflow.orb.local"
+
+  frontend:
+    labels:
+      - "dev.orbstack.domains=frontend.workflow.orb.local"

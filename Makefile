@@ -79,7 +79,7 @@ portal: ## 打开统一门户（本地 OrbStack 用 orb.local；服务器用 SER
 
 gateway-up: ## 启动统一网关（Traefik 聚合 7 系统，入口 *.devops.orb.local）
 	@bash scripts/generate-routes.sh
-	@$(DC) -f infra/gateway/docker-compose.yml up -d
+	@$(DC) -f infra/gateway/docker-compose.yml -f infra/gateway/docker-compose.override.yml up -d
 	@SERVER_IP=$$(grep '^SERVER_IP=' deploy/server/.env.server 2>/dev/null | cut -d= -f2); \
 	if [ -n "$$SERVER_IP" ]; then \
 		echo "统一入口：http://$$SERVER_IP:8088 （Dashboard: http://$$SERVER_IP:8086/dashboard/）"; \
@@ -88,10 +88,13 @@ gateway-up: ## 启动统一网关（Traefik 聚合 7 系统，入口 *.devops.or
 	fi
 
 gateway-down: ## 停止统一网关
-	@$(DC) -f infra/gateway/docker-compose.yml down
+	@$(DC) -f infra/gateway/docker-compose.yml -f infra/gateway/docker-compose.override.yml down
 
 gateway-ps: ## 查看统一网关状态与路由
-	@$(DC) -f infra/gateway/docker-compose.yml ps
+	@$(DC) -f infra/gateway/docker-compose.yml -f infra/gateway/docker-compose.override.yml ps
+
+ldap: ## 启动 LDAP 身份源（openldap + LAM 管理台 :8083，--profile ldap）
+	@cd $(AUTH_DIR) && $(DC) --profile ldap up -d
 
 deploy-server: ## 一键部署到本地/自建服务器（构建 iam 镜像 + bootstrap + start + gateway + 验证）
 	@bash scripts/deploy-server.sh $(RESET)

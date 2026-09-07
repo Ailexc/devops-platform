@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "RS256"
     jwt_access_expire_minutes: int = 60
     jwt_refresh_expire_days: int = 7
-    issuer: str = "auth.devops.orb.local"
+    issuer: str = "http://localhost:8099"  # JWT iss 声明（浏览器可达兑底，规范 R1；各环境可覆盖）
     audience: str = "devops-portal"
 
     # 数据库

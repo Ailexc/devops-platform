@@ -1,0 +1,15 @@
+# OrbStack 专属配置（仅 Mac + OrbStack 生效；Linux 上标签被忽略，无害）
+# 规范 R3：平台特有能力不放 base compose 文件
+# 用法：与 docker-compose.yml 同目录时，`docker compose up` 自动叠加本文件
+services:
+  api:
+    labels:
+      - "dev.orbstack.domains=api.event-management.orb.local"
+
+  go-api:
+    labels:
+      - "dev.orbstack.domains=api.go-event-management.orb.local"
+
+  frontend:
+    labels:
+      - "dev.orbstack.domains=frontend.event-management.orb.local"

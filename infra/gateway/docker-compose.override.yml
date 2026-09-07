@@ -1,0 +1,7 @@
+# 统一网关 OrbStack 专属配置（仅 Mac + OrbStack 生效；Linux 上标签被忽略，无害）
+# 规范 R3：平台特有能力不放 base compose 文件
+# 注意：Makefile gateway-up/down/ps 已成对加载本文件
+services:
+  traefik:
+    labels:
+      - "dev.orbstack.domains=devops.orb.local,portal.devops.orb.local,cloud.devops.orb.local,event.devops.orb.local,iam.devops.orb.local,release.devops.orb.local,cmdb.devops.orb.local,workflow.devops.orb.local,api.auth.devops.orb.local,traefik.devops.orb.local"

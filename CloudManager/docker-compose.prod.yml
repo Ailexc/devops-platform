@@ -20,8 +20,9 @@ services:
       - REDIS_PASSWORD=
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-your-secret-key-here}
       - DJANGO_DEBUG=false
-      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-*,backend,cloud_manager_backend,cloud-manager-backend.orb.local}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://cloud-manager-nginx.orb.local,http://cloud-manager-backend.orb.local}
+      # 默认通配兑底（规范 R2：白名单只进 .env.<env>）；CORS 兑底 = 统一网关本地入口
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-*,localhost}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8090}
     restart: unless-stopped
     networks:
       - cloud_net
