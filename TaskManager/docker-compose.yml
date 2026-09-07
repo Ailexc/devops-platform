@@ -29,8 +29,9 @@ services:
       CELERY_BROKER_URL: "amqp://devops:devops@devops-rabbitmq:5672//"
       # ALLOWED_HOSTS 由 .env.<env> 插值注入；默认通配兑底（规范 R2：白名单只进 env 文件）
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-*,localhost}"
-      HTTP_PROXY: "http://host.docker.internal:7897"
-      HTTPS_PROXY: "http://host.docker.internal:7897"
+      # 外呼代理由环境变量注入，默认空 = 直连（规范 R1；Mac 需代理时在 .env.local 给值）
+      HTTP_PROXY: "${HTTP_PROXY:-}"
+      HTTPS_PROXY: "${HTTPS_PROXY:-}"
       NO_PROXY: "localhost,127.0.0.1,devops-postgres,devops-redis,devops-rabbitmq,.orb.local"
     # OrbStack 专属域名标签已移至 docker-compose.override.yml（规范 R3）
     networks:
@@ -48,8 +49,8 @@ services:
       DATABASE_URL: "postgresql://devops:devops@devops-postgres:5432/devops_cmdb"
       REDIS_URL: "redis://devops-redis:6379/5"
       CELERY_BROKER_URL: "amqp://devops:devops@devops-rabbitmq:5672//"
-      HTTP_PROXY: "http://host.docker.internal:7897"
-      HTTPS_PROXY: "http://host.docker.internal:7897"
+      HTTP_PROXY: "${HTTP_PROXY:-}"
+      HTTPS_PROXY: "${HTTPS_PROXY:-}"
       NO_PROXY: "localhost,127.0.0.1,devops-postgres,devops-redis,devops-rabbitmq,.orb.local"
     networks:
       - default
@@ -65,8 +66,8 @@ services:
       DATABASE_URL: "postgresql://devops:devops@devops-postgres:5432/devops_cmdb"
       REDIS_URL: "redis://devops-redis:6379/5"
       CELERY_BROKER_URL: "amqp://devops:devops@devops-rabbitmq:5672//"
-      HTTP_PROXY: "http://host.docker.internal:7897"
-      HTTPS_PROXY: "http://host.docker.internal:7897"
+      HTTP_PROXY: "${HTTP_PROXY:-}"
+      HTTPS_PROXY: "${HTTPS_PROXY:-}"
       NO_PROXY: "localhost,127.0.0.1,devops-postgres,devops-redis,devops-rabbitmq,.orb.local"
     networks:
       - default
@@ -85,8 +86,8 @@ services:
       REDIS_DB: "7"
       CMDB_ROLE: "all"
       PORT: "8080"
-      HTTP_PROXY: "http://host.docker.internal:7897"
-      HTTPS_PROXY: "http://host.docker.internal:7897"
+      HTTP_PROXY: "${HTTP_PROXY:-}"
+      HTTPS_PROXY: "${HTTPS_PROXY:-}"
       NO_PROXY: "localhost,127.0.0.1,devops-postgres,devops-redis,.orb.local"
     networks:
       - default
