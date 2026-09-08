@@ -36,7 +36,8 @@ services:
       - "8097:8097"      # 演示 pilot-app（网关 forwardAuth 保护）
       - "8098:8098"      # 演示 oidc-demo（OIDC 授权码）
       - "8099:8099"      # 认证中心 API（authorize/token/userinfo/jwks）
-      - "8086:8086"      # Traefik Dashboard（独立端口，避免与门户 8088 的 /api 冲突）
+      - "8086:8080"      # Traefik Dashboard/API（api.insecure 监听容器内 :8080；
+                         #  原误映射 8086:8086→web-dash 空入口，Dashboard 一直 404）
     volumes:
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
       - ./dynamic:/etc/traefik/dynamic:ro

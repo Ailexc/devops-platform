@@ -4,6 +4,8 @@
 !.env.example
 !.env.cloud
 !.env.server
+# 环境声明（本地状态，不入仓）：make use E=xx 写入，load_env 优先读取
+.env-active
 # 演示环境 .env 允许提交（无真实密钥，便于 git clone 后一键部署）
 !Authentication/.env
 !CloudManager/.env

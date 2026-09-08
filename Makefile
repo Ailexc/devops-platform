@@ -1,100 +1,92 @@
 # ============================================================
 # DevOpsPlatform —— 统一管理入口
-# 目标：统一构建 / 统一部署 / 统一数据重置 / 统一入口
-# 快速开始：make bootstrap → make up P=auth → make status
+# 日常：make（交互菜单）· make start · make reset · make env
+# 环境：make use E=local|server|cloud（显式声明，禁止靠猜）
 # 完整命令：make help
 # ============================================================
 SHELL := /bin/bash
-.DEFAULT_GOAL := help
+.DEFAULT_GOAL := menu
 
-# ---------- 配置 ----------
 DC         := docker compose
 INFRA_CMP  := infra/docker-compose.yml
+AUTH_DIR   := Authentication
 
-# 项目短名 → 目录
-AUTH_DIR    := Authentication
-CLOUD_DIR   := CloudManager
-EVENT_DIR   := EventManager
-IAM_DIR     := PermissionCenter
-RELEASE_DIR := ReleaseManager
-CMDB_DIR    := TaskManager
-WORKFLOW_DIR:= WorkFlowCenter
+.PHONY: help menu env use ports start down reset seed demo-reset status logs portal backup gateway-up gateway-down gateway-ps ldap build up deploy deploy-server deploy-cloud
 
-PROJECT_DIRS := $(AUTH_DIR) $(CLOUD_DIR) $(EVENT_DIR) $(IAM_DIR) $(RELEASE_DIR) $(CMDB_DIR) $(WORKFLOW_DIR)
+help: ## 显示分组帮助
+	@awk 'BEGIN{FS=":.*?## "} /^# @group/{gsub(/^# @group[ ]*/,""); printf "\n\033[1m%s\033[0m\n",$$0} /^[a-zA-Z_%-]+:.*?## /{printf "  \033[36m%-13s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@echo ""
 
-# 统一 PostgreSQL 的业务库（一实例多库）
-DBS := devops_auth devops_cloud devops_event devops_iam devops_release devops_cmdb devops_workflow
+# @group 常用
+menu: ## 交互式菜单（裸 make 进入；CI 自动降级为 help）
+	@bash scripts/menu.sh
 
-.PHONY: help bootstrap status build up start down seed reset demo-reset ps logs portal backup gateway-up gateway-down gateway-ps
+env: ## 查看当前环境与关键地址
+	@bash scripts/env.sh
 
-help: ## 显示帮助
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
+use: ## 切换环境（make use E=local|server|cloud）
+	@bash scripts/env.sh use "$(E)"
 
-bootstrap: ## 启动统一基础设施（PostgreSQL + Redis）并创建 10 个业务库
-	@bash scripts/bootstrap.sh
+start: ## 启动全部（缺省）/ 单项目（P=auth|cloud|...）；含演示数据确保（preflight）
+	@RESET_ON_START="$(RESET_ON_START)" bash scripts/start.sh "$(P)"
 
-status: ## 查看统一基础设施与业务容器状态
+down: ## 停止全部（缺省）/ 单项目（P=xx）；保留数据卷
+	@bash scripts/compose.sh down "$(P)"
+
+reset: ## 恢复出厂态（默认快速复用镜像；FULL=1 先重建镜像；P=单项目）
+	@NO_BUILD=$$( [ "$(FULL)" = "1" ] && echo 0 || echo 1 ); bash scripts/reset-all.sh "$(P)"
+
+seed: ## 补齐演示数据（幂等，不破坏现有数据）
+	@bash scripts/preflight.sh
+
+status: ## 状态总览（基础设施 + 业务容器）
 	@echo "── 统一基础设施 ──"
 	@$(DC) -f $(INFRA_CMP) ps
 	@echo ""
 	@echo "── 业务容器 ──"
 	@docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'NAMES|devops|auth|cloud|event|iam|release|cmdb|task|workflow' || echo "（暂无业务容器）"
 
-build: ## 构建镜像（make build P=auth 单项目；不带 P 则全部）
-	@bash scripts/compose.sh build "$(P)"
+ports: ## 端口映射与网关路由清单（--doc 查看设计基准）
+	@bash scripts/ports.sh
 
-up: ## 启动（make up P=auth 单项目；不带 P 则全部，不重置数据）
-	@bash scripts/compose.sh up "$(P)"
-
-start: ## 统一启动入口（make start P=auth；RESET_ON_START=true 先重置出厂态再启动）
-	@RESET_ON_START="$(RESET_ON_START)" bash scripts/start.sh "$(P)"
-
-down: ## 停止（make down P=auth 单项目；不带 P 则全部，保留数据卷）
-	@bash scripts/compose.sh down "$(P)"
-
-seed: ## 初始化数据（make seed P=auth 单项目；不带 P 则全部）
-	@bash scripts/seed.sh "$(P)"
-
-reset: ## 数据重置（make reset P=auth 单项目；不带 P 则全量重置回出厂态）
-	@bash scripts/reset-all.sh "$(P)"
-
-demo-reset: ## 一键恢复到干净出厂态（演示专用：DB 硬重建 + Redis 清空 + 全部重建启动 + 冒烟）
-	@bash scripts/demo-reset.sh
-
-backup: ## 统一数据备份（切换到 backups/<时间戳>/）
-	@bash scripts/backup.sh
-
-ps: status ## 同 status
-
-logs: ## 查看单项目日志（make logs P=auth）
+logs: ## 单项目日志（P=auth）
 	@bash scripts/compose.sh logs "$(P)"
 
-portal: ## 打开统一门户（本地 OrbStack 用 orb.local；服务器用 SERVER_IP:8088）
-	@SERVER_IP=$$(grep '^SERVER_IP=' deploy/server/.env.server 2>/dev/null | cut -d= -f2); \
-	if [ -n "$$SERVER_IP" ]; then \
-		echo "门户地址：http://$$SERVER_IP:8088"; \
-	else \
-		open http://portal.authentication.orb.local 2>/dev/null || echo "门户地址：http://portal.authentication.orb.local"; \
-	fi
+portal: ## 门户地址
+	@bash scripts/env.sh portal
 
-gateway-up: ## 启动统一网关（Traefik 聚合 7 系统，入口 *.devops.orb.local）
+# @group 高级
+build: ## 构建镜像（P=单项目；缺省全部）
+	@bash scripts/compose.sh build "$(P)"
+
+up: ## 裸 compose up（跳过 infra 检查/演示数据确保；日常请用 start）
+	@bash scripts/compose.sh up "$(P)"
+
+demo-reset: ## （兼容别名）= make reset
+	@NO_BUILD=$$( [ "$(FULL)" = "1" ] && echo 0 || echo 1 ); bash scripts/reset-all.sh "$(P)"
+
+backup: ## 统一数据备份（切换 backups/<时间戳>/）
+	@bash scripts/backup.sh
+
+gateway-up: ## 启动统一网关（Traefik，入口 :8088）
 	@bash scripts/generate-routes.sh
 	@$(DC) -f infra/gateway/docker-compose.yml -f infra/gateway/docker-compose.override.yml up -d
-	@SERVER_IP=$$(grep '^SERVER_IP=' deploy/server/.env.server 2>/dev/null | cut -d= -f2); \
-	if [ -n "$$SERVER_IP" ]; then \
-		echo "统一入口：http://$$SERVER_IP:8088 （Dashboard: http://$$SERVER_IP:8086/dashboard/）"; \
-	else \
-		echo "统一入口：http://portal.devops.orb.local （Dashboard: http://traefik.devops.orb.local）"; \
-	fi
+	@bash scripts/env.sh portal
 
 gateway-down: ## 停止统一网关
 	@$(DC) -f infra/gateway/docker-compose.yml -f infra/gateway/docker-compose.override.yml down
 
-gateway-ps: ## 查看统一网关状态与路由
+gateway-ps: ## 统一网关状态
 	@$(DC) -f infra/gateway/docker-compose.yml -f infra/gateway/docker-compose.override.yml ps
 
-ldap: ## 启动 LDAP 身份源（openldap + LAM 管理台 :8083，--profile ldap）
+ldap: ## 启动 LDAP 身份源（openldap + LAM 管理台 :8083）
 	@cd $(AUTH_DIR) && $(DC) --profile ldap up -d
 
-deploy-server: ## 一键部署到本地/自建服务器（构建 iam 镜像 + bootstrap + start + gateway + 验证）
+deploy: ## 一键部署（RESET=1 出厂态；PULL=1 拉代码；环境按 make use 声明）
+	@a=""; [ "$(RESET)" = "1" ] && a="$$a --reset"; [ "$(PULL)" = "1" ] && a="$$a --pull"; bash scripts/deploy.sh $$a
+
+deploy-server: ## （兼容别名）= 自建服务器一键部署
 	@bash scripts/deploy-server.sh $(RESET)
+
+deploy-cloud: ## （兼容别名）= 阿里云 ECS 一键部署
+	@bash scripts/deploy-cloud.sh $(RESET)

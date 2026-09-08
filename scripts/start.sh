@@ -85,11 +85,12 @@ else
     start_one "${p}" || true
   done
   log "全部项目已启动"
+
+  # ---- 4. 演示数据确保（非破坏性幂等；仅全量启动时执行）----
+  # 收编原 deploy-server.sh 独有的 5.5~5.8 步骤，make start 与 deploy 单一标准
+  log "确保演示数据就绪（preflight，幂等）"
+  bash scripts/preflight.sh || err "preflight 有失败项（不影响容器运行；可重试：make seed）"
 fi
 
-# 就绪提示按环境区分：本地 OrbStack 用 orb.local 域名；服务器用 SERVER_IP:8088
-if [ "${ENV:-}" = "server" ] || [ "${ENV:-}" = "cloud" ]; then
-  log "启动完成。统一门户: ${PORTAL_URL:-http://${SERVER_IP:-localhost}:8088}"
-else
-  log "启动完成。统一门户: http://portal.authentication.orb.local"
-fi
+# 就绪提示按环境区分：统一用 PORTAL_URL / SERVER_IP（规范 R1：环境只管参数）
+log "启动完成。统一门户: ${PORTAL_URL:-http://${SERVER_IP:-localhost}:8088}"
