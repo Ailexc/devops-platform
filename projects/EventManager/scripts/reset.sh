@@ -5,10 +5,10 @@
 # 顶层 reset-all.sh 爆破数据层后调用；也可独立运行
 # ============================================================
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../../.."
 source scripts/lib.sh
 load_env >/dev/null
-cd EventManager
+cd projects/EventManager
 
 echo "── [event] 清库重建 + 演示数据（init-all.sh，Python+Go 双栈）..."
 exec bash scripts/init-all.sh -c -t "${EVENT_SEED_COUNT:-1000}"

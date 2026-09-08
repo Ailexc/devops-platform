@@ -9,7 +9,7 @@ SHELL := /bin/bash
 
 DC         := docker compose
 INFRA_CMP  := infra/docker-compose.yml
-AUTH_DIR   := Authentication
+AUTH_DIR   := projects/Authentication
 
 .PHONY: help menu env use ports start down reset seed demo-reset status logs portal backup gateway-up gateway-down gateway-ps ldap build up deploy deploy-server deploy-cloud
 

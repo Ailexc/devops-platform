@@ -52,8 +52,8 @@ ok "Docker 就绪：$(docker --version)"
 # ---------- 2. PermissionCenter：容器内多阶段构建 ----------
 # GOARCH 按环境注入（.env.server=amd64 / .env.local=arm64），不再硬编码（规范 R1 同族）
 log "构建 PermissionCenter 镜像（GOARCH=${GOARCH:-amd64}，容器内多阶段）..."
-docker build -f PermissionCenter/backend/Dockerfile.build --build-arg GOARCH="${GOARCH:-amd64}" -t iam-backend PermissionCenter/backend
-docker build -f PermissionCenter/frontend/Dockerfile -t iam-frontend PermissionCenter/frontend
+docker build -f projects/PermissionCenter/backend/Dockerfile.build --build-arg GOARCH="${GOARCH:-amd64}" -t iam-backend projects/PermissionCenter/backend
+docker build -f projects/PermissionCenter/frontend/Dockerfile -t iam-frontend projects/PermissionCenter/frontend
 
 # ---------- 3. 基础设施 + 全量启动（含 preflight 演示数据）----------
 log "启动统一基础设施并创建业务库"

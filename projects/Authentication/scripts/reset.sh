@@ -5,11 +5,11 @@
 # 顶层 reset-all.sh 爆破数据层后调用；也可独立运行（--full 连 LDAP 卷一起重置）
 # ============================================================
 set -euo pipefail
-cd "$(dirname "$0")/../.."                    # → 仓库根
+cd "$(dirname "$0")/../../.."                    # → 仓库根
 source scripts/lib.sh
 load_env >/dev/null                           # 独立运行时自识别环境
 NO_BUILD="${NO_BUILD:-0}"
-cd Authentication
+cd projects/Authentication
 
 FULL_FLAG="${1:-}"
 

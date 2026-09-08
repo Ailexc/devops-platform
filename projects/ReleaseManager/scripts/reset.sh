@@ -5,10 +5,10 @@
 # 顶层 reset-all.sh 爆破数据层后调用；也可独立运行
 # ============================================================
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../../.."
 source scripts/lib.sh
 load_env >/dev/null
-cd ReleaseManager
+cd projects/ReleaseManager
 
 # 快速模式（NO_BUILD=1，顶层 make reset 默认）复用现有镜像；默认 -y 跳过确认
 ARGS="-y"

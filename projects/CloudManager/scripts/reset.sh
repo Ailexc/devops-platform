@@ -8,7 +8,7 @@
 #       仅补生成成本优化报告（entrypoint 未覆盖的 [8/8]）。
 # ============================================================
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../../.."
 source scripts/lib.sh
 load_env >/dev/null
 
@@ -19,6 +19,6 @@ echo "── [cloud] 等待就绪..."
 wait_container_ready cloud_manager_backend "Booting worker|Listening at|Application startup complete" 240
 
 echo "── [cloud] 生成成本优化报告..."
-( cd CloudManager && docker compose exec -T backend python manage.py shell -c "from cost.engine import run_all; r = run_all(trigger='manual', operator='seed'); print('  ✓ 优化报告已生成: ' + r.report_no)" )
+( cd projects/CloudManager && docker compose exec -T backend python manage.py shell -c "from cost.engine import run_all; r = run_all(trigger='manual', operator='seed'); print('  ✓ 优化报告已生成: ' + r.report_no)" )
 
 ok "  ✓ cloud 重置完成"

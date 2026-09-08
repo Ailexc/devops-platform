@@ -5,7 +5,7 @@
 > 每一个子项目都是完整的可运行 Demo（前端 + 后端 + 数据库 + 网关），既可独立演示，也可串成一条「多云 DevOps 平台」的完整故事线。
 > 该合集作为个人技术作品集，用于面试展示与复盘。
 
-[🚀 在线展示页（showcase）](./showcase/index.html) · [📖 统一门户说明](./Authentication/README.md) · [🧭 免费部署计划](./免费部署计划.md)
+[🚀 在线展示页（showcase）](./docs/showcase/index.html) · [📖 统一门户说明](./projects/Authentication/README.md) · [🧭 免费部署计划](./免费部署计划.md)
 
 ---
 
@@ -64,7 +64,7 @@
                     └──────────────────────────┘
 ```
 
-> 详细架构图见 [docs/overall-architecture.md](./docs/overall-architecture.md)；动态版见 [showcase/index.html](./showcase/index.html)。
+> 详细架构图见 [docs/overall-architecture.md](./docs/overall-architecture.md)；动态版见 [showcase/index.html](./docs/showcase/index.html)。
 
 ---
 
@@ -87,49 +87,23 @@
 ```
 DevOpsPlatform/
 ├── README.md                # 👈 本文件：合集说明
+├── Makefile                 # 统一管理入口（make / make start / make reset ...）
 ├── docs/
-│   └── overall-architecture.md  # 整体架构图（Mermaid）
-├── showcase/                # 🚀 项目介绍展示页（静态可部署，滚动画卷式）
-│   └── index.html
+│   ├── overall-architecture.md  # 整体架构图（Mermaid）
+│   ├── showcase/                # 🚀 项目介绍展示页（静态可部署，滚动画卷式）
+│   └── ...                      # 治理规范 / 部署方案 / 端口分配等
+├── deploy/                  # 多环境变量（local / cloud / server）
+├── infra/                   # 统一基础设施（PG/Redis/RabbitMQ）+ 统一网关（Traefik）
+├── scripts/                 # 平台编排脚本（start / reset 契约调用 / deploy / ports...）
 ├── 免费部署计划.md           # Render 免费部署方案
-├── Authentication/          # 统一认证中心（统一门户 + SSO）
-│   ├── backend/             #   FastAPI 认证中心（JWT/JWKS/身份源降级链）
-│   ├── frontend/            #   React 19 统一门户
-│   ├── gateway/             #   Traefik forwardAuth 网关
-│   ├── ldap/                #   OpenLDAP 演示目录树
-│   ├── mock-app/            #   受网关保护的演示业务应用
-│   └── docs/                #   设计文档 + 面试准备 + 演示脚本
-├── CloudManager/            # 多云管理系统
-│   ├── backend/             #   Django 后端 + 多云适配层
-│   ├── frontend/            #   Vue 3 仿 AWS 控制台
-│   ├── docs/                #   架构设计 + 面试准备 + 路线图
-│   └── docker-compose.yml
-├── EventManager/            # 事件管理系统（EventFlow）
-│   ├── backend/             #   Python Django + Ninja + Celery
-│   ├── backend-go/          #   Go 后端（GORM + PostgreSQL）
-│   ├── frontend/            #   React + Vite
-│   └── Makefile
-├── PermissionCenter/        # 权限中心（IAM）
-│   ├── backend/             #   Go：iam-server / iam-agent / mock-cmdb / mock-identity
-│   ├── frontend/            #   Vue 3 管理控制台
-│   ├── deploy/              #   docker-compose + Traefik
-│   └── docs/
-├── ReleaseManager/          # 发布系统
-│   ├── backend/             #   Django + DRF
-│   ├── frontend/            #   React 18 + Ant Design
-│   ├── executor/            #   FastAPI 执行端
-│   ├── demo-apps/           #   go / node / python 三种 Demo 应用
-│   ├── k8s/                 #   kind 集群脚本
-│   └── SPEC.md
-├── TaskManager/             # CMDB 数据维护平台
-│   ├── backend/             #   Django + Celery
-│   ├── go-backend/          #   Go 重写版（Gin + asynq）
-│   ├── frontend/            #   Vue 3
-│   └── DEPLOY.md
-└── WorkFlowCenter/          # 工作流平台
-    ├── backend/             #   Django 5 + DRF
-    ├── frontend/            #   Vue 3 + Element Plus + LogicFlow
-    └── docs/                #   行业调研 + 系统设计 + 集成设计
+└── projects/                # ← 业务项目层（7 个真实系统）
+    ├── Authentication/      # 统一认证中心（统一门户 + SSO）
+    ├── CloudManager/        # 多云管理系统
+    ├── EventManager/        # 事件管理系统（EventFlow，Python + Go 双栈）
+    ├── PermissionCenter/    # 权限中心（IAM）
+    ├── ReleaseManager/      # 发布系统（含 executor / demo-apps / k8s）
+    ├── TaskManager/         # CMDB 数据维护平台（Django + Go 双栈）
+    └── WorkFlowCenter/      # 工作流平台
 ```
 
 ---
@@ -191,21 +165,21 @@ docker compose up -d --build
 
 | 系统 | 快速开始 | 本地访问（OrbStack） |
 |------|----------|---------------------|
-| Authentication | [README](./Authentication/README.md) | `portal.authentication.orb.local` |
-| CloudManager | [README](./CloudManager/README.md) | `cloud-manager-nginx.orb.local` |
+| Authentication | [README](./projects/Authentication/README.md) | `portal.authentication.orb.local` |
+| CloudManager | [README](./projects/CloudManager/README.md) | `cloud-manager-nginx.orb.local` |
 | EventManager | [README](./EventManager/README.md) | `frontend.event-management.orb.local` |
 | PermissionCenter | [README](./PermissionCenter/README.md) | `frontend.permission-center.orb.local` |
 | ReleaseManager | [README](./ReleaseManager/README.md) | `frontend.release-system.orb.local` |
 | TaskManager | [README](./TaskManager/README.md) | `localhost`（Docker Compose） |
 | WorkFlowCenter | [README](./WorkFlowCenter/README.md) | `frontend.workflow.orb.local` |
 
-> 💡 多项目同时开发时遵循 OrbStack 域名约定（不暴露端口、不写死 localhost），详见 [CloudManager/DEV_CONVENTION.md](./CloudManager/DEV_CONVENTION.md)。
+> 💡 多项目同时开发时遵循 OrbStack 域名约定（不暴露端口、不写死 localhost），详见 [CloudManager/DEV_CONVENTION.md](./projects/CloudManager/DEV_CONVENTION.md)。
 
 ---
 
 ## 六、面试演示建议
 
-1. **打开展示页** [showcase/index.html](./showcase/index.html) —— 用滚动动画先讲一遍全家桶整体架构
+1. **打开展示页** [showcase/index.html](./docs/showcase/index.html) —— 用滚动动画先讲一遍全家桶整体架构
 2. **进入统一门户** —— 展示 SSO 登录、应用广场、一键跳转业务系统
 3. **逐个系统深挖** —— 按面试官兴趣选择 1~2 个系统演示核心链路（权限中心 / 发布系统 / 工作流平台均有现成 demo 脚本）
 4. **技术点收尾** —— 各项目 `docs/` 均有面试准备文档（叙事线 + 高频问题）
@@ -214,7 +188,7 @@ docker compose up -d --build
 
 ## 七、部署说明
 
-- **本展示页**：纯静态单文件，可部署到 GitHub Pages / Cloudflare Pages / Render 任意静态托管，见 [showcase/README.md](./showcase/README.md)
+- **本展示页**：纯静态单文件，可部署到 GitHub Pages / Cloudflare Pages / Render 任意静态托管，见 [docs/showcase/README.md](./docs/showcase/README.md)
 - **全套系统**：Render 免费 Hobby 计划（每个系统一个 Web Service + SQLite），详见 [免费部署计划.md](./免费部署计划.md)
 
 ---

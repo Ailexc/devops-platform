@@ -55,7 +55,7 @@ fi
 if [ "${BUILD}" = "1" ]; then
   log "构建全部业务镜像（BUILD=1）..."
   bash scripts/compose.sh build
-  # 认证项目（含演示 mock/direct/pilot/oidc + 认证 API）由 Authentication/reset.sh 构建启动
+  # 认证项目（含演示 mock/direct/pilot/oidc + 认证 API）由 projects/Authentication/scripts/reset.sh 构建启动
   # 统一网关单独构建（聚合 7 系统 + 演示 app + 认证 API 到 8088-8099）
   log "构建统一网关镜像 ..."
   docker compose -f infra/gateway/docker-compose.yml build
@@ -71,7 +71,7 @@ if [ "${BUILD}" = "1" ]; then
 else
   NO_BUILD=1 bash scripts/reset-all.sh
 fi
-# 说明：reset-all.sh 阶段三 auth 分支已调用 Authentication/reset.sh
+# 说明：reset-all.sh 阶段三 auth 分支已调用 projects/Authentication/scripts/reset.sh
 #   （内含 drop schema + 种子 + 认证/门户/演示 app/认证 API 的 up --build），
 #   故认证相关服务无需在此重复构建/启动。
 

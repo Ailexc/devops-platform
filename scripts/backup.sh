@@ -15,11 +15,11 @@ log "备份目录：${DIR}"
 
 # ---- 1) SQLite / 本地文件备份（若存在） ----
 SQLITE_FILES=(
-  "Authentication/data/auth.db"
-  "Authentication/backend/auth.db"
-  "ReleaseManager/backend/db.sqlite3"
-  "WorkFlowCenter/backend/db.sqlite3"
-  "TaskManager/backend/db.sqlite3"
+  "projects/Authentication/data/auth.db"
+  "projects/Authentication/backend/auth.db"
+  "projects/ReleaseManager/backend/db.sqlite3"
+  "projects/WorkFlowCenter/backend/db.sqlite3"
+  "projects/TaskManager/backend/db.sqlite3"
 )
 for f in "${SQLITE_FILES[@]}"; do
   if [ -f "$f" ]; then

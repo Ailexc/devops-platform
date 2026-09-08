@@ -7,7 +7,7 @@
 #       并发 migrate 会触发 pg_type_typname_nsp_index 唯一约束竞态。
 # ============================================================
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../../.."
 source scripts/lib.sh
 load_env >/dev/null
 

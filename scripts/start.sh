@@ -46,7 +46,7 @@ fi
 #    实测表现为 migrate 容器静默挂起（TCP 重试无超时）。
 if [ -z "${P}" ] || [ "${P}" = "iam" ]; then
   log "OpenFGA 数据库迁移检查（幂等）"
-  ( cd PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm \
+  ( cd projects/PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm \
       openfga migrate \
       --datastore-engine postgres \
       --datastore-uri "postgresql://devops:devops@devops-postgres:5432/devops_openfga?sslmode=disable" \

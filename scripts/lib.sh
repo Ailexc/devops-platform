@@ -35,17 +35,18 @@ wait_container_healthy() {
 }
 
 # ── 项目短名 → 目录 / compose 参数（统一映射，全脚本共用）──────────
-# 说明：所有项目统一为根目录 docker-compose.yml（+ 可选 docker-compose.override.yml 自动叠加）；
-#       唯一例外 iam：compose 在 deploy/ 子目录（需成对加载 override）。
+# 说明：业务项目统一在 projects/ 目录下；所有项目主文件为根目录 docker-compose.yml
+#       （+ 可选 docker-compose.override.yml 自动叠加）；唯一例外 iam：compose 在
+#       deploy/ 子目录（需成对加载 override）。
 project_dir() {
   case "$1" in
-    auth)     echo "Authentication" ;;
-    cloud)    echo "CloudManager" ;;
-    event)    echo "EventManager" ;;
-    iam)      echo "PermissionCenter" ;;
-    release)  echo "ReleaseManager" ;;
-    cmdb)     echo "TaskManager" ;;
-    workflow) echo "WorkFlowCenter" ;;
+    auth)     echo "projects/Authentication" ;;
+    cloud)    echo "projects/CloudManager" ;;
+    event)    echo "projects/EventManager" ;;
+    iam)      echo "projects/PermissionCenter" ;;
+    release)  echo "projects/ReleaseManager" ;;
+    cmdb)     echo "projects/TaskManager" ;;
+    workflow) echo "projects/WorkFlowCenter" ;;
     *)        echo "" ;;
   esac
 }

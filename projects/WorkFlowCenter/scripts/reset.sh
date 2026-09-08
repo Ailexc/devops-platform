@@ -7,7 +7,7 @@
 #       （migrate+flush+loaddata+seed，幂等）——避免并发 migrate 冲突。
 # ============================================================
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../../.."
 source scripts/lib.sh
 load_env >/dev/null
 
@@ -18,6 +18,6 @@ echo "── [workflow] 等待就绪（HTTP 探活，规避 stdout 缓冲）..."
 wait_http_ready workflow-api http://127.0.0.1:8000/ 180
 
 echo "── [workflow] 演示数据（reset_demo）..."
-( cd WorkFlowCenter && docker compose exec -T api python manage.py reset_demo )
+( cd projects/WorkFlowCenter && docker compose exec -T api python manage.py reset_demo )
 
 ok "  ✓ workflow 重置完成"

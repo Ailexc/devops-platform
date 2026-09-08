@@ -9,14 +9,14 @@ source scripts/lib.sh
 load_env >/dev/null
 
 log "preflight 1/4：IAM 演示数据（用户/应用/授权模型）"
-( cd PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm iam-server iam-server seed < /dev/null ) \
+( cd projects/PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm iam-server iam-server seed < /dev/null ) \
   && ok "  ✓ IAM seed 完成" \
   || err "  ✗ IAM seed 失败（继续；可单独重试：make seed）"
 
 log "preflight 2/4：LDAP 身份目录 + LAM 管理台"
 ensure_image "osixia/openldap:1.5.0" "docker.1ms.run/osixia/openldap:1.5.0" || true
 ensure_image "ldapaccountmanager/lam:stable" "docker.1ms.run/ldapaccountmanager/lam:stable" || true
-( cd Authentication && docker compose --profile ldap up -d ) \
+( cd projects/Authentication && docker compose --profile ldap up -d ) \
   && ok "  ✓ openldap + lam 已就绪" \
   || err "  ✗ LDAP 启动失败（继续）"
 

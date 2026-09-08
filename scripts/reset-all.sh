@@ -79,11 +79,11 @@ else
   echo "  阶段二：重建 sidecar 迁移（openfga / cmdb-go）"
   # OpenFGA：distroless 镜像需单独 migrate（幂等），须先于 iam 种子（建 store）
   # docker compose run 无 TTY 必须 -T 且 stdin </dev/null（防 SIGTTIN 挂起）
-  ( cd PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm openfga migrate < /dev/null > /tmp/reset-sidecar.log 2>&1 ) \
+  ( cd projects/PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm openfga migrate < /dev/null > /tmp/reset-sidecar.log 2>&1 ) \
     && echo "  ✓ openfga migrate 完成" \
     || { err "openfga migrate 失败（详见 /tmp/reset-sidecar.log）"; exit 1; }
   # cmdb-go：旧容器用旧 hostname，需按当前 compose 重建（--seed 自动迁移+播种）
-  ( cd TaskManager && docker compose up -d --force-recreate go_backend >> /tmp/reset-sidecar.log 2>&1 ) \
+  ( cd projects/TaskManager && docker compose up -d --force-recreate go_backend >> /tmp/reset-sidecar.log 2>&1 ) \
     && echo "  ✓ cmdb-go 已按当前配置重建" \
     || { err "cmdb-go 重建失败（详见 /tmp/reset-sidecar.log）"; exit 1; }
   echo ""
