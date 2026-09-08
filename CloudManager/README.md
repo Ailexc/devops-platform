@@ -79,11 +79,15 @@ docker compose -f docker-compose.yml down
 
 ### 数据一键重置 / 初始化（本地开发）
 
-本地开发时，用 `reset_db.sh` 一键恢复**整个项目数据**（清空 → 迁移 → 全链路种子数据 → 成本优化报告与建议）：
+数据重置已统一到平台重置契约（幂等，含清空 → 迁移 → 全链路种子 → 成本优化报告）：
 
 ```bash
-./reset_db.sh            # 交互确认后重置
-./reset_db.sh --yes      # 跳过交互确认（CI / 无交互环境）
+# 顶层统一入口（推荐）
+make reset P=cloud          # 仅云管（快速，复用镜像）
+make reset                  # 全部项目
+
+# 单项目入口（等价）
+./scripts/reset.sh
 ```
 
 | 参数 | 说明 |

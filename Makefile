@@ -49,6 +49,10 @@ status: ## 状态总览（基础设施 + 业务容器）
 ports: ## 端口映射与网关路由清单（--doc 查看设计基准）
 	@bash scripts/ports.sh
 
+html: ## 起静态服务预览仓库内 HTML 指南（:8899，Ctrl+C 停止）
+	@echo "预览示例：http://localhost:8899/showcase/index.html 或各项目 docs/ 下的设计稿与指南"
+	@python3 -m http.server 8899 --bind 0.0.0.0
+
 logs: ## 单项目日志（P=auth）
 	@bash scripts/compose.sh logs "$(P)"
 
