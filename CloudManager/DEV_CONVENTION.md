@@ -86,7 +86,7 @@ proxy: { target: 'http://backend:8000' }
 python3 manage.py runserver 0.0.0.0:8000
 
 # 正确 ✅ — 通过 Docker 部署
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml up -d --build
 ```
 
 ---
@@ -134,7 +134,7 @@ networks:
 
 ```bash
 # 查看当前项目所有容器
-docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.yml ps
 
 # 查看 OrbStack 分配的域名
 docker inspect --format '{{.Name}}' $(docker ps -q) | sed 's/^[\/ ]*//' | sed 's/_/-/g' | awk '{print $0".orb.local"}'

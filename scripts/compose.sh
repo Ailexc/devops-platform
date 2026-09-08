@@ -5,8 +5,7 @@
 #       bash scripts/compose.sh <action> [project]
 #   action : up | build | down | logs | ps
 #   project: auth/cloud/event/iam/release/cmdb/workflow（空 = 全部）
-# 说明：统一处理各项目 compose 文件位置差异
-#       （CloudManager → docker-compose.prod.yml；PermissionCenter → deploy/）
+# 说明：统一处理各项目 compose 文件位置差异（PermissionCenter → deploy/）
 # ============================================================
 set -euo pipefail
 cd "$(dirname "$0")/.."

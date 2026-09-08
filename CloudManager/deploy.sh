@@ -25,11 +25,11 @@ fi
 
 # 停止之前的容器
 echo "🧹 清理旧容器..."
-docker compose -f docker-compose.prod.yml down 2>/dev/null || true
+docker compose -f docker-compose.yml down 2>/dev/null || true
 
 # 构建并启动
 echo "🔨 构建并启动服务..."
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml up -d --build
 
 echo ""
 echo "⏳ 等待服务启动..."
@@ -46,12 +46,12 @@ echo "  📡 后端:  http://cloud-manager-backend.orb.local/api/"
 echo ""
 echo "  📋 演示账号: admin / admin123"
 echo ""
-echo "  查看日志: docker compose -f docker-compose.prod.yml logs -f"
-echo "  停止服务: docker compose -f docker-compose.prod.yml down"
+echo "  查看日志: docker compose -f docker-compose.yml logs -f"
+echo "  停止服务: docker compose -f docker-compose.yml down"
 echo "========================================="
 echo "  📋 演示账号: admin / admin123"
 echo ""
-echo "  查看日志: $COMPOSE_CMD -f docker-compose.prod.yml logs -f"
-echo "  停止服务: $COMPOSE_CMD -f docker-compose.prod.yml down"
-echo "  重启服务: $COMPOSE_CMD -f docker-compose.prod.yml restart"
+echo "  查看日志: $COMPOSE_CMD -f docker-compose.yml logs -f"
+echo "  停止服务: $COMPOSE_CMD -f docker-compose.yml down"
+echo "  重启服务: $COMPOSE_CMD -f docker-compose.yml restart"
 echo "========================================="

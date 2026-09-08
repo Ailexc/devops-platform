@@ -68,13 +68,13 @@ cp .env.example .env
 # 编辑 .env 文件配置数据库密码等
 
 # 3. 一键部署
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml up -d --build
 
 # 4. 查看日志
-docker compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.yml logs -f
 
 # 5. 停止服务
-docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.yml down
 ```
 
 ### 数据一键重置 / 初始化（本地开发）

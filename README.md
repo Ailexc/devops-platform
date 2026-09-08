@@ -103,7 +103,7 @@ DevOpsPlatform/
 │   ├── backend/             #   Django 后端 + 多云适配层
 │   ├── frontend/            #   Vue 3 仿 AWS 控制台
 │   ├── docs/                #   架构设计 + 面试准备 + 路线图
-│   └── docker-compose.prod.yml
+│   └── docker-compose.yml
 ├── EventManager/            # 事件管理系统（EventFlow）
 │   ├── backend/             #   Python Django + Ninja + Celery
 │   ├── backend-go/          #   Go 后端（GORM + PostgreSQL）

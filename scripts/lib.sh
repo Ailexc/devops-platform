@@ -35,8 +35,8 @@ wait_container_healthy() {
 }
 
 # ── 项目短名 → 目录 / compose 参数（统一映射，全脚本共用）──────────
-# 说明：cloud 的 compose 在 docker-compose.prod.yml；iam 在 deploy/ 子目录。
-# 其余项目均用根目录默认 docker-compose.yml。
+# 说明：所有项目统一为根目录 docker-compose.yml（+ 可选 docker-compose.override.yml 自动叠加）；
+#       唯一例外 iam：compose 在 deploy/ 子目录（需成对加载 override）。
 project_dir() {
   case "$1" in
     auth)     echo "Authentication" ;;
@@ -52,7 +52,6 @@ project_dir() {
 
 project_compose_opts() {
   case "$1" in
-    cloud) echo "-f docker-compose.prod.yml" ;;
     iam)   echo "-f deploy/docker-compose.yml -f deploy/docker-compose.override.yml" ;;
     *)     echo "" ;;
   esac

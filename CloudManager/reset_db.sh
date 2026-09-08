@@ -65,7 +65,7 @@ esac
 
 # ---- 运行 Python 的统一入口 ----
 # SQLite/MySQL（本地直连）→ 直接跑；PostgreSQL（容器化统一库）→ 进容器执行
-COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml"
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 runpy() {
   if [ "$is_postgres" -eq 1 ]; then
     docker compose -f "$COMPOSE_FILE" exec -T backend python "$@"
