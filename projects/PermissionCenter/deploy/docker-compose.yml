@@ -64,6 +64,8 @@ services:
       dockerfile: Dockerfile.build
       args:
         GOARCH: ${GOARCH:-amd64}
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        APK_MIRROR: ${APK_MIRROR:-https://dl-cdn.alpinelinux.org}
     image: iam-backend:latest
     pull_policy: build   # 本地构建镜像，跳过 pull（避免 docker.io/library/iam-backend 报错噪音）
     command: ["iam-server"]

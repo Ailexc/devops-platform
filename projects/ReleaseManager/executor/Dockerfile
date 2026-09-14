@@ -1,8 +1,8 @@
 FROM python:3.11-slim
+# 依赖源可覆盖：默认官方公网源；内网部署经 compose build args 注入缓存端点（deploy/server/.env.server）
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_FLAGS=
 
-# pip 使用国内镜像加速
-RUN pip config set global.index-url http://pypi.home.ailexc.com/simple/
-RUN pip config set global.trusted-host pypi.home.ailexc.com
 
 # 安装 Docker CLI 和 kubectl（用于 CI 构建 + CD 部署）
 # debian 官方源保留（内网 deb.debian.org 劫持自动走 AnyHaven apt 缓存）；
@@ -28,7 +28,7 @@ WORKDIR /app
 COPY requirements.txt .
 # BuildKit 缓存挂载：pip 缓存存 builder 不进镜像层（rebuild 命中缓存秒过，镜像体积不变）
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt -i http://pypi.home.ailexc.com/simple --trusted-host pypi.home.ailexc.com
+    pip install -r requirements.txt -i ${PIP_INDEX_URL} ${PIP_FLAGS}
 
 # 复制项目代码
 COPY . .

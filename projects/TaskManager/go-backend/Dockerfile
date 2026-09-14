@@ -1,7 +1,7 @@
 FROM golang:1.24-alpine AS builder
 
-# GOPROXY 走 AnyHaven 缓存（ARG 可覆盖；上云构建可设 goproxy.cn）
-ARG GOPROXY=http://goproxy.home.ailexc.com
+# 依赖源可覆盖：默认官方源；内网部署注入 http://goproxy.home.ailexc.com
+ARG GOPROXY=https://proxy.golang.org,direct
 ENV GOPROXY=${GOPROXY}
 
 WORKDIR /app
@@ -9,8 +9,9 @@ WORKDIR /app
 # Allow Go to auto-download the required toolchain (go.mod requires 1.24)
 ENV GOTOOLCHAIN=auto
 
-# apk 源走 AnyHaven 缓存 http://alpine.home.ailexc.com（内网口径 http；上云构建改回 https://dl-cdn.alpinelinux.org）
-RUN sed -i 's|https://dl-cdn.alpinelinux.org|http://alpine.home.ailexc.com|g' /etc/apk/repositories
+# 依赖源可覆盖：默认官方源；内网部署注入 http://alpine.home.ailexc.com
+ARG APK_MIRROR=https://dl-cdn.alpinelinux.org
+RUN sed -i "s|https://dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories
 
 # Install git and ca-certs for HTTPS
 RUN apk add --no-cache git ca-certificates
@@ -28,8 +29,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/cmdb-server ./cmd
 # Runtime
 FROM alpine:3.19
 
-# apk 源走 AnyHaven 缓存 http://alpine.home.ailexc.com（内网口径 http；上云构建改回 https://dl-cdn.alpinelinux.org）
-RUN sed -i 's|https://dl-cdn.alpinelinux.org|http://alpine.home.ailexc.com|g' /etc/apk/repositories
+# 依赖源可覆盖：默认官方源；内网部署注入 http://alpine.home.ailexc.com
+ARG APK_MIRROR=https://dl-cdn.alpinelinux.org
+RUN sed -i "s|https://dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories
 RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app

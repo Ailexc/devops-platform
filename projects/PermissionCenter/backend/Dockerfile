@@ -3,8 +3,9 @@
 # 而宿主机 Go 工具链可用 → 由 Makefile 先 `go build` 到 bin/，此处仅拷贝 + 运行。
 # 构建：make backend-image（内部先编译 4 个二进制再 docker build）
 FROM alpine:3.20
-# apk 源走 AnyHaven 缓存 http://alpine.home.ailexc.com（内网口径 http；上云构建改回 https://dl-cdn.alpinelinux.org）
-RUN sed -i 's|https://dl-cdn.alpinelinux.org|http://alpine.home.ailexc.com|g' /etc/apk/repositories
+# 依赖源可覆盖：默认官方源；内网部署注入 http://alpine.home.ailexc.com
+ARG APK_MIRROR=https://dl-cdn.alpinelinux.org
+RUN sed -i "s|https://dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories
 RUN apk add --no-cache ca-certificates tzdata
 
 # 二进制：iam-server / mock-cmdb / mock-identity / iam-agent（对应 cmd/*）

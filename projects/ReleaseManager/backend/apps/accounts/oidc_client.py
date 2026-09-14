@@ -22,7 +22,7 @@ import requests
 #    （服务器由 APP_URL_RELEASE_MANAGER 派生 = http://<SERVER_IP>:8093/oauth/callback）
 AUTH_ISSUER = os.environ.get("AUTH_ISSUER", "http://auth-backend:8000")
 OIDC_CLIENT_ID = "release-manager-app"
-OIDC_CLIENT_SECRET = "release-secret-123456"
+OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET", "release-secret-123456")
 _RELEASE_BASE = os.environ.get("APP_URL_RELEASE_MANAGER", "http://release.devops.orb.local")
 OIDC_REDIRECT_URI = f"{_RELEASE_BASE.rstrip('/')}/oauth/callback"
 AUTH_AUTHORIZE_URL = os.environ.get("AUTH_AUTHORIZE_URL", f"{AUTH_ISSUER}/oauth/authorize")
