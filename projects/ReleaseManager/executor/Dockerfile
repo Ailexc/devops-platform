@@ -1,15 +1,13 @@
 FROM python:3.11-slim
 
 # pip 使用国内镜像加速
-RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
-RUN pip config set global.trusted-host mirrors.aliyun.com
+RUN pip config set global.index-url http://pypi.home.ailexc.com/simple/
+RUN pip config set global.trusted-host pypi.home.ailexc.com
 
 # 安装 Docker CLI 和 kubectl（用于 CI 构建 + CD 部署）
-# 中国 ECS：apt 默认源 deb.debian.org / download.docker.com / dl.k8s.io 慢/不可达
-#          → 全部改用阿里云镜像源（apt、docker-ce、kubernetes）
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null \
-    || sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true \
-    && apt-get update && apt-get install -y --no-install-recommends \
+# debian 官方源保留（内网 deb.debian.org 劫持自动走 AnyHaven apt 缓存）；
+# docker-ce / k8s 无缓存面，仍用阿里云镜像源
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl gnupg \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
@@ -30,7 +28,7 @@ WORKDIR /app
 COPY requirements.txt .
 # BuildKit 缓存挂载：pip 缓存存 builder 不进镜像层（rebuild 命中缓存秒过，镜像体积不变）
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+    pip install -r requirements.txt -i http://pypi.home.ailexc.com/simple --trusted-host pypi.home.ailexc.com
 
 # 复制项目代码
 COPY . .

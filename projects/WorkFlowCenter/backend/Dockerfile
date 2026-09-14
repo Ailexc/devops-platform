@@ -2,9 +2,6 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# 中国 ECS：apt 默认源 deb.debian.org 慢 → 改用阿里云 debian 镜像
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null \
-    || sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev && \
@@ -13,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 # BuildKit 缓存挂载：pip 缓存存 builder 不进镜像层（rebuild 命中缓存秒过，镜像体积不变）
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+    pip install -r requirements.txt -i http://pypi.home.ailexc.com/simple --trusted-host pypi.home.ailexc.com
 
 COPY . .
 

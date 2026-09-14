@@ -2,9 +2,6 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# 中国 ECS：apt 默认源 deb.debian.org 慢 → 改用阿里云 debian 镜像
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null \
-    || sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
 
 # 系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Python 依赖（中国 ECS：使用阿里云镜像）
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+RUN pip install --no-cache-dir -r requirements.txt -i http://pypi.home.ailexc.com/simple --trusted-host pypi.home.ailexc.com
 
 # 项目代码（含 backend/docs/，即镜像内 /app/docs，供 /api/v1/docs 接口展示）
 COPY backend/ .
