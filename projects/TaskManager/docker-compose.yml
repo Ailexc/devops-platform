@@ -4,7 +4,11 @@ services:
   # Redis:      devops-redis（db index 5=cmdb, 7=cmdb-go）
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_FLAGS: ${PIP_FLAGS:-}
     container_name: cmdb-task-backend      # 全局唯一容器名，避免与其他项目 DNS 冲突
     restart: unless-stopped
     command: >
@@ -39,7 +43,11 @@ services:
       - devops-net
 
   celery_worker:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_FLAGS: ${PIP_FLAGS:-}
     restart: unless-stopped
     command: celery -A config worker -l info -Q aws,connector,inspection,default
     volumes:
@@ -57,7 +65,11 @@ services:
       - devops-net
 
   celery_beat:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_FLAGS: ${PIP_FLAGS:-}
     restart: unless-stopped
     command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
@@ -74,7 +86,11 @@ services:
       - devops-net
 
   go_backend:
-    build: ./go-backend
+    build:
+      context: ./go-backend
+      args:
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        APK_MIRROR: ${APK_MIRROR:-https://dl-cdn.alpinelinux.org}
     container_name: cmdb-task-go-backend
     restart: unless-stopped
     command: ["./cmdb-server", "--seed"]

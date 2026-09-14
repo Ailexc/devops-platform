@@ -1,4 +1,7 @@
 FROM python:3.12-slim
+# 依赖源可覆盖：默认官方公网源；内网部署经 compose build args 注入缓存端点（deploy/server/.env.server）
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_FLAGS=
 
 WORKDIR /app
 
@@ -10,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Python 依赖（中国 ECS：使用阿里云镜像）
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -i http://pypi.home.ailexc.com/simple --trusted-host pypi.home.ailexc.com
+RUN pip install --no-cache-dir -r requirements.txt -i ${PIP_INDEX_URL} ${PIP_FLAGS}
 
 # 项目代码（含 backend/docs/，即镜像内 /app/docs，供 /api/v1/docs 接口展示）
 COPY backend/ .

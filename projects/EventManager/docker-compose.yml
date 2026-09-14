@@ -20,6 +20,9 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_FLAGS: ${PIP_FLAGS:-}
     container_name: cmdb-event-api
     env_file: .env
     environment:
@@ -53,6 +56,9 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.worker
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_FLAGS: ${PIP_FLAGS:-}
     container_name: cmdb-event-worker
     env_file: .env
     environment:
@@ -75,6 +81,9 @@ services:
     build:
       context: ./backend-go
       dockerfile: Dockerfile
+      args:
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        APK_MIRROR: ${APK_MIRROR:-https://dl-cdn.alpinelinux.org}
     container_name: cmdb-event-go-api
     command: api
     env_file: .env
@@ -103,6 +112,9 @@ services:
     build:
       context: ./backend-go
       dockerfile: Dockerfile
+      args:
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        APK_MIRROR: ${APK_MIRROR:-https://dl-cdn.alpinelinux.org}
     container_name: cmdb-event-go-worker
     command: worker
     env_file: .env

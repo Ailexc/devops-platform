@@ -65,7 +65,11 @@ services:
       - default
 
   auth-backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_FLAGS: ${PIP_FLAGS:-}
     container_name: authentication-auth-backend
     restart: unless-stopped
     command: >
@@ -127,7 +131,11 @@ services:
       - devops-net
 
   direct-app:
-    build: ./direct-app
+    build:
+      context: ./direct-app
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_FLAGS: ${PIP_FLAGS:-}
     container_name: authentication-direct-app
     # 直连模式示例：不经统一网关，业务自身用 JWKS 公钥本地验签统一 JWT
     environment:

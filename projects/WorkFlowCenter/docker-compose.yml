@@ -8,6 +8,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_FLAGS: ${PIP_FLAGS:-}
     container_name: workflow-api
     command: >
       sh -c "python wait_for_db.py &&

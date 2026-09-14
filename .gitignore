@@ -62,3 +62,8 @@ devops-images.tar
 
 # ---- 网关路由（模板生成，不入仓）----
 infra/gateway/dynamic/routes.yml
+
+# ---- uv lock（内网生成，不入仓；开源后同样排除）----
+uv.lock
+# ---- k8s secret（example 模板入仓，真实 secret 不入）----
+**/02-secret.yaml

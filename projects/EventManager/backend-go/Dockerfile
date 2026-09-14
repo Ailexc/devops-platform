@@ -1,10 +1,11 @@
 # Build stage
 FROM golang:1.26-alpine AS builder
-# GOPROXY 走 AnyHaven 缓存（ARG 可覆盖；上云构建可设 goproxy.cn）
-ARG GOPROXY=http://goproxy.home.ailexc.com
+# 依赖源可覆盖：默认官方源；内网部署注入 http://goproxy.home.ailexc.com
+ARG GOPROXY=https://proxy.golang.org,direct
 ENV GOPROXY=${GOPROXY}
-# apk 源走 AnyHaven 缓存 http://alpine.home.ailexc.com（内网口径 http；上云构建改回 https://dl-cdn.alpinelinux.org）
-RUN sed -i 's|https://dl-cdn.alpinelinux.org|http://alpine.home.ailexc.com|g' /etc/apk/repositories
+# 依赖源可覆盖：默认官方源；内网部署注入 http://alpine.home.ailexc.com
+ARG APK_MIRROR=https://dl-cdn.alpinelinux.org
+RUN sed -i "s|https://dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories
 RUN apk add --no-cache git
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -16,8 +17,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/seed ./cmd/seed
 
 # Runtime stage
 FROM alpine:3.20
-# apk 源走 AnyHaven 缓存 http://alpine.home.ailexc.com（内网口径 http；上云构建改回 https://dl-cdn.alpinelinux.org）
-RUN sed -i 's|https://dl-cdn.alpinelinux.org|http://alpine.home.ailexc.com|g' /etc/apk/repositories
+# 依赖源可覆盖：默认官方源；内网部署注入 http://alpine.home.ailexc.com
+ARG APK_MIRROR=https://dl-cdn.alpinelinux.org
+RUN sed -i "s|https://dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /bin/api /bin/worker /bin/seed /usr/local/bin/
