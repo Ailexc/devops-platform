@@ -37,3 +37,9 @@ python_files = ["tests.py", "test_*.py", "*_tests.py"]
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
+
+# AnyHaven 缓存面（consumer-guide.md 方案1）：lock 只在内网生成，URL 含尾斜杠一字不差
+[[tool.uv.index]]
+name = "anyhaven"
+url = "http://pypi.home.ailexc.com/simple/"
+default = true
