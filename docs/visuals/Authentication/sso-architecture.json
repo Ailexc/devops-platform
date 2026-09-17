@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "统一认证系统总体架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1360, 560],
+    "views": [
+      { "id": "login-path", "label": "登录与统一凭证", "focus": ["user", "portal", "auth", "idp"], "note": "门户登录 → 认证中心按序尝试身份源 → 签发 RS256 JWT 并持久化审计。" },
+      { "id": "mode1-gateway", "label": "方式一 · 网关 forwardAuth", "focus": ["gw", "cloud", "workflow", "iam"], "note": "鉴权下沉到网关：校验会话或 JWT，注入 X-Auth-* 头，业务后端零鉴权代码。" },
+      { "id": "mode2-jwks", "label": "方式二 · 授权码 + JWKS", "focus": ["auth", "taskevent"], "note": "一次性授权码兑换 JWT，后端拉取 JWKS 本地验签，Token 不进浏览器。" },
+      { "id": "mode3-oidc", "label": "方式三 · 标准 OIDC", "focus": ["auth", "release"], "note": "标准授权码 + PKCE 流程，作为企业级 IdP 对接的样板。" }
+    ]
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "用户浏览器", "sublabel": "仅持有 _gw_session", "pos": [40, 160], "size": [120, 58] },
+    { "id": "portal", "type": "frontend", "label": "统一门户 Portal", "sublabel": "React19 + antd :8088", "pos": [240, 30], "size": [150, 62] },
+    { "id": "gw", "type": "security", "label": "统一网关 Traefik", "sublabel": "devops-gateway", "tag": "IP 路由 :8088-:8094", "pos": [240, 160], "size": [176, 68] },
+    { "id": "auth", "type": "backend", "label": "认证中心", "sublabel": "FastAPI :8099", "tag": "签发 RS256 JWT", "pos": [240, 380], "size": [176, 68] },
+    { "id": "idp", "type": "backend", "label": "身份源抽象链", "sublabel": "Local → LDAP → Okta(预留)", "pos": [40, 460], "size": [186, 62] },
+    { "id": "cloud", "type": "backend", "label": "云管系统", "sublabel": "CloudManager :8090", "pos": [680, 30], "size": [168, 62] },
+    { "id": "iam", "type": "backend", "label": "权限中心", "sublabel": "PermissionCenter :8094", "pos": [680, 170], "size": [168, 62] },
+    { "id": "workflow", "type": "backend", "label": "工单系统", "sublabel": "WorkFlowCenter :8091", "pos": [680, 310], "size": [168, 62] },
+    { "id": "release", "type": "backend", "label": "发布系统", "sublabel": "ReleaseManager :8093", "tag": "标准 OIDC 客户端", "pos": [1120, 60], "size": [168, 62] },
+    { "id": "taskevent", "type": "backend", "label": "任务 / 事件系统", "sublabel": ":8089 / :8092", "tag": "本地 JWKS 验签", "pos": [1120, 200], "size": [190, 62] }
+  ],
+  "connections": [
+    { "id": "user-gw", "from": "user", "to": "gw", "label": "HTTPS 自动带 Cookie", "variant": "emphasis", "labelAt": [195, 240] },
+    { "id": "gw-portal", "from": "gw", "to": "portal", "label": "serve SPA", "fromSide": "top", "toSide": "bottom" },
+    { "id": "portal-auth", "from": "portal", "to": "auth", "label": "POST /api/auth/login", "variant": "emphasis", "fromSide": "left", "toSide": "left", "via": [[10, 61], [10, 414]], "labelAt": [60, 240] },
+    { "id": "gw-auth", "from": "gw", "to": "auth", "label": "forwardAuth /api/auth/verify", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [328, 300] },
+    { "id": "auth-idp", "from": "auth", "to": "idp", "label": "按序尝试，失败即停", "fromSide": "bottom", "toSide": "right", "via": [[328, 491]], "labelAt": [300, 520] },
+    { "id": "gw-cloud", "from": "gw", "to": "cloud", "label": "注入 X-Auth-* 头", "variant": "emphasis", "fromSide": "right", "toSide": "left", "via": [[470, 194], [470, 61]], "labelAt": [470, 130] },
+    { "id": "gw-iam", "from": "gw", "to": "iam", "label": "X-Auth-* 头" },
+    { "id": "gw-workflow", "from": "gw", "to": "workflow", "label": "X-Auth-* 头" },
+    { "id": "auth-taskevent", "from": "auth", "to": "taskevent", "label": "code 换 JWT", "variant": "dashed", "fromSide": "bottom", "toSide": "left", "via": [[328, 500], [900, 500], [900, 231]], "labelAt": [620, 500] },
+    { "id": "auth-release", "from": "auth", "to": "release", "label": "OIDC 授权码 + PKCE", "variant": "dashed", "fromSide": "right", "toSide": "left", "via": [[1000, 414], [1000, 91]], "labelAt": [1000, 150] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "统一入口", "items": ["Traefik 按 IP 路由 :8088-:8094", "forwardAuth 校验网关会话 Cookie 或 JWT，注入 X-Auth-* 头", "方式一系统零鉴权代码，配置级接入"] },
+    { "dot": "emerald", "title": "认证中心 :8099", "items": ["RS256 私钥签发 JWT，JWKS 公钥发布", "Authenticator 抽象 + 降级链：Local → LDAP → Okta", "SQLite 持久化：用户 / 应用注册 / 审计日志", "安全边界：认证失败不降级，身份源不可用才降级"] },
+    { "dot": "amber", "title": "三种接入方式", "items": ["方式一：网关 forwardAuth（云管/工单/权限）", "方式二：一次性授权码 + 本地 JWKS 验签（任务/事件）", "方式三：标准 OIDC 授权码 + PKCE（发布）"] },
+    { "dot": "rose", "title": "安全设计", "items": ["Token 不进浏览器 URL，会话走 HttpOnly Cookie", "一次性授权码 60s 过期，用完即毁", "业务后端只读网关注入头，不接触凭证"] }
+  ]
+}
