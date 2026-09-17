@@ -1,6 +1,7 @@
-# docs/visuals — 飞书文档引用的静态视觉资产
+# visuals — 飞书文档引用的静态视觉资产
 
 > 创建：2026-09-17 ｜ 定位：**文档叙事资料**（与各系统内部知识库是两个维度，勿混放）
+> 为什么在仓库根目录：静态资源不是开发/项目介绍文档，不进 docs/，独立成 `visuals/` 与 projects/ 平级
 
 ## 这个目录是什么
 
@@ -13,7 +14,7 @@
 ## 目录结构与命名规范
 
 ```
-docs/visuals/
+visuals/
 ├── README.md                 # 本文件：规范与流程
 └── <系统名>/                 # 按项目分类，与 projects/ 下目录同名
     ├── <图名>.json           # archify 源规格（唯一事实来源，可重新生成）
@@ -47,12 +48,12 @@ PNG 截图：visual-check 的 sidecar 截图，或用 Playwright 以 1600×1000 
 飞书: PNG 插文档保底 + html5-block 内嵌（≤500KB）或链接卡片引用公网 HTML
 ```
 
-云端 URL 规则：`https://sso-arch.ailexc.com/<系统名>/<图名>.html`（与仓库目录一一对应）。
+云端 URL 规则：`https://viz.devops.ailexc.com/<系统名>/<图名>.html`（与仓库目录一一对应；泛解析 `*.devops.ailexc.com` 已配置，新增子域零 DNS 操作）。
 
 ## 云端托管信息（ali-light）
 
-- Caddy 站点配置：`/home/admin/openclaw/caddy/Caddyfile` 中 `sso-arch.ailexc.com` 块
-- 仓库浅 clone 路径：`/home/admin/openclaw/repos/DevOpsPlatform`（`--depth 1`）
+- Caddy 站点配置：`/home/admin/openclaw/caddy/Caddyfile` 中 `viz.devops.ailexc.com` 块
+- 仓库稀疏 clone 路径：`/home/admin/openclaw/repos/dev-ops-platform`（`--depth 1 --sparse`，仅检出 visuals/）
 - 更新：云上 `git pull` 即生效，无需重启 Caddy（静态文件即时可读）
 
 ## 变更记录
