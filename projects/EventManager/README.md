@@ -343,7 +343,6 @@ docker compose logs -f frontend
 - [初始化脚本使用指南](scripts/README.md)
 - [初始化脚本使用示例](scripts/EXAMPLES.md)
 - [初始化系统架构](scripts/ARCHITECTURE.md)
-- [初始化系统总结](scripts/SUMMARY.md)
 
 ## 🤝 贡献
 

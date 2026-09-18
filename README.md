@@ -173,7 +173,7 @@ docker compose up -d --build
 | TaskManager | [README](./TaskManager/README.md) | `localhost`（Docker Compose） |
 | WorkFlowCenter | [README](./WorkFlowCenter/README.md) | `frontend.workflow.orb.local` |
 
-> 💡 多项目同时开发时遵循 OrbStack 域名约定（不暴露端口、不写死 localhost），详见 [CloudManager/DEV_CONVENTION.md](./projects/CloudManager/DEV_CONVENTION.md)。
+> 💡 多项目同时开发时遵循 OrbStack 域名约定（不暴露端口、不写死 localhost）；开发期域名规范 DEV_CONVENTION 已随开发完成归档，见 git 历史。
 
 ---
 

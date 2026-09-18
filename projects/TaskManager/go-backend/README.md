@@ -1,4 +1,4 @@
-# CMDB 任务管理平台 — Go Backend
+# 任务编排平台 TaskManager — Go Backend
 
 > 基于 Python (Django+Celery) 版本的 Go 重写，前端复用、同一 API 契约、可一键切换演示。
 

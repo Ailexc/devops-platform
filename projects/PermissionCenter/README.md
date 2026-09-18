@@ -184,4 +184,3 @@ scripts/            种子与演示脚本
 ## 设计文档
 
 - 架构设计：`docs/architecture.md`
-- 实施计划：`plans/implementation-plan.md`（含决策点与里程碑）
