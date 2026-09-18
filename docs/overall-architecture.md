@@ -23,7 +23,7 @@ flowchart TB
         S3["🚀 发布系统<br/>ReleaseManager<br/>Django + React + kind"]
         S4["🧩 工作流平台<br/>WorkFlowCenter<br/>Django + LogicFlow"]
         S5["☁️ 多云管理<br/>CloudManager<br/>Vue3 + Django"]
-        S6["🗄️ CMDB 数据平台<br/>TaskManager<br/>Django + Celery"]
+        S6["� 任务编排平台<br/>TaskManager<br/>Django + Celery"]
         S7["⚡ 事件管理<br/>EventManager<br/>Python + Go 双栈"]
     end
 
@@ -85,7 +85,7 @@ flowchart LR
     end
     subgraph PEP["下游接入 PEP"]
         GW["Traefik forwardAuth"]
-        CMDB["mock-cmdb"]
+        CMDB["CloudManager<br/>资源视图 Mock"]
     end
 
     PAP --> PDP
@@ -117,7 +117,9 @@ flowchart LR
     EXEC -->|执行结果回写| CMDB
 ```
 
-> 核心设计：**前端/后端不直接调云 API**，所有资源变更先走工单审批，保证合规与留痕；**CMDB 为唯一数据源**，保证多页面数据一致。
+> 核心设计：**前端/后端不直接调云 API**，所有资源变更先走工单审批，保证合规与留痕；**CMDB（云管资源视图）为系统内唯一数据源**，保证多页面数据一致。
+
+> **平台数据边界原则**：各业务系统**数据自治**——共享同一 PostgreSQL 实例、**逻辑库隔离**（devops_event / devops_cmdb / …），互不直读直写；系统间只通过平台网关 API 交互，调用方身份由统一认证中心 JWT 标识。资源管理内置在 CloudManager 内（本图及各技术梳理文档中的 “CMDB” 均指**云管资源视图**，Demo 以多态资源表模拟）；**不引入独立 CMDB 系统**——生产权威 CMDB 为独立平台（如蓝鲸配置平台，一云一模型集分组管理），云管在其之上做汇聚读模型，**读写分离：云管拥有视图，权威源拥有真相**。
 
 ---
 

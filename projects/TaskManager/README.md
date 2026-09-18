@@ -1,4 +1,4 @@
-# CMDB 数据维护平台
+# 任务编排平台 TaskManager
 
 > 多云资产（AWS 为主）的自动化采集、关系编排、调度监控与运维大盘一体化平台。
 
@@ -65,6 +65,8 @@
 | **缓存/队列** | Redis 7 | Celery Broker + 缓存 |
 | **调度** | django-celery-beat | 动态 Cron 调度 |
 | **容器** | Docker Compose / K8s | 开发/生产部署 |
+
+> **命名与数据边界说明**：本系统定位为**任务编排**（任务建模 / 编排引擎 / 执行留痕），不承担 CMDB 职责；环境变量示例与 PG 库名中的 `cmdb` 为早期搭建遗留命名（已在此正名）。数据自治：独立逻辑库（共享 PG 实例、逻辑库隔离），与平台其它系统互不直读写——系统间只走平台网关 API + 统一认证 JWT。Demo 以本地 PostgreSQL 模拟，无外部数据源接入。
 
 ---
 
@@ -211,7 +213,7 @@ docker compose exec backend python manage.py reset_data
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `DATABASE_URL` | `postgres://cmdb:cmdb_dev@localhost:5432/cmdb` | 数据库连接 |
+| `DATABASE_URL` | `postgres://devops:devops@devops-postgres:5432/devops_cmdb` | 数据库连接（`devops_cmdb` 为遗留命名，见上方说明） |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis 连接 |
 | `DEBUG` | `1` | 调试模式 |
 | `SECRET_KEY` | `dev-secret-key-change-in-production` | Django 密钥 |
