@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "统一认证中心 · 技术选型分层落位图",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1380, 460],
+    "views": [
+      { "id": "front-layer", "label": "前端层", "focus": ["portal", "bff"], "note": "React 19 + AntD 6 + Zustand 门户 SPA；Vite 8 + TS 构建；BFF 代理 /portal/*，token 不进浏览器。" },
+      { "id": "gateway-layer", "label": "网关层", "focus": ["gw", "m1"], "note": "Traefik 持有全部端口；方式一系统的鉴权收口在网关，校验后注入 X-Auth-* 头。" },
+      { "id": "service-layer", "label": "服务层", "focus": ["auth", "jwt", "chain"], "note": "FastAPI 认证中心（OIDC Provider）+ PyJWT/cryptography RS256 签发与 JWKS 发布 + 身份源抽象降级链。" },
+      { "id": "data-layer", "label": "身份源与数据层", "focus": ["ldap", "db"], "note": "OpenLDAP（osixia 1.5.0 + LAM）为默认身份源；SQLAlchemy 2.0 存储，默认 SQLite、可切 PostgreSQL。" },
+      { "id": "access-modes", "label": "三种接入落位", "focus": ["m1", "m2", "m3"], "note": "鉴权位置与 Token 路径的差异：网关代鉴权 / 后端本地验签 / 标准 OIDC 流程。" }
+    ]
+  },
+  "components": [
+    { "id": "portal", "type": "frontend", "label": "统一门户 SPA", "sublabel": "React 19 · Ant Design 6", "tag": "Vite 8 + TS · Zustand", "brand": "react", "pos": [420, 40], "size": [220, 68] },
+    { "id": "gw", "type": "security", "label": "统一网关 Traefik", "sublabel": "forwardAuth 鉴权中间件", "tag": "端口收口 :8088-:8094", "pos": [420, 148], "size": [220, 68] },
+    { "id": "bff", "type": "backend", "label": "门户 BFF", "sublabel": "FastAPI /portal/*", "tag": "token 不出后端 · Cookie", "brand": "fastapi", "pos": [120, 260], "size": [210, 68] },
+    { "id": "auth", "type": "backend", "label": "认证中心", "sublabel": "FastAPI · OIDC Provider", "tag": "uvicorn · Pydantic 2", "brand": "fastapi", "pos": [420, 256], "size": [220, 80] },
+    { "id": "jwt", "type": "backend", "label": "JWT / JWKS 引擎", "sublabel": "PyJWT + cryptography", "tag": "RS256 签发 · 公钥发布", "pos": [760, 260], "size": [210, 68] },
+    { "id": "chain", "type": "backend", "label": "身份源抽象链", "sublabel": "策略模式 Authenticator", "tag": "Local→LDAP→Okta(预留)", "pos": [120, 364], "size": [210, 66] },
+    { "id": "ldap", "type": "database", "label": "OpenLDAP 目录服务", "sublabel": "osixia/openldap:1.5.0", "tag": "ldap3 客户端 · LAM :8083", "pos": [420, 362], "size": [210, 70] },
+    { "id": "db", "type": "database", "label": "业务数据存储", "sublabel": "SQLite 默认 / PostgreSQL", "tag": "SQLAlchemy 2.0 · bcrypt", "brand": "sqlite", "pos": [760, 362], "size": [210, 70] },
+    { "id": "m1", "type": "backend", "label": "方式一 · 网关鉴权", "sublabel": "云管 / 工单 / 权限", "tag": "forwardAuth · 零鉴权代码", "pos": [1120, 64], "size": [220, 68] },
+    { "id": "m2", "type": "backend", "label": "方式二 · 直连验签", "sublabel": "任务 :8089 / 事件 :8092", "tag": "code 换 JWT · JWKS", "pos": [1120, 225], "size": [220, 68] },
+    { "id": "m3", "type": "backend", "label": "方式三 · 标准 OIDC", "sublabel": "发布 :8093 · oidc-demo", "tag": "授权码 + PKCE", "pos": [1120, 372], "size": [220, 68] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "认证中心 Docker Compose 栈（--profile ldap 一键编排）", "wraps": ["portal", "gw", "bff", "auth", "jwt", "chain", "ldap", "db"], "pad": 20 },
+    { "kind": "region", "label": "平台业务系统（按三种方式接入）", "wraps": ["m1", "m2", "m3"], "pad": 16 }
+  ],
+  "connections": [
+    { "from": "portal", "to": "gw", "label": "页面与 API 请求", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [530, 122] },
+    { "from": "gw", "to": "auth", "label": "转发认证 API :8099", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [530, 230] },
+    { "from": "gw", "to": "m1", "label": "注入 X-Auth-* · 网关代鉴权", "variant": "security", "fromSide": "right", "toSide": "left" },
+    { "from": "bff", "to": "auth", "label": "code 换 token", "fromSide": "right", "toSide": "left", "labelAt": [375, 236] },
+    { "from": "auth", "to": "jwt", "label": "RS256 · JWKS 发布", "fromSide": "right", "toSide": "left", "labelAt": [710, 236] },
+    { "from": "auth", "to": "chain", "label": "认证请求按序尝试", "fromSide": "left", "toSide": "top", "labelAt": [300, 348] },
+    { "from": "auth", "to": "ldap", "label": "ldap3 查询", "fromSide": "bottom", "toSide": "top", "labelAt": [463, 348] },
+    { "from": "auth", "to": "db", "label": "读写用户/注册/审计", "fromSide": "bottom", "toSide": "top", "labelAt": [700, 349] },
+    { "from": "chain", "to": "db", "label": "失败降级 · 本地库兜底", "variant": "dashed", "fromSide": "bottom", "toSide": "bottom", "via": [[225, 448], [865, 448]], "labelAt": [520, 448] },
+    { "from": "jwt", "to": "m2", "label": "JWKS 公钥验签", "variant": "dashed", "fromSide": "right", "toSide": "left", "labelAt": [1045, 275] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "前端层选型", "items": ["React 19：并发渲染 + 成熟生态，统一门户 SPA", "Ant Design 6：企业级组件库（登录页/应用广场/个人中心）", "Zustand：轻量状态管理，少样板代码", "Vite 8 + TypeScript：秒级构建与全链路类型安全"] },
+    { "dot": "emerald", "title": "网关与服务层选型", "items": ["Traefik：配置级接入，鉴权收口在网关，业务系统零鉴权代码", "FastAPI：异步高并发（认证 IO 密集）+ 自动 OpenAPI 文档", "uvicorn + Pydantic 2：ASGI 运行时与请求校验", "BFF 模式：token 只在后端，浏览器仅持 HttpOnly Cookie"] },
+    { "dot": "amber", "title": "身份源与数据层选型", "items": ["ldap3 + osixia OpenLDAP：还原真实企业目录服务", "降级链：身份源不可用才降级，认证失败不降级（安全边界）", "SQLAlchemy 2.0：默认 SQLite 零依赖，生产可切 PostgreSQL", "PyJWT + cryptography：RS256 非对称签名 + JWKS 公钥分发；bcrypt 密码哈希"] },
+    { "dot": "rose", "title": "接入谱系与编排", "items": ["方式一：网关 forwardAuth——最省事，配置即接入", "方式二：一次性 code + JWKS 本地验签——Token 不进浏览器", "方式三：标准 OIDC 授权码 + PKCE——企业级 IdP 对接样板", "Docker Compose：一键复现全栈，--profile ldap 按需启身份源"] }
+  ]
+}
