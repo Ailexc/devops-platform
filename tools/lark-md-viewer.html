@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>docs-local 文档预览器</title>
+<style>
+  :root { --ink:#1f2329; --sub:#646a73; --line:#e4e9f0; --blue:#245bdb; --bg:#f7f8fa; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,"PingFang SC","Microsoft Yahei",sans-serif; font-size:16px; line-height:1.8; }
+  #topbar { position:sticky; top:0; z-index:9; background:#fff; border-bottom:1px solid var(--line); padding:10px 20px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  #topbar select { font-size:14px; padding:4px 8px; border:1px solid var(--line); border-radius:6px; min-width:260px; }
+  #topbar a { color:var(--blue); font-size:13px; text-decoration:none; }
+  #meta { font-size:12px; color:var(--sub); }
+  #warn { background:#fff7e6; border:1px solid #ffd591; color:#874d00; font-size:13px; padding:6px 12px; border-radius:6px; }
+  article { max-width:900px; margin:24px auto 120px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:40px 56px; }
+  article h1.doc-title { font-size:28px; line-height:1.4; margin:0 0 18px; }
+  article h1 { font-size:24px; margin:34px 0 12px; }
+  article h2 { font-size:20px; margin:28px 0 10px; }
+  article h3 { font-size:17px; margin:22px 0 8px; }
+  article table { border-collapse:collapse; width:100%; margin:12px 0; font-size:14px; }
+  article th, article td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  article th { background:#f2f4f7; }
+  article code { background:#f2f4f7; padding:1px 6px; border-radius:4px; font-size:13px; }
+  article pre { background:#f6f8fa; border:1px solid var(--line); border-radius:8px; padding:14px 16px; overflow:auto; }
+  article pre code { background:none; padding:0; }
+  article blockquote { border-left:3px solid var(--blue); background:#f0f4ff; margin:12px 0; padding:8px 16px; color:#333; border-radius:0 6px 6px 0; }
+  .callout { background:#fff8e6; border:1px solid #ffe4a3; border-radius:8px; padding:10px 16px; margin:14px 0; }
+  .callout[data-emoji]:not([data-emoji=""])::before { content:attr(data-emoji) " "; }
+  .lark-card { border:1px solid var(--line); border-radius:10px; overflow:hidden; margin:18px 0; background:#fbfcfe; }
+  .lark-card-tag { font-size:12px; color:var(--sub); padding:6px 12px; border-bottom:1px dashed var(--line); }
+  .lark-card iframe { width:100%; height:900px; border:0; display:block; background:#fff; }
+  .lark-card-cap { font-size:13px; color:var(--sub); padding:8px 12px; border-top:1px solid var(--line); }
+  .lark-card-cap a { color:var(--blue); text-decoration:none; }
+  .miss { padding:20px; text-align:center; color:var(--sub); font-size:13px; background:#fafafa; }
+  .mermaid { text-align:center; margin:16px 0; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <select id="docsel"><option>加载中…</option></select>
+  <a id="srcLink" target="_blank">📄 查看/编辑源文件（VS Code）</a>
+  <span id="meta"></span>
+  <span id="warn" style="display:none"></span>
+</div>
+<article id="out">加载中…</article>
+<script src="/tools/vendor/marked.umd.js"></script>
+<script src="/tools/vendor/mermaid.min.js"></script>
+<script>
+/* docs-local 预览器：渲染 lark markdown 超集（网页卡片/html5 块/callout/mermaid） */
+const $ = (s) => document.querySelector(s);
+let current = null;
+
+async function jget(url) { const r = await fetch(url); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.json(); }
+async function tget(url) { const r = await fetch(url); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.text(); }
+
+function preprocess(md, refmap) {
+  const mermaids = [], callouts = [];
+  // mermaid 围栏 → 占位
+  md = md.replace(/```mermaid\n([\s\S]*?)```/g, (m, code) => { mermaids.push(code); return `\n<div class="mermaid-slot" data-i="${mermaids.length - 1}">\n\n\u0060\u0060\u0060text\n[mermaid 图表加载中]\n\u0060\u0060\u0060\n\n</div>\n`; });
+  // 文档标题
+  md = md.replace(/<title[^>]*>([\s\S]*?)<\/title>/g, (m, t) => `\n# ${t}\n`);
+  // 网页卡片（readonly-block）→ iframe 近似呈现
+  md = md.replace(/<readonly-block[^>]*href="([^"]+)"[^>]*>\s*<\/readonly-block>/g, (m, href) =>
+    `\n<div class="lark-card"><div class="lark-card-tag">🖼️ 网页卡片（飞书原生组件，本地预览以 iframe 近似呈现）</div><iframe src="${href}" loading="lazy"></iframe><div class="lark-card-cap"><a href="${href}" target="_blank">🔗 新标签页打开</a></div></div>\n`);
+  // html5 块 → 本地缓存资源 iframe（高度加载后自适应）
+  md = md.replace(/<html5-block[^>]*\/?>|<html5-block[^>]*>\s*<\/html5-block>/g, (tag) => {
+    const ref = ((tag.match(/data-ref="([^"]+)"/) || tag.match(/path="([^"]+)"/) || [])[1]) || '';
+    const alt = (tag.match(/alt="([^"]*)"/) || [])[1] || '';
+    let src = '';
+    const h5 = (refmap || {})['html5-block'] || {};
+    if (h5[ref]) src = (h5[ref].path || '').replace(/^@/, '');
+    if (!src && /\.html?$/.test(ref)) src = ref.replace(/^@\//, '');
+    return `\n<div class="lark-card"><div class="lark-card-tag">🧩 HTML5 交互块</div>` +
+      (src ? `<iframe class="h5frame" src="${src}" loading="lazy" onload="fitH5(this)"></iframe>` : `<div class="miss">资源缺失：${ref}（确认 docs-local 镜像的 reference-map 与 doc-fetch-resources 缓存）</div>`) +
+      `<div class="lark-card-cap">${alt}</div></div>\n`;
+  });
+  // callout → 占位（内容随后单独渲染）
+  md = md.replace(/<callout[^>]*emoji="([^"]*)"[^>]*>([\s\S]*?)<\/callout>/g, (m, emoji, inner) => { callouts.push({ emoji, inner }); return `\n<div class="callout-slot" data-i="${callouts.length - 1}"></div>\n`; });
+  md = md.replace(/<callout[^>]*>([\s\S]*?)<\/callout>/g, (m, inner) => { callouts.push({ emoji: '', inner }); return `\n<div class="callout-slot" data-i="${callouts.length - 1}"></div>\n`; });
+  // 图片 token 占位（本地无法渲染飞书私有资源）
+  md = md.replace(/<img[^>]*src="(?!http)([^"]*)"[^>]*>/g, '<div class="miss">🖼️ 飞书图片资源（token: $1）— 本地预览不可见，飞书文档内正常</div>');
+  return { md, mermaids, callouts };
+}
+
+function fitH5(f) {
+  try { const h = f.contentDocument.documentElement.scrollHeight; if (h > 100) f.style.height = (h + 8) + 'px'; } catch (e) { f.style.height = '700px'; }
+}
+
+async function render(key) {
+  const base = `/docs-local/${key}`;
+  const [content, refmap, meta] = await Promise.all([
+    tget(`${base}/content.md`),
+    jget(`${base}/reference-map.json`).catch(() => ({})),
+    jget(`${base}/meta.json`).catch(() => null),
+  ]);
+  const { md, mermaids, callouts } = preprocess(content, refmap);
+  const html = marked.parse(md);
+  $('#out').innerHTML = html;
+  // 填充 mermaid / callout 占位
+  document.querySelectorAll('.mermaid-slot').forEach(el => { el.classList.add('mermaid'); el.textContent = mermaids[+el.dataset.i]; });
+  document.querySelectorAll('.callout-slot').forEach(el => {
+    const c = callouts[+el.dataset.i];
+    el.classList.add('callout'); el.setAttribute('data-emoji', c.emoji || '');
+    el.innerHTML = marked.parse(c.inner);
+  });
+  try { await mermaid.run({ querySelector: '.mermaid' }); } catch (e) { console.warn('mermaid:', e); }
+  if (meta) {
+    $('#meta').textContent = `rev ${meta.revision_id} · sha ${String(meta.content_sha).slice(0, 12)} · 网页卡片 ${meta.cards.length} · html5 块 ${meta.html5_refs.length}`;
+    $('#srcLink').href = `vscode://file/${location.host ? '' : ''}`;
+    $('#srcLink').textContent = `📄 源文件：docs-local/${key}/content.md`;
+    $('#srcLink').removeAttribute('href');
+    const warn = $('#warn');
+    if (meta.cards.length) { warn.style.display = ''; warn.textContent = `⚠️ 该文档线上含 ${meta.cards.length} 个网页卡片：push 会被防呆拦截（overwrite 会丢卡片）`; }
+    else warn.style.display = 'none';
+  }
+  current = key;
+  history.replaceState(null, '', `?file=${base}/content.md`);
+}
+
+(async function init() {
+  try {
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+    const idx = await jget('/docs-local/index.json');
+    const sel = $('#docsel');
+    sel.innerHTML = idx.map(d => `<option value="${d.key}">${d.key}（rev ${d.revision_id} · 卡片 ${d.cards} · html5 ${d.html5}）</option>`).join('');
+    const q = new URLSearchParams(location.search).get('file') || '';
+    const m = q.match(/docs-local\/([^/]+)\//);
+    const key = m ? m[1] : (idx[0] && idx[0].key);
+    if (!key) { $('#out').textContent = 'docs-local/index.json 为空——先执行：scripts/doc-sync.sh pull <key> <文档URL>'; return; }
+    sel.value = key;
+    sel.onchange = () => render(sel.value);
+    await render(key);
+  } catch (e) { $('#out').textContent = '预览器初始化失败：' + e.message + '\n（确认 make html 已启动且 docs-local/ 已 pull）'; }
+})();
+</script>
+</body>
+</html>
