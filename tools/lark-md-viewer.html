@@ -114,6 +114,14 @@ async function render(key) {
     el.innerHTML = marked.parse(c.inner);
   });
   try { await mermaid.run({ querySelector: '.mermaid' }); } catch (e) { console.warn('mermaid:', e); }
+  // 兜底：html5 块壳内若嵌跨域 viz iframe 且其子请求挂起，外层 onload 永不触发 → fitH5 不执行。
+  // 壳的内容高在子请求挂起时已稳定（内层 iframe 固定高度），故可安全补测：仅对尚无 inline 高度且 body 就绪的块重算。
+  [600, 2500].forEach(t => setTimeout(() => {
+    document.querySelectorAll('iframe.h5frame').forEach(f => {
+      const d = f.contentDocument;
+      if (!f.style.height && d && d.body) fitH5(f);
+    });
+  }, t));
   if (meta) {
     $('#meta').textContent = `rev ${meta.revision_id} · sha ${String(meta.content_sha).slice(0, 12)} · 网页卡片 ${meta.cards.length} · html5 块 ${meta.html5_refs.length}`;
     $('#srcLink').href = `vscode://file/${location.host ? '' : ''}`;
