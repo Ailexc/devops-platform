@@ -70,7 +70,7 @@ function preprocess(md, refmap) {
     let src = '';
     const h5 = (refmap || {})['html5-block'] || {};
     if (h5[ref]) src = (h5[ref].path || '').replace(/^@\/?/, '/');
-    if (!src && /\.html?$/.test(ref)) src = '/' + ref.replace(/^@\//, '');
+    if (!src && /\.html?$/.test(ref)) src = '/' + ref.replace(/^@\/?/, '');
     return `\n<div class="lark-card"><div class="lark-card-tag">🧩 HTML5 交互块</div>` +
       (src ? `<iframe class="h5frame" src="${src}" loading="lazy" onload="fitH5(this)"></iframe>` : `<div class="miss">资源缺失：${ref}（确认 docs-local 镜像的 reference-map 与 doc-fetch-resources 缓存）</div>`) +
       `<div class="lark-card-cap">${alt}</div></div>\n`;
