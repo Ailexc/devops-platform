@@ -5546,57 +5546,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
     <!-- Info Cards -->
     <div class="cards">
-      <div class="card">
-        <div class="card-header">
-          <div class="card-dot cyan"></div>
-          <h3>前端层选型</h3>
-        </div>
-        <ul>
-          <li>&bull; Vue 3.5：组合式 API + 渐进式生态，管理台交互密集型页面</li>
-          <li>&bull; Ant Design Vue 4：企业级组件库，表格/表单/图表联动开箱即用</li>
-          <li>&bull; ECharts 6 + vue-echarts：成本大屏与依赖图谱可视化</li>
-          <li>&bull; Pinia + Vite 8 + TS 6：轻量状态管理与秒级工程化（Vitest 单测）</li>
-        </ul>
-      </div>
 
-      <div class="card">
-        <div class="card-header">
-          <div class="card-dot emerald"></div>
-          <h3>服务层选型</h3>
-        </div>
-        <ul>
-          <li>&bull; Django 4.2：自带电池（Admin/ORM/中间件），建模高效</li>
-          <li>&bull; DRF 3.14：ViewSet + Serializer 快速出 API，django-filter 灵活过滤</li>
-          <li>&bull; SimpleJWT：信任网关注入的 X-Auth-* 头——方式一接入，后端零鉴权代码</li>
-          <li>&bull; gunicorn：生产级 WSGI 运行时</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="card-dot amber"></div>
-          <h3>流程与数据层</h3>
-        </div>
-        <ul>
-          <li>&bull; 所有写操作走工单：变更可控、责任可溯、便于审计合规</li>
-          <li>&bull; CMDB 唯一数据源：云资源统一建模，成本/拓扑/权限均由其派生</li>
-          <li>&bull; Celery + django-celery-beat：异步长任务与定时采集，结果回写 CMDB 保证最终一致</li>
-          <li>&bull; MySQL 8（生产）/ SQLite（本地）；RabbitMQ（真实）/ Mock 异步</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="card-dot rose"></div>
-          <h3>扩展点与接入</h3>
-        </div>
-        <ul>
-          <li>&bull; 多云适配层 = 注册表模式：新增云厂商 = 新增 Provider 适配器，业务层无感</li>
-          <li>&bull; 统一操作接口：create/start/stop/resize/delete + 统一资源模型</li>
-          <li>&bull; 平台接入：Traefik forwardAuth（方式一），鉴权收口在网关</li>
-          <li>&bull; Docker Compose + nginx + 平台 devops-net 网络，一键复现</li>
-        </ul>
-      </div>
     </div>
 
   </div>

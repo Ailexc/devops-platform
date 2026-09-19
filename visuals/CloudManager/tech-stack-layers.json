@@ -40,10 +40,5 @@
     { "from": "worker", "to": "queue", "label": "投递定时 / 长任务", "fromSide": "bottom", "toSide": "top", "labelAt": [160, 345] },
     { "from": "worker", "to": "cmdb", "label": "执行结果异步回写", "variant": "dashed", "fromSide": "bottom", "toSide": "left" }
   ],
-  "cards": [
-    { "dot": "cyan", "title": "前端层选型", "items": ["Vue 3.5：组合式 API + 渐进式生态，管理台交互密集型页面", "Ant Design Vue 4：企业级组件库，表格/表单/图表联动开箱即用", "ECharts 6 + vue-echarts：成本大屏与依赖图谱可视化", "Pinia + Vite 8 + TS 6：轻量状态管理与秒级工程化（Vitest 单测）"] },
-    { "dot": "emerald", "title": "服务层选型", "items": ["Django 4.2：自带电池（Admin/ORM/中间件），建模高效", "DRF 3.14：ViewSet + Serializer 快速出 API，django-filter 灵活过滤", "SimpleJWT：信任网关注入的 X-Auth-* 头——方式一接入，后端零鉴权代码", "gunicorn：生产级 WSGI 运行时"] },
-    { "dot": "amber", "title": "流程与数据层", "items": ["所有写操作走工单：变更可控、责任可溯、便于审计合规", "CMDB 唯一数据源：云资源统一建模，成本/拓扑/权限均由其派生", "Celery + django-celery-beat：异步长任务与定时采集，结果回写 CMDB 保证最终一致", "MySQL 8（生产）/ SQLite（本地）；RabbitMQ（真实）/ Mock 异步"] },
-    { "dot": "rose", "title": "扩展点与接入", "items": ["多云适配层 = 注册表模式：新增云厂商 = 新增 Provider 适配器，业务层无感", "统一操作接口：create/start/stop/resize/delete + 统一资源模型", "平台接入：Traefik forwardAuth（方式一），鉴权收口在网关", "Docker Compose + nginx + 平台 devops-net 网络，一键复现"] }
-  ]
+  "cards": []
 }
