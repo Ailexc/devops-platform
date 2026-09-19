@@ -8,8 +8,8 @@
     "viewBox": [1380, 460],
     "views": [
       { "id": "front-layer", "label": "前端层", "focus": ["console"], "note": "Vue 3.5 + Ant Design Vue 4 + ECharts 6 + Pinia；Vite 8 + TS 6 + Vitest 工程化。" },
-      { "id": "service-layer", "label": "服务层", "focus": ["api", "worker", "ticket"], "note": "Django 4.2 + DRF 业务 API；Celery 异步任务；工单是全部写操作的统一入口。" },
-      { "id": "data-layer", "label": "数据与消息层", "focus": ["cmdb", "queue"], "note": "CMDB 唯一数据源（MySQL 8 生产 / SQLite 本地）；RabbitMQ（真实）/ Mock 异步解耦，保证最终一致。" },
+      { "id": "service-layer", "label": "服务层", "focus": ["api", "worker", "ticket"], "note": "Django 4.2 + DRF 业务 API；Celery 定时采集/同步作业；工单是全部变更的统一入口（执行在工单侧任务平台）。" },
+      { "id": "data-layer", "label": "数据与消息层", "focus": ["cmdb", "queue"], "note": "CMDB 唯一数据源（MySQL 8 生产 / SQLite 本地）；RabbitMQ 消息代理解耦采集/同步作业。" },
       { "id": "adapter-ext", "label": "多云适配扩展点", "focus": ["adapter", "cloud"], "note": "Provider 注册表模式：新增云厂商 = 新增适配器，业务层无感（开闭原则）。" },
       { "id": "platform-auth", "label": "平台认证接入", "focus": ["gw", "api"], "note": "Traefik forwardAuth（方式一）：网关校验并注入 X-Auth-* 头，业务后端零鉴权代码。" }
     ]
@@ -17,10 +17,10 @@
   "components": [
     { "id": "console", "type": "frontend", "label": "管理台前端", "sublabel": "Vue 3.5 · Ant Design Vue 4", "tag": "ECharts 6 · Pinia · Vite 8+TS", "brand": "vue", "pos": [420, 40], "size": [220, 68] },
     { "id": "gw", "type": "security", "label": "平台网关 Traefik", "sublabel": "方式一 · forwardAuth", "tag": "注入 X-Auth-* 头", "pos": [420, 148], "size": [220, 68] },
-    { "id": "worker", "type": "backend", "label": "异步任务", "sublabel": "Celery 5.4 · celery-beat", "tag": "定时采集 / 长任务执行", "pos": [120, 260], "size": [210, 68] },
+    { "id": "worker", "type": "backend", "label": "异步任务", "sublabel": "Celery 5.4 · celery-beat", "tag": "定时采集 / 同步作业", "pos": [120, 260], "size": [210, 68] },
     { "id": "api", "type": "backend", "label": "业务 API", "sublabel": "Django 4.2 + DRF 3.14", "tag": "ViewSet · SimpleJWT 信任网关头", "brand": "django", "pos": [420, 256], "size": [220, 80] },
-    { "id": "ticket", "type": "backend", "label": "工单系统", "sublabel": "写操作统一入口", "tag": "审批 → 执行 → 留痕", "pos": [760, 260], "size": [210, 68] },
-    { "id": "queue", "type": "messagebus", "label": "异步消息", "sublabel": "RabbitMQ（真实）/ Mock", "tag": "长任务解耦 · 最终一致", "brand": "rabbitmq", "pos": [120, 364], "size": [210, 66] },
+    { "id": "ticket", "type": "backend", "label": "工单系统", "sublabel": "变更统一入口", "tag": "审批 → 执行 → 留痕", "pos": [760, 260], "size": [210, 68] },
+    { "id": "queue", "type": "messagebus", "label": "异步消息", "sublabel": "RabbitMQ", "tag": "采集作业解耦", "brand": "rabbitmq", "pos": [120, 364], "size": [210, 66] },
     { "id": "cmdb", "type": "database", "label": "CMDB 唯一数据源", "sublabel": "MySQL 8 生产 / SQLite 本地", "tag": "Django ORM · 多态资源表", "brand": "mysql", "pos": [420, 362], "size": [210, 70] },
     { "id": "adapter", "type": "backend", "label": "多云适配层", "sublabel": "Provider 注册表模式", "tag": "新增厂商 = 新增适配器", "pos": [760, 362], "size": [210, 70] },
     { "id": "cloud", "type": "external", "label": "云厂商", "sublabel": "AWS / 阿里云（Demo: Mock）", "tag": "统一操作接口屏蔽差异", "pos": [1120, 260], "size": [220, 68] }
@@ -33,12 +33,12 @@
     { "from": "console", "to": "gw", "label": "页面与 API 请求", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [530, 122] },
     { "from": "gw", "to": "api", "label": "转发业务 API（X-Auth-* 头）", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [530, 230] },
     { "from": "api", "to": "worker", "label": "触发异步任务", "fromSide": "left", "toSide": "right", "labelAt": [375, 236] },
-    { "from": "api", "to": "ticket", "label": "写操作先过工单入口", "fromSide": "right", "toSide": "left", "labelAt": [710, 236] },
+    { "from": "api", "to": "ticket", "label": "变更先过工单入口", "fromSide": "right", "toSide": "left", "labelAt": [710, 236] },
     { "from": "api", "to": "cmdb", "label": "读写唯一数据源（ORM）", "fromSide": "bottom", "toSide": "top", "labelAt": [530, 348] },
-    { "from": "ticket", "to": "adapter", "label": "审批通过 → Provider 执行", "fromSide": "bottom", "toSide": "top", "labelAt": [920, 345] },
+    { "from": "ticket", "to": "adapter", "label": "执行在外：任务平台经适配层操作云", "fromSide": "bottom", "toSide": "top", "labelAt": [920, 345] },
     { "from": "adapter", "to": "cloud", "label": "统一操作接口调用", "variant": "dashed", "fromSide": "right", "toSide": "left" },
     { "from": "worker", "to": "queue", "label": "投递定时 / 长任务", "fromSide": "bottom", "toSide": "top", "labelAt": [160, 345] },
-    { "from": "worker", "to": "cmdb", "label": "执行结果异步回写", "variant": "dashed", "fromSide": "bottom", "toSide": "left" }
+    { "from": "worker", "to": "cmdb", "label": "同步采集写入视图（只读回流）", "variant": "dashed", "fromSide": "bottom", "toSide": "left" }
   ],
   "cards": []
 }
