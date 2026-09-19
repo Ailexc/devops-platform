@@ -63,6 +63,21 @@ pull)
   [ -n "$URL" ] || { echo "❌ 首次 pull 需要文档 URL：$0 pull $KEY <wiki-or-docx-url>"; exit 1; }
   OLD_SHA=""
   [ -f "$META" ] && OLD_SHA=$(python3 -c "import json;print(json.load(open('$META')).get('content_sha',''))")
+  # 本地未推修改保护：本地 content 与基线不一致 = 有未推送的本地修改，直接 pull 会被线上内容覆盖
+  HAS_FORCE=""
+  for _a in "$@"; do [ "$_a" = "--force" ] && HAS_FORCE=1; done
+  if [ -f "$CONTENT" ] && [ -n "$OLD_SHA" ]; then
+    LOCAL_SHA=$(sha256sum "$CONTENT" | cut -d' ' -f1)
+    if [ "$LOCAL_SHA" != "$OLD_SHA" ] && [ -z "$HAS_FORCE" ]; then
+      echo "🛑 pull 拦截：本地 content.md 存在未推送的修改（本地 ${LOCAL_SHA:0:12} vs 基线 ${OLD_SHA:0:12}）"
+      echo "   直接 pull 会用线上内容覆盖这些修改。"
+      echo "   选项: ① 保留本地修改 → 先 scripts/doc-sync.sh push $KEY 再 pull"
+      echo "         ② 两边都要 → 先手动合并（VS Code 对比本地与线上）"
+      echo "         ③ 确认放弃本地修改 → scripts/doc-sync.sh pull $KEY $URL --force"
+      exit 2
+    fi
+    [ -n "$HAS_FORCE" ] && echo "⚠️  --force：将放弃本地未推送修改，用线上内容覆盖"
+  fi
   lark-cli docs +fetch --doc "$URL" --detail full --doc-format markdown --as user > "/tmp/docsync-pull-$KEY.json"
   python3 -c "
 import json,hashlib,re,os
