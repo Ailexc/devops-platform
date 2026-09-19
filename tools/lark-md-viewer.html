@@ -84,7 +84,16 @@ function preprocess(md, refmap) {
 }
 
 function fitH5(f) {
-  try { const h = f.contentDocument.documentElement.scrollHeight; if (h > 100) f.style.height = (h + 8) + 'px'; } catch (e) { f.style.height = '700px'; }
+  try {
+    const apply = () => {
+      const d = f.contentDocument;
+      // body.scrollHeight=纯内容高；documentElement.scrollHeight 会被 iframe 视口反向污染（设高后=视口高，正反馈锁死），故 body 优先
+      const h = (d.body ? d.body.scrollHeight : 0) || d.documentElement.scrollHeight;
+      if (h > 100) f.style.height = (h + 8) + 'px';
+    };
+    apply();
+    setTimeout(apply, 150); // 二次校正：首测可能早于壳样式应用/旧值残留
+  } catch (e) { f.style.height = '700px'; }
 }
 
 async function render(key) {
