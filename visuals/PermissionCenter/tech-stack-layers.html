@@ -5130,7 +5130,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read"
          data-preset-badge-editorial-plate="ARCHIFY / 图版 04">
-      <svg viewBox="0 0 1380 460" role="img" lang="zh-CN" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
+      <svg viewBox="0 0 1100 450" role="img" lang="zh-CN" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
         <title id="archify-diagram-title">权限中心 · 技术选型分层落位图</title>
         <desc id="archify-diagram-description">由 Archify 生成的架构图。</desc>
         <!-- Definitions -->
@@ -5156,171 +5156,171 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" data-composition-frame-label="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）" x="400" y="16" width="960" height="420" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" data-composition-frame-label="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）" x="120" y="16" width="940" height="420" rx="12" class="c-region" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" data-composition-frame-label="外部系统与 Demo 替身" x="1104" y="16" width="252" height="422" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" data-composition-frame-label="外部系统与 Demo 替身" x="804" y="16" width="252" height="422" rx="12" class="c-region" stroke-width="1"/>
 
         <!-- Connection paths (before components for correct z-order) -->
-        <path data-edge-from="apps" data-edge-to="gw" data-edge-label="业务流量 · PEP 拦截" data-edge-key="0" data-composition-points="1230,108;1230,195" d="M 1230 108 L 1230 195" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="gw" data-edge-to="pdp" data-edge-label="forwardAuth / ext-authz 鉴权回调" data-edge-key="1" data-composition-points="1120,229;980,229" d="M 1120 229 L 980 229" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="pap" data-edge-to="pdp" data-edge-label="策略管理与发布" data-edge-key="2" data-composition-points="870,108;870,195" d="M 870 108 L 870 195" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="pdp" data-edge-to="openfga" data-edge-label="Check / ListObjects" data-edge-key="3" data-composition-points="760,229;640,229" d="M 760 229 L 640 229" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="pdp" data-edge-to="pg" data-edge-label="策略 / 审计 / 索引落库" data-edge-key="4" data-composition-points="870,263;870,287;886,287;886,326;865,326;865,350" d="M 870 263 L 870 279 Q 870 287 878 287 L 878 287 Q 886 287 886 295 L 886 318 Q 886 326 878 326 L 873 326 Q 865 326 865 334 L 865 350" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="apps" data-edge-to="gw" data-edge-label="业务流量 · PEP 拦截" data-edge-key="0" data-composition-points="930,108;930,195" d="M 930 108 L 930 195" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="gw" data-edge-to="pdp" data-edge-label="forwardAuth / ext-authz 鉴权回调" data-edge-key="1" data-composition-points="820,229;700,229" d="M 820 229 L 700 229" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="pap" data-edge-to="pdp" data-edge-label="策略管理与发布" data-edge-key="2" data-composition-points="590,108;590,195" d="M 590 108 L 590 195" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="pdp" data-edge-to="openfga" data-edge-label="Check / ListObjects" data-edge-key="3" data-composition-points="480,229;360,229" d="M 480 229 L 360 229" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="pdp" data-edge-to="pg" data-edge-label="策略 / 审计 / 索引落库" data-edge-key="4" data-composition-points="590,263;590,287;606,287;606,326;585,326;585,350" d="M 590 263 L 590 279 Q 590 287 598 287 L 598 287 Q 606 287 606 295 L 606 318 Q 606 326 598 326 L 593 326 Q 585 326 585 334 L 585 350" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
         <g id="node-sync" data-node-id="sync" data-node-label="Sync 同步服务" tabindex="0" role="button" aria-label="聚焦Sync 同步服务，Connector 抽象, PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Connector 抽象" data-node-tag="OpenAPI→模板 · CMDB→索引 · SCIM 身份" data-node-context="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）">
           <title>Sync 同步服务 · Connector 抽象 · PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend） · OpenAPI→模板 · CMDB→索引 · SCIM 身份</title>
-          <rect x="420" y="40" width="220" height="68" rx="6" class="c-mask"/>
-          <rect x="420" y="40" width="220" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(426 46) scale(0.6875)">
+          <rect x="140" y="40" width="220" height="68" rx="6" class="c-mask"/>
+          <rect x="140" y="40" width="220" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(146 46) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="530" y="72" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Sync 同步服务</text>
-        <text data-detail="context" x="530" y="88" class="t-muted" font-size="9" text-anchor="middle">Connector 抽象</text>
-        <text data-detail="fine" x="530" y="100" class="t-backend" font-size="7" text-anchor="middle">OpenAPI→模板 · CMDB→索引 · SCIM 身份</text>
+          <text data-node-label="" data-detail-anchor="" x="250" y="72" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Sync 同步服务</text>
+        <text data-detail="context" x="250" y="88" class="t-muted" font-size="9" text-anchor="middle">Connector 抽象</text>
+        <text data-detail="fine" x="250" y="100" class="t-backend" font-size="7" text-anchor="middle">OpenAPI→模板 · CMDB→索引 · SCIM 身份</text>
         </g>
 
         <g id="node-pap" data-node-id="pap" data-node-label="PAP 管理控制台" tabindex="0" role="button" aria-label="聚焦PAP 管理控制台，Vue 3.5 · Element Plus 2.9, PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）, Vue.js" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Vue 3.5 · Element Plus 2.9" data-node-tag="以我为中心工作台 · 弱管理员" data-node-context="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）" data-node-brand="Vue.js" data-node-brand-id="vue" data-node-brand-status="preset" data-node-brand-source="https://github.com/vuejs/art/blob/a1c78b74569b70a25300925b4eacfefcc143b8f6/logo.svg">
           <title>PAP 管理控制台 · Vue 3.5 · Element Plus 2.9 · PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend） · 以我为中心工作台 · 弱管理员 · Vue.js</title>
-          <rect x="760" y="40" width="220" height="68" rx="6" class="c-mask"/>
-          <rect x="760" y="40" width="220" height="68" rx="6" class="c-frontend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(766 46) scale(0.6875)">
+          <rect x="480" y="40" width="220" height="68" rx="6" class="c-mask"/>
+          <rect x="480" y="40" width="220" height="68" rx="6" class="c-frontend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(486 46) scale(0.6875)">
             <rect x="2" y="3" width="12" height="10" rx="2"/>
             <path d="M2 6.5h12"/>
             <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
             <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
           </g>
-          <g aria-hidden="true" data-brand-mark="vue" data-brand-title="Vue.js" data-brand-status="preset" data-brand-source="https://github.com/vuejs/art/blob/a1c78b74569b70a25300925b4eacfefcc143b8f6/logo.svg" class="brand-mark" transform="translate(958 46)">
+          <g aria-hidden="true" data-brand-mark="vue" data-brand-title="Vue.js" data-brand-status="preset" data-brand-source="https://github.com/vuejs/art/blob/a1c78b74569b70a25300925b4eacfefcc143b8f6/logo.svg" class="brand-mark" transform="translate(678 46)">
             <rect width="16" height="16" rx="4" class="brand-mark-badge"/>
             <path d="M24,1.61H14.06L12,5.16,9.94,1.61H0L12,22.39ZM12,14.08,5.16,2.23H9.59L12,6.41l2.41-4.18h4.43Z" transform="translate(3 3) scale(0.4166666666666667)" fill="#4FC08D"/>
             <rect width="16" height="16" rx="4" class="brand-mark-frame"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="870" y="72" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">PAP 管理控制台</text>
-        <text data-detail="context" x="870" y="88" class="t-muted" font-size="9" text-anchor="middle">Vue 3.5 · Element Plus 2.9</text>
-        <text data-detail="fine" x="870" y="100" class="t-frontend" font-size="7" text-anchor="middle">以我为中心工作台 · 弱管理员</text>
+          <text data-node-label="" data-detail-anchor="" x="590" y="72" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">PAP 管理控制台</text>
+        <text data-detail="context" x="590" y="88" class="t-muted" font-size="9" text-anchor="middle">Vue 3.5 · Element Plus 2.9</text>
+        <text data-detail="fine" x="590" y="100" class="t-frontend" font-size="7" text-anchor="middle">以我为中心工作台 · 弱管理员</text>
         </g>
 
         <g id="node-openfga" data-node-id="openfga" data-node-label="OpenFGA 实例级引擎" tabindex="0" role="button" aria-label="聚焦OpenFGA 实例级引擎，v1.8.7 · CNCF · Zanzibar, PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）" aria-pressed="false" data-node-kind="database" data-node-sublabel="v1.8.7 · CNCF · Zanzibar" data-node-tag="Check / ListObjects · 自有 datastore" data-node-context="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）">
           <title>OpenFGA 实例级引擎 · v1.8.7 · CNCF · Zanzibar · PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend） · Check / ListObjects · 自有 datastore</title>
-          <rect x="420" y="195" width="220" height="68" rx="6" class="c-mask"/>
-          <rect x="420" y="195" width="220" height="68" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(426 201) scale(0.6875)">
+          <rect x="140" y="195" width="220" height="68" rx="6" class="c-mask"/>
+          <rect x="140" y="195" width="220" height="68" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(146 201) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="530" y="227" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">OpenFGA 实例级引擎</text>
-        <text data-detail="context" x="530" y="243" class="t-muted" font-size="9" text-anchor="middle">v1.8.7 · CNCF · Zanzibar</text>
-        <text data-detail="fine" x="530" y="255" class="t-database" font-size="7" text-anchor="middle">Check / ListObjects · 自有 datastore</text>
+          <text data-node-label="" data-detail-anchor="" x="250" y="227" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">OpenFGA 实例级引擎</text>
+        <text data-detail="context" x="250" y="243" class="t-muted" font-size="9" text-anchor="middle">v1.8.7 · CNCF · Zanzibar</text>
+        <text data-detail="fine" x="250" y="255" class="t-database" font-size="7" text-anchor="middle">Check / ListObjects · 自有 datastore</text>
         </g>
 
         <g id="node-pdp" data-node-id="pdp" data-node-label="PDP 授权决策服务" tabindex="0" role="button" aria-label="聚焦PDP 授权决策服务，Go 1.26 + Gin 1.12, PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Go 1.26 + Gin 1.12" data-node-tag="动作级 Casbin · OAuth M2M · 无状态扩展" data-node-context="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）">
           <title>PDP 授权决策服务 · Go 1.26 + Gin 1.12 · PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend） · 动作级 Casbin · OAuth M2M · 无状态扩展</title>
-          <rect x="760" y="195" width="220" height="68" rx="6" class="c-mask"/>
-          <rect x="760" y="195" width="220" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(766 201) scale(0.6875)">
+          <rect x="480" y="195" width="220" height="68" rx="6" class="c-mask"/>
+          <rect x="480" y="195" width="220" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(486 201) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="870" y="227" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">PDP 授权决策服务</text>
-        <text data-detail="context" x="870" y="243" class="t-muted" font-size="9" text-anchor="middle">Go 1.26 + Gin 1.12</text>
-        <text data-detail="fine" x="870" y="255" class="t-backend" font-size="7" text-anchor="middle">动作级 Casbin · OAuth M2M · 无状态扩展</text>
+          <text data-node-label="" data-detail-anchor="" x="590" y="227" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">PDP 授权决策服务</text>
+        <text data-detail="context" x="590" y="243" class="t-muted" font-size="9" text-anchor="middle">Go 1.26 + Gin 1.12</text>
+        <text data-detail="fine" x="590" y="255" class="t-backend" font-size="7" text-anchor="middle">动作级 Casbin · OAuth M2M · 无状态扩展</text>
         </g>
 
         <g id="node-redis" data-node-id="redis" data-node-label="Redis 缓存" tabindex="0" role="button" aria-label="聚焦Redis 缓存，复用 devops-redis · db3 隔离, PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）" aria-pressed="false" data-node-kind="database" data-node-sublabel="复用 devops-redis · db3 隔离" data-node-tag="策略/决策缓存 · Streams 两用" data-node-context="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）">
           <title>Redis 缓存 · 复用 devops-redis · db3 隔离 · PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend） · 策略/决策缓存 · Streams 两用</title>
-          <rect x="420" y="350" width="210" height="66" rx="6" class="c-mask"/>
-          <rect x="420" y="350" width="210" height="66" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(426 356) scale(0.6875)">
+          <rect x="140" y="350" width="210" height="66" rx="6" class="c-mask"/>
+          <rect x="140" y="350" width="210" height="66" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(146 356) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="525" y="381" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Redis 缓存</text>
-        <text data-detail="context" x="525" y="397" class="t-muted" font-size="9" text-anchor="middle">复用 devops-redis · db3 隔离</text>
-        <text data-detail="fine" x="525" y="408" class="t-database" font-size="7" text-anchor="middle">策略/决策缓存 · Streams 两用</text>
+          <text data-node-label="" data-detail-anchor="" x="245" y="381" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Redis 缓存</text>
+        <text data-detail="context" x="245" y="397" class="t-muted" font-size="9" text-anchor="middle">复用 devops-redis · db3 隔离</text>
+        <text data-detail="fine" x="245" y="408" class="t-database" font-size="7" text-anchor="middle">策略/决策缓存 · Streams 两用</text>
         </g>
 
         <g id="node-pg" data-node-id="pg" data-node-label="PostgreSQL 主存储" tabindex="0" role="button" aria-label="聚焦PostgreSQL 主存储，策略 / 审计 / 资源索引, PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）" aria-pressed="false" data-node-kind="database" data-node-sublabel="策略 / 审计 / 资源索引" data-node-tag="追加写 · 按月分区" data-node-context="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）">
           <title>PostgreSQL 主存储 · 策略 / 审计 / 资源索引 · PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend） · 追加写 · 按月分区</title>
-          <rect x="760" y="350" width="210" height="66" rx="6" class="c-mask"/>
-          <rect x="760" y="350" width="210" height="66" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(766 356) scale(0.6875)">
+          <rect x="480" y="350" width="210" height="66" rx="6" class="c-mask"/>
+          <rect x="480" y="350" width="210" height="66" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(486 356) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="865" y="381" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">PostgreSQL 主存储</text>
-        <text data-detail="context" x="865" y="397" class="t-muted" font-size="9" text-anchor="middle">策略 / 审计 / 资源索引</text>
-        <text data-detail="fine" x="865" y="408" class="t-database" font-size="7" text-anchor="middle">追加写 · 按月分区</text>
+          <text data-node-label="" data-detail-anchor="" x="585" y="381" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">PostgreSQL 主存储</text>
+        <text data-detail="context" x="585" y="397" class="t-muted" font-size="9" text-anchor="middle">策略 / 审计 / 资源索引</text>
+        <text data-detail="fine" x="585" y="408" class="t-database" font-size="7" text-anchor="middle">追加写 · 按月分区</text>
         </g>
 
         <g id="node-apps" data-node-id="apps" data-node-label="下游业务系统" tabindex="0" role="button" aria-label="聚焦下游业务系统，云管 / 工单 / 事件, 外部系统与 Demo 替身" aria-pressed="false" data-node-kind="external" data-node-sublabel="云管 / 工单 / 事件" data-node-tag="零权限代码 · 只读身份头" data-node-context="外部系统与 Demo 替身">
           <title>下游业务系统 · 云管 / 工单 / 事件 · 外部系统与 Demo 替身 · 零权限代码 · 只读身份头</title>
-          <rect x="1120" y="40" width="220" height="68" rx="6" class="c-mask"/>
-          <rect x="1120" y="40" width="220" height="68" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1126 46) scale(0.6875)">
+          <rect x="820" y="40" width="220" height="68" rx="6" class="c-mask"/>
+          <rect x="820" y="40" width="220" height="68" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(826 46) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1230" y="72" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">下游业务系统</text>
-        <text data-detail="context" x="1230" y="88" class="t-muted" font-size="9" text-anchor="middle">云管 / 工单 / 事件</text>
-        <text data-detail="fine" x="1230" y="100" class="t-external" font-size="7" text-anchor="middle">零权限代码 · 只读身份头</text>
+          <text data-node-label="" data-detail-anchor="" x="930" y="72" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">下游业务系统</text>
+        <text data-detail="context" x="930" y="88" class="t-muted" font-size="9" text-anchor="middle">云管 / 工单 / 事件</text>
+        <text data-detail="fine" x="930" y="100" class="t-external" font-size="7" text-anchor="middle">零权限代码 · 只读身份头</text>
         </g>
 
         <g id="node-gw" data-node-id="gw" data-node-label="网关 PEP" tabindex="0" role="button" aria-label="聚焦网关 PEP，APISIX 设计 / Traefik Demo, PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）" aria-pressed="false" data-node-kind="security" data-node-sublabel="APISIX 设计 / Traefik Demo" data-node-tag="forwardAuth → /v1/gateway/check" data-node-context="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）">
           <title>网关 PEP · APISIX 设计 / Traefik Demo · PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend） · forwardAuth → /v1/gateway/check</title>
-          <rect x="1120" y="195" width="220" height="68" rx="6" class="c-mask"/>
-          <rect x="1120" y="195" width="220" height="68" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(1126 201) scale(0.6875)">
+          <rect x="820" y="195" width="220" height="68" rx="6" class="c-mask"/>
+          <rect x="820" y="195" width="220" height="68" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(826 201) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1230" y="227" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">网关 PEP</text>
-        <text data-detail="context" x="1230" y="243" class="t-muted" font-size="9" text-anchor="middle">APISIX 设计 / Traefik Demo</text>
-        <text data-detail="fine" x="1230" y="255" class="t-security" font-size="7" text-anchor="middle">forwardAuth → /v1/gateway/check</text>
+          <text data-node-label="" data-detail-anchor="" x="930" y="227" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">网关 PEP</text>
+        <text data-detail="context" x="930" y="243" class="t-muted" font-size="9" text-anchor="middle">APISIX 设计 / Traefik Demo</text>
+        <text data-detail="fine" x="930" y="255" class="t-security" font-size="7" text-anchor="middle">forwardAuth → /v1/gateway/check</text>
         </g>
 
         <g id="node-mock" data-node-id="mock" data-node-label="mock 数据源" tabindex="0" role="button" aria-label="聚焦mock 数据源，mock-cmdb / mock-identity, 外部系统与 Demo 替身" aria-pressed="false" data-node-kind="external" data-node-sublabel="mock-cmdb / mock-identity" data-node-tag="替身演示同步 · 降级 · JML" data-node-context="外部系统与 Demo 替身">
           <title>mock 数据源 · mock-cmdb / mock-identity · 外部系统与 Demo 替身 · 替身演示同步 · 降级 · JML</title>
-          <rect x="1120" y="350" width="220" height="68" rx="6" class="c-mask"/>
-          <rect x="1120" y="350" width="220" height="68" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1126 356) scale(0.6875)">
+          <rect x="820" y="350" width="220" height="68" rx="6" class="c-mask"/>
+          <rect x="820" y="350" width="220" height="68" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(826 356) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1230" y="382" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">mock 数据源</text>
-        <text data-detail="context" x="1230" y="398" class="t-muted" font-size="9" text-anchor="middle">mock-cmdb / mock-identity</text>
-        <text data-detail="fine" x="1230" y="410" class="t-external" font-size="7" text-anchor="middle">替身演示同步 · 降级 · JML</text>
+          <text data-node-label="" data-detail-anchor="" x="930" y="382" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">mock 数据源</text>
+        <text data-detail="context" x="930" y="398" class="t-muted" font-size="9" text-anchor="middle">mock-cmdb / mock-identity</text>
+        <text data-detail="fine" x="930" y="410" class="t-external" font-size="7" text-anchor="middle">替身演示同步 · 降级 · JML</text>
         </g>
 
         <!-- Connection labels -->
         <g data-detail="context" data-edge-from="apps" data-edge-to="gw" data-edge-label="业务流量 · PEP 拦截" data-edge-key="0">
-          <rect x="1184.4" y="140" width="101.2" height="14" rx="3" class="c-mask"/>
-          <text x="1235" y="150" class="t-backend" font-size="8" text-anchor="middle">业务流量 · PEP 拦截</text>
+          <rect x="884.4" y="140" width="101.2" height="14" rx="3" class="c-mask"/>
+          <text x="935" y="150" class="t-backend" font-size="8" text-anchor="middle">业务流量 · PEP 拦截</text>
         </g>
         <g data-detail="context" data-edge-from="gw" data-edge-to="pdp" data-edge-label="forwardAuth / ext-authz 鉴权回调" data-edge-key="1">
-          <rect x="968.2" y="168" width="163.6" height="14" rx="3" class="c-mask"/>
-          <text x="1050" y="178" class="t-backend" font-size="8" text-anchor="middle">forwardAuth / ext-authz 鉴权回调</text>
+          <rect x="678.2" y="168" width="163.6" height="14" rx="3" class="c-mask"/>
+          <text x="760" y="178" class="t-backend" font-size="8" text-anchor="middle">forwardAuth / ext-authz 鉴权回调</text>
         </g>
         <g data-detail="context" data-edge-from="pap" data-edge-to="pdp" data-edge-label="策略管理与发布" data-edge-key="2">
-          <rect x="846.4" y="140" width="77.2" height="14" rx="3" class="c-mask"/>
-          <text x="885" y="150" class="t-muted" font-size="8" text-anchor="middle">策略管理与发布</text>
+          <rect x="566.4" y="140" width="77.2" height="14" rx="3" class="c-mask"/>
+          <text x="605" y="150" class="t-muted" font-size="8" text-anchor="middle">策略管理与发布</text>
         </g>
         <g data-detail="context" data-edge-from="pdp" data-edge-to="openfga" data-edge-label="Check / ListObjects" data-edge-key="3">
-          <rect x="649.4" y="168" width="101.2" height="14" rx="3" class="c-mask"/>
-          <text x="700" y="178" class="t-muted" font-size="8" text-anchor="middle">Check / ListObjects</text>
+          <rect x="369.4" y="168" width="101.2" height="14" rx="3" class="c-mask"/>
+          <text x="420" y="178" class="t-muted" font-size="8" text-anchor="middle">Check / ListObjects</text>
         </g>
         <g data-detail="context" data-edge-from="pdp" data-edge-to="pg" data-edge-label="策略 / 审计 / 索引落库" data-edge-key="4">
-          <rect x="827.2" y="295" width="115.6" height="14" rx="3" class="c-mask"/>
-          <text x="885" y="305" class="t-muted" font-size="8" text-anchor="middle">策略 / 审计 / 索引落库</text>
+          <rect x="547.2" y="295" width="115.6" height="14" rx="3" class="c-mask"/>
+          <text x="605" y="305" class="t-muted" font-size="8" text-anchor="middle">策略 / 审计 / 索引落库</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->
         <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="region" data-composition-frame-label="PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）">
-          <rect data-graph-role="structural-frame-label-mask" x="404" y="20" width="436.59999999999997" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="408" y="33" class="t-cloud" font-size="9" font-weight="600">PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）</text>
+          <rect data-graph-role="structural-frame-label-mask" x="124" y="20" width="436.59999999999997" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="128" y="33" class="t-cloud" font-size="9" font-weight="600">PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）</text>
         </g>
 
         <g data-graph-role="structural-frame-label" data-composition-frame-id="1" data-composition-frame-kind="region" data-composition-frame-label="外部系统与 Demo 替身">
-          <rect data-graph-role="structural-frame-label-mask" x="1108" y="20" width="118" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="1112" y="33" class="t-cloud" font-size="9" font-weight="600">外部系统与 Demo 替身</text>
+          <rect data-graph-role="structural-frame-label-mask" x="808" y="20" width="118" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="812" y="33" class="t-cloud" font-size="9" font-weight="600">外部系统与 Demo 替身</text>
         </g>
 
         <!-- Legend -->
