@@ -51,8 +51,8 @@
 const $ = (s) => document.querySelector(s);
 let current = null;
 
-async function jget(url) { const r = await fetch(url); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.json(); }
-async function tget(url) { const r = await fetch(url); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.text(); }
+async function jget(url) { const r = await fetch(url, {cache: 'no-cache'}); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.json(); }
+async function tget(url) { const r = await fetch(url, {cache: 'no-cache'}); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.text(); }
 
 function preprocess(md, refmap) {
   const mermaids = [], callouts = [];
