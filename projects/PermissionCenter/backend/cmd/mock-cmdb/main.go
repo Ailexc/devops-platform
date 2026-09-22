@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -186,7 +187,8 @@ func main() {
 		g.JSON(200, out)
 	})
 
-	// 实例列表
+	// 实例列表（A4：支持 updated_after 增量过滤 + page/page_size 分页——
+	// "updated_at 可过滤"= L1 接入义务（数据契约三级义务）在 mock 的实现；无参数=全量返回兼容既有调用）
 	r.GET("/api/v1/models/:code/instances", func(g *gin.Context) {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -195,9 +197,47 @@ func main() {
 			g.JSON(404, gin.H{"error": "model not found"})
 			return
 		}
-		var out []*Instance
-		for _, inst := range m.Instances {
-			out = append(out, inst)
+		var after time.Time
+		hasAfter := false
+		if s := g.Query("updated_after"); s != "" {
+			t, err := time.Parse(time.RFC3339, s)
+			if err != nil {
+				g.JSON(400, gin.H{"error": "bad updated_after (RFC3339): " + err.Error()})
+				return
+			}
+			after, hasAfter = t, true
+		}
+		ids := make([]uint64, 0, len(m.Instances))
+		for id := range m.Instances {
+			if hasAfter {
+				ts, err := time.Parse(time.RFC3339, m.Instances[id].UpdatedAt)
+				if err == nil && !ts.After(after) {
+					continue
+				}
+			}
+			ids = append(ids, id)
+		}
+		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+		out := make([]*Instance, 0, len(ids))
+		for _, id := range ids {
+			out = append(out, m.Instances[id])
+		}
+		// 分页（page 从 1 起；page_size 缺省/<=0 = 不分页，兼容旧全量调用）
+		page, _ := strconv.Atoi(g.DefaultQuery("page", "1"))
+		size, _ := strconv.Atoi(g.DefaultQuery("page_size", "0"))
+		if size > 0 {
+			if page < 1 {
+				page = 1
+			}
+			start := (page - 1) * size
+			if start > len(out) {
+				start = len(out)
+			}
+			end := start + size
+			if end > len(out) {
+				end = len(out)
+			}
+			out = out[start:end]
 		}
 		g.JSON(200, out)
 	})

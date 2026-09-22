@@ -79,6 +79,8 @@ services:
       IDENTITY_BASE_URL: "http://mock-identity:8091"
       JWT_SECRET: "${JWT_SECRET:-demo-jwt-secret-change-in-prod}"
       PEP_SHARED_SECRET: "${PEP_SHARED_SECRET:-pep-shared-secret}"
+      PATROL_INTERVAL: "10s"     # 数据契约巡检周期（清单 A4；demo 短周期 → 分钟级演示新鲜度三态）
+      RECONCILE_INTERVAL: "24h"  # 深对账周期（清单 A5b；demo 另有手动 POST /api/v1/sync/reconcile）
     ports:
       - "18080:8080"   # 管理 API + PDP（demo.sh / 本地工具使用），宿主机备用端口
     restart: unless-stopped

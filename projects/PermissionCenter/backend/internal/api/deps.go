@@ -27,18 +27,22 @@ type Deps struct {
 	Syncs  *store.SyncRepo
 	Caps   *store.CapabilityRepo
 	Tpls   *store.PolicyTemplateRepo
+	// Contracts 数据契约 + 巡检日志（清单 A2/A4：注册期契约、确认制时钟、失败历史）
+	Contracts *store.ContractRepo
 
 	JWT *auth.Manager
 
-	Checker  *authz.Checker
+	Checker   *authz.Checker
 	DataPlane *authz.DataPlane
-	Builder  *authz.Builder
-	OFGA     *openfga.Client
+	Builder   *authz.Builder
+	OFGA      *openfga.Client
 
 	OpenAPISyncer *sync.OpenAPISyncer
 	CMDBConnector *sync.CMDBConnector
 	IdentityConn  *sync.IdentityConnector
 	BundleMgr     *bundle.Manager
+	// Patrol 巡检 + 深对账服务（清单 A4/A5b；API 手动触发 /sync/reconcile 与后台定时循环共用单实例）
+	Patrol *sync.PatrolService
 }
 
 // NewDeps 组装全部依赖
@@ -51,6 +55,7 @@ func NewDeps(cfg *config.Config, db *gorm.DB, cache *store.Cache) *Deps {
 	res := store.NewResourceRepo(db)
 	syncs := store.NewSyncRepo(db)
 	caps := store.NewCapabilityRepo(db)
+	contracts := store.NewContractRepo(db)
 	tpls := store.NewPolicyTemplateRepo(db)
 
 	jwt := auth.NewManager(cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
@@ -62,6 +67,11 @@ func NewDeps(cfg *config.Config, db *gorm.DB, cache *store.Cache) *Deps {
 	dataPlane := authz.NewDataPlane(ofga, res, users, groups, apps, pol)
 
 	bundleMgr := bundle.NewManager(syncs, pol, access, apps, users, groups, cache)
+
+	cmdbConn := sync.NewCMDBConnector(cfg.CMDBBaseURL, res, syncs)
+	// 巡检周期 10% 作增量水位重叠窗口（回拨兜两侧时钟偏差，清单 A4）
+	overlap := cfg.PatrolInterval / 10
+	patrol := sync.NewPatrolService(contracts, res, cmdbConn, syncs, overlap, dataPlane.PurgeInstanceTuples)
 
 	return &Deps{
 		Cfg:           cfg,
@@ -75,6 +85,7 @@ func NewDeps(cfg *config.Config, db *gorm.DB, cache *store.Cache) *Deps {
 		Res:           res,
 		Syncs:         syncs,
 		Caps:          caps,
+		Contracts:     contracts,
 		Tpls:          tpls,
 		JWT:           jwt,
 		Checker:       checker,
@@ -82,8 +93,9 @@ func NewDeps(cfg *config.Config, db *gorm.DB, cache *store.Cache) *Deps {
 		Builder:       builder,
 		OFGA:          ofga,
 		OpenAPISyncer: sync.NewOpenAPISyncer(access, syncs),
-		CMDBConnector: sync.NewCMDBConnector(cfg.CMDBBaseURL, res, syncs),
+		CMDBConnector: cmdbConn,
 		IdentityConn:  sync.NewIdentityConnector(cfg.IdentityBaseURL, users, groups, syncs),
 		BundleMgr:     bundleMgr,
+		Patrol:        patrol,
 	}
 }

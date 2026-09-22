@@ -17,7 +17,45 @@ type DataContract struct {
 	Enabled          bool     `gorm:"not null;default:true" json:"enabled"`
 	// 确认制时钟（清单 2.3.1）：同步成功落地 或 指纹比对一致 才刷新——不是"写入制"。
 	// 上游无变更时指纹每次都匹配、时钟持续刷新 → 不会误判为太旧。
-	LastConfirmedFreshAt *time.Time `json:"last_confirmed_fresh_at"`
+	LastConfirmedFreshAt *time.Time `json:"last_confirmed_fresh_at"` // 增量水位（清单 A4）：= 最近一次增量拉取的"查询起始时间戳"（批末推进，
+	// 不是批内 max(updated_at)——后者在上游乱序/迟到写入时产生永不重拉的盲区）
+	SyncWatermarkAt *time.Time `json:"sync_watermark_at"`
+}
+
+// 数据新鲜度三态（清单 2.3.1 确认制状态机）：判定只认 fresh_age（时间），不数版本
+const (
+	FreshStateFresh    = "fresh"
+	FreshStateDegraded = "degraded"
+	FreshStateExpired  = "expired"
+)
+
+// Freshness 计算新鲜度年龄与三态：
+//   - ref = 最后一次确认新鲜的时刻（同步落地 或 指纹比对一致才刷新；nil → 契约创建时刻兜底）
+//   - Expired  iff age > degrade_max_age（默认 = staleness_sla × K，K=6）——**拒绝条件唯一**
+//   - Degraded iff staleness_sla < age ≤ degrade_max_age（超承诺未超限：降级续判 + stale 标注）
+//   - Fresh    iff age ≤ staleness_sla
+func (c *DataContract) Freshness(now time.Time) (age time.Duration, state string) {
+	sla := time.Duration(c.StalenessSlaSec) * time.Second
+	if sla <= 0 {
+		sla = 300 * time.Second
+	}
+	maxAge := time.Duration(c.DegradeMaxAgeSec) * time.Second
+	if maxAge <= 0 {
+		maxAge = sla * 6
+	}
+	ref := c.LastConfirmedFreshAt
+	if ref == nil {
+		ref = &c.CreatedAt
+	}
+	age = now.Sub(*ref)
+	switch {
+	case age > maxAge:
+		return age, FreshStateExpired
+	case age > sla:
+		return age, FreshStateDegraded
+	default:
+		return age, FreshStateFresh
+	}
 }
 
 // PatrolLog 巡检日志（失败历史，清单 2.3.1）：判定不进、观测与告警分级进——

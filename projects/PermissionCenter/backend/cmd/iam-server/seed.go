@@ -276,6 +276,8 @@ func seed(reset bool) error {
 	grantViaRequest(deps, ctx, userID(deps, "alice"), app.ID, "user:alice:cmdb-read",
 		model.ReqSubjectUser, userID(deps, "alice"), readActionIDs, nil,
 		"alice 为 cmdb 联合负责人，需要只读权限", "", false)
+	// 6.1 强一致档种子（A6）：给 alice 追加一条 force-remote 只读策略（幂等由调用方环境保证：seed --reset 重建）
+	seedForceRemotePolicy(deps, app.ID, userID(deps, "alice"), readActionIDs)
 
 	// 7. 程序身份（M2M）
 	secret := "cloud-mgmt-secret"
@@ -320,6 +322,8 @@ func seed(reset bool) error {
 	deps.CMDBConnector.SyncModels(ctx)
 	deps.CMDBConnector.SyncInstances(ctx)
 	deps.IdentityConn.Sync(ctx)
+	// 8.0 数据契约行（A2/A4）：投影就绪后起确认制时钟——巡检与判定门槛立即可读
+	seedContractRows(deps, app.ID)
 	// 身份同步可能新建组织（path 为 mock-identity id），以本地组织树为准重算物化路径
 	refreshAllOrgPaths(deps)
 
@@ -469,6 +473,74 @@ func seedResourceModel(deps *api.Deps, appID uint64, sourceID uint64, code, name
 	}
 }
 
+// seedContractSpecs 数据域契约默认值（种子专用）：host 用短承诺（SLA 5s / 上限 30s）——
+// demo 可在分钟级演示"超龄拒绝→恢复"三态（清单 2.3.1 时序走查）；字段只取基础判定字段（白名单恒可算）
+var seedContractSpecs = map[string]map[string]any{
+	"host":            {"fields": []any{"name", "owner_id"}, "algorithm": "L2", "staleness_sla_sec": 5, "degrade_max_age_sec": 30},
+	"database":        {"fields": []any{"name", "owner_id"}, "algorithm": "L2", "staleness_sla_sec": 300, "degrade_max_age_sec": 0},
+	"public_resource": {"fields": []any{"name"}, "algorithm": "L1", "staleness_sla_sec": 300, "degrade_max_age_sec": 0},
+}
+
+// withDataContractMeta 预设回填契约元数据（幂等）：data_control 预设缺 data_contract →
+// 按数据域套默认契约——让发布链路门禁（ensureDataContracts）对种子能力可正向通过（清单 A2）
+func withDataContractMeta(presets model.JSONAny) model.JSONAny {
+	for _, raw := range presets {
+		p, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if dc, _ := p["data_control"].(bool); !dc {
+			continue
+		}
+		if _, has := p["data_contract"]; has {
+			continue
+		}
+		dms, _ := p["data_models"].([]any)
+		if len(dms) == 0 {
+			continue
+		}
+		mc, _ := dms[0].(string)
+		if spec, ok := seedContractSpecs[mc]; ok {
+			p["data_contract"] = spec
+		}
+	}
+	return presets
+}
+
+// seedContractRows 数据契约行种子（清单 A2/A4）：确认制时钟起钟、增量水位空（首轮巡检从零拉）；
+// 巡检按契约域遍历、无投影域（如 public_resource）自动跳过，判定门槛同款跳过——不误伤
+func seedContractRows(deps *api.Deps, appID uint64) {
+	for mc, spec := range seedContractSpecs {
+		fields := []string{}
+		for _, f := range spec["fields"].([]any) {
+			fields = append(fields, f.(string))
+		}
+		sla, _ := spec["staleness_sla_sec"].(int)
+		maxAge, _ := spec["degrade_max_age_sec"].(int)
+		if _, err := deps.Contracts.UpsertContract(&model.DataContract{
+			AppID: appID, ModelCode: mc, Fields: fields,
+			Algorithm: spec["algorithm"].(string), StalenessSlaSec: sla, DegradeMaxAgeSec: maxAge,
+		}); err != nil {
+			log.Printf("[seed] contract %s warn: %v", mc, err)
+		}
+	}
+	log.Printf("[seed] data contracts ready (host: sla=5s/max=30s — 分钟级新鲜度三态演示)")
+}
+
+// seedForceRemotePolicy 强一致档种子（清单 A6 验收：决策日志 reason=force_remote 可查）：
+// alice 只读授权额外打一条 force-remote 标记——与 §5.7 策略分发同一标记合流，
+// 数据级挂接=判定前指纹快查+前置同步（判定主体仍是权限中心）
+func seedForceRemotePolicy(deps *api.Deps, appID uint64, aliceID uint64, actionIDs []uint64) {
+	deps.DB.Create(&model.Policy{
+		AppID: appID, Name: "user:alice:cmdb-read-strong",
+		SubjectType: model.SubjectUser, SubjectID: aliceID,
+		ActionIDs: actionIDs, Effect: model.EffectAllow,
+		Status: model.PolicyActive, Source: model.SourceOwnerGrant,
+		ForceRemote: true,
+	})
+	log.Printf("[seed] force-remote policy for alice (强一致档 reason=force_remote 可查)")
+}
+
 func findOrCreateOrg(deps *api.Deps, name string, parentID *uint64) *model.Group {
 	// 幂等：先按 (name, parent_id) 精确查找，避免重复创建
 	existing, err := deps.Groups.FindOrgByNameParent(name, parentID, 0)
@@ -500,10 +572,16 @@ func ensureOwner(deps *api.Deps, appID, userID uint64, isPrimary bool) {
 func findOrCreateCapability(deps *api.Deps, appID uint64, name, desc, status string, ownerID uint64,
 	modelFields, presets model.JSONAny, tags model.StringArray, actionIDs []uint64,
 ) *model.CapabilityManifest {
+	presets = withDataContractMeta(presets) // A2：契约元数据注入（创建路径）
 	// 查找已有
 	caps, _ := deps.Caps.List(appID)
 	for _, c := range caps {
 		if c.Name == name {
+			// 幂等自愈：早期种子的能力包缺 data_contract → 原地回填后保存（发布门禁可正向通过）
+			withDataContractMeta(c.Presets)
+			if err := deps.Caps.Update(&c); err != nil {
+				log.Printf("[seed] heal capability %q contract meta warn: %v", name, err)
+			}
 			return &c
 		}
 	}
@@ -809,6 +887,7 @@ func capActionRows(actionIDs []uint64) []*model.CapabilityAction {
 func upsertCapability(deps *api.Deps, appID uint64, name, desc, status string, ownerID uint64,
 	modelFields, presets model.JSONAny, tags model.StringArray, actionIDs []uint64,
 ) *model.CapabilityManifest {
+	presets = withDataContractMeta(presets) // A2：data_control 预设回填契约元数据（发布门禁对种子能力可正向通过）
 	caps, _ := deps.Caps.List(appID)
 	for i := range caps {
 		if caps[i].Name == name {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -169,6 +170,131 @@ func parseUpstreamTS(s string) *time.Time {
 		return nil
 	}
 	return &t
+}
+
+// FingerprintInfo 集合指纹端点响应（契约算法见 mock /sync/fingerprint 注释，两侧必须逐字一致）
+type FingerprintInfo struct {
+	Version       uint64 `json:"version"`
+	Count         int    `json:"count"`
+	MaxUpdatedAt  string `json:"max_updated_at"`
+	HashIDs       string `json:"hash_ids"`
+	HashUpdatedAt string `json:"hash_updated_at"`
+	Fingerprint   string `json:"fingerprint"`
+}
+
+// FetchFingerprint 拉上游集合指纹（巡检脏检 / 强一致档指纹快查）
+func (c *CMDBConnector) FetchFingerprint(ctx context.Context, modelCode string) (*FingerprintInfo, error) {
+	var out FingerprintInfo
+	if err := c.getJSON(ctx, "/sync/fingerprint?model="+url.QueryEscape(modelCode), &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// EnsureFresh 强一致档（清单 2.3 强一致档 / A6）：指纹快查 → 失配触发前置同步。
+// 判定主体仍是权限中心，上游永不判定；带超时兜底——超时按本地投影判定，不阻塞热路径。
+// 返回 (changed, err)：err 非空=超时/不可达（调用方降级按本地判 + warning）
+func (c *CMDBConnector) EnsureFresh(ctx context.Context, modelCode string, timeout time.Duration) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	up, err := c.FetchFingerprint(ctx, modelCode)
+	if err != nil {
+		return false, err
+	}
+	localIDs, localTS, _, err := c.repo.SetFingerprint(modelCode)
+	if err != nil {
+		return false, err
+	}
+	if localIDs == up.HashIDs && localTS == up.HashUpdatedAt {
+		return false, nil // 已新鲜，无需同步
+	}
+	_, _, _, _, err = c.SyncInstancesSince(ctx, modelCode, nil, 0)
+	return err == nil, err
+}
+
+// SyncInstancesSince 增量水位同步（清单 A4，水位推进三句语义的"拉取+写库"半段）：
+//   - after = 水位回拨重叠窗口（watermark=nil → 从零时刻起，等价首轮全量）
+//   - queryStart = 首次请求发起时刻 = 返回给调用方的新水位（**不是批内 max(updated_at)**）
+//   - 分页拉取（page_size=100），逐条 upsert（fp 去重 + 单调守卫，重叠区幂等）
+//
+// 调用方（巡检）负责：本函数返回 nil（=全部写成功）后才 UpdateWatermark(queryStart)——批末推进。
+func (c *CMDBConnector) SyncInstancesSince(ctx context.Context, modelCode string, watermark *time.Time, overlap time.Duration) (written, skipped, total int, queryStart time.Time, err error) {
+	m, err := c.repo.ModelByCode(modelCode)
+	if err != nil {
+		return 0, 0, 0, queryStart, err
+	}
+	after := time.Time{}
+	if watermark != nil {
+		after = watermark.Add(-overlap)
+	}
+	queryStart = time.Now()
+	job := &model.SyncJob{Type: model.SyncCMDBInst, Status: 1}
+	ts := queryStart
+	job.StartedAt = &ts
+	c.syncs.CreateJob(job)
+	defer func() {
+		if err != nil {
+			c.syncs.FinishJob(job.ID, 0, map[string]any{"error": err.Error()})
+			return
+		}
+		c.syncs.FinishJob(job.ID, 2, map[string]any{
+			"since": after.Format(time.RFC3339Nano), "written": written, "skipped": skipped, "total": total,
+		})
+	}()
+	page := 1
+	for {
+		var insts []CMDBInstance
+		path := fmt.Sprintf("/api/v1/models/%s/instances?updated_after=%s&page=%d&page_size=100",
+			m.Code, url.QueryEscape(after.Format(time.RFC3339Nano)), page)
+		if err = c.getJSON(ctx, path, &insts); err != nil {
+			return
+		}
+		for _, inst := range insts {
+			ok, uerr := c.repo.UpsertInstance(&model.ResourceInstance{
+				ModelID:           m.ID,
+				ExternalID:        fmt.Sprintf("%s-%d", m.Code, inst.ID),
+				Name:              inst.Name,
+				Attributes:        inst.Attributes,
+				OwnerID:           inst.OwnerID,
+				UpstreamUpdatedAt: parseUpstreamTS(inst.UpdatedAt),
+				SyncedAt:          &ts,
+			})
+			if uerr != nil {
+				err = uerr
+				return
+			}
+			if ok {
+				written++
+			} else {
+				skipped++
+			}
+			total++
+		}
+		if len(insts) < 100 {
+			break
+		}
+		page++
+	}
+	return
+}
+
+// FetchAllInstances 全量分页拉取（不带过滤；深对账"先取后比再写"的取数半段，清单 A5b）
+func (c *CMDBConnector) FetchAllInstances(ctx context.Context, modelCode string) ([]CMDBInstance, error) {
+	var all []CMDBInstance
+	page := 1
+	for {
+		var insts []CMDBInstance
+		path := fmt.Sprintf("/api/v1/models/%s/instances?page=%d&page_size=100", modelCode, page)
+		if err := c.getJSON(ctx, path, &insts); err != nil {
+			return nil, err
+		}
+		all = append(all, insts...)
+		if len(insts) < 100 {
+			break
+		}
+		page++
+	}
+	return all, nil
 }
 
 func (c *CMDBConnector) getJSON(ctx context.Context, path string, out any) error {

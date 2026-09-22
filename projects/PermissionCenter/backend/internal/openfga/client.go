@@ -91,6 +91,25 @@ func (c *Client) DeleteTuple(ctx context.Context, user, relation, object string)
 	return c.do(ctx, http.MethodPost, fmt.Sprintf("/stores/%s/write", c.storeID), body, &out)
 }
 
+// ReadTuplesByObject 按对象读关系元组（OpenFGA read API 带 object 过滤）——
+// 实例删除级联清理的前置查询（清单 A5a：已删实例的全部关系必须逐条删除，幽灵授权=判多红线）
+func (c *Client) ReadTuplesByObject(ctx context.Context, object string) ([]RelationTuple, error) {
+	body := map[string]any{"tuple_key": map[string]string{"object": object}}
+	var out struct {
+		Tuples []struct {
+			Key RelationTuple `json:"key"`
+		} `json:"tuples"`
+	}
+	if err := c.do(ctx, http.MethodPost, fmt.Sprintf("/stores/%s/read", c.storeID), body, &out); err != nil {
+		return nil, err
+	}
+	res := make([]RelationTuple, 0, len(out.Tuples))
+	for _, t := range out.Tuples {
+		res = append(res, t.Key)
+	}
+	return res, nil
+}
+
 func (c *Client) write(ctx context.Context, tuples []map[string]string) error {
 	body := map[string]any{"writes": map[string]any{"tuple_keys": tuples}}
 	var out map[string]any
@@ -178,15 +197,15 @@ func (c *Client) ReadTypeTuples(ctx context.Context, objType string) ([]Relation
 
 // AuthorizationModel 授权模型视图（type 定义，数据面图谱用）
 type AuthorizationModel struct {
-	ID             string                   `json:"id"`
-	TypeDefs       []map[string]any         `json:"type_definitions"`
+	ID       string           `json:"id"`
+	TypeDefs []map[string]any `json:"type_definitions"`
 }
 
 // LatestModel 最新授权模型（type 定义）
 func (c *Client) LatestModel(ctx context.Context) (*AuthorizationModel, error) {
 	var models struct {
 		AuthorizationModels []struct {
-			ID             string           `json:"id"`
+			ID              string           `json:"id"`
 			TypeDefinitions []map[string]any `json:"type_definitions"`
 		} `json:"authorization_models"`
 	}

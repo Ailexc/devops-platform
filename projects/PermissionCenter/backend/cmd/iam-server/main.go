@@ -53,6 +53,8 @@ func main() {
 
 	// 后台 worker：消费 CMDB 变更事件（Redis Streams，与审计事件总线两用）
 	go consumeCMDBEvents(ctx, deps)
+	// 数据契约巡检 + 深对账双定时循环（清单 A4/A5b：指纹比对→增量同步→确认制时钟刷新；天级全量兜底）
+	go patrolLoop(ctx, deps)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := api.NewRouter(deps)
