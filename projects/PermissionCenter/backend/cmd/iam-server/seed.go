@@ -473,10 +473,12 @@ func seedResourceModel(deps *api.Deps, appID uint64, sourceID uint64, code, name
 	}
 }
 
-// seedContractSpecs 数据域契约默认值（种子专用）：host 用短承诺（SLA 5s / 上限 30s）——
-// demo 可在分钟级演示"超龄拒绝→恢复"三态（清单 2.3.1 时序走查）；字段只取基础判定字段（白名单恒可算）
+// seedContractSpecs 数据域契约默认值（种子专用）：host 用短承诺（SLA 15s / 上限 30s）——
+// ⚠️ 设计约束：**巡检周期必须显著小于 SLA**（否则两次巡检之间 age 必超 SLA，Fresh 态不可达、stale 常驻）
+// demo 组合 = PATROL_INTERVAL 5s / SLA 15s / max 30s → 正常 fresh、停上游 40s 内演示 Expired 三态
+// （清单 2.3.1 时序走查）；字段只取基础判定字段（白名单恒可算）
 var seedContractSpecs = map[string]map[string]any{
-	"host":            {"fields": []any{"name", "owner_id"}, "algorithm": "L2", "staleness_sla_sec": 5, "degrade_max_age_sec": 30},
+	"host":            {"fields": []any{"name", "owner_id"}, "algorithm": "L2", "staleness_sla_sec": 15, "degrade_max_age_sec": 30},
 	"database":        {"fields": []any{"name", "owner_id"}, "algorithm": "L2", "staleness_sla_sec": 300, "degrade_max_age_sec": 0},
 	"public_resource": {"fields": []any{"name"}, "algorithm": "L1", "staleness_sla_sec": 300, "degrade_max_age_sec": 0},
 }
@@ -524,7 +526,7 @@ func seedContractRows(deps *api.Deps, appID uint64) {
 			log.Printf("[seed] contract %s warn: %v", mc, err)
 		}
 	}
-	log.Printf("[seed] data contracts ready (host: sla=5s/max=30s — 分钟级新鲜度三态演示)")
+	log.Printf("[seed] data contracts ready (host: sla=15s/max=30s — 分钟级新鲜度三态演示；巡检 5s < SLA)")
 }
 
 // seedForceRemotePolicy 强一致档种子（清单 A6 验收：决策日志 reason=force_remote 可查）：

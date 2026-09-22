@@ -101,7 +101,7 @@ echo "> 数据契约与确认制时钟（GET /api/v1/sync/contracts）："
 curl -s "$IAM/api/v1/sync/contracts" -H "$AUTH" | python3 -c 'import json,sys
 for c in json.load(sys.stdin)["items"]:
     print("  %s algo=%s sla=%ss max=%ss clock_running=%s watermarked=%s" % (
-        c["model_code"], c["algorithm"], c["staleness_sla_sec"], c["degrade_max_age_sec"],
+        c["model"], c["algorithm"], c["staleness_sla_sec"], c["degrade_max_age_sec"],
         bool(c.get("last_confirmed_fresh_at")), bool(c.get("sync_watermark_at"))))'
 echo "> 巡检日志最近 3 条（reachable / fingerprint_match / sync_ok / fresh_age）："
 curl -s "$IAM/api/v1/sync/patrol-logs?limit=3" -H "$AUTH" | python3 -c 'import json,sys
@@ -127,7 +127,7 @@ curl -s -X POST "$OFGA/stores/$SID/read" -H "$CT" -d '{"tuple_key":{"object":"ho
 say "14. 新鲜度三态：降级续判 → 超龄拒绝 → 恢复自愈（2.3.1 确认制状态机）"
 echo "> 0) 当前（应 allow，fresh）：alice 读 host-6"
 curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-6","operation":"read"}'; echo
-echo "> 1) 停 mock-cmdb（上游不可达 → 确认制时钟不再刷新；host 契约 SLA=5s/上限=30s）"
+echo "> 1) 停 mock-cmdb（上游不可达 → 确认制时钟不再刷新；host 契约 SLA=15s/上限=30s，巡检周期 5s）"
 docker compose -f deploy/docker-compose.yml stop mock-cmdb >/dev/null
 echo "> 2) 等待 40s（年龄越过 30s 上限 → Expired）…"
 sleep 40

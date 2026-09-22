@@ -64,7 +64,8 @@ services:
       dockerfile: Dockerfile.build
       args:
         GOARCH: ${GOARCH:-amd64}
-        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        # 容器内编译的模块代理：本地 AnyHaven 缓存优先 → goproxy.cn 兜底（proxy.golang.org 直连被墙，实测 exit 1）
+        GOPROXY: ${GOPROXY:-http://goproxy.home.ailexc.com,https://goproxy.cn,direct}
         APK_MIRROR: ${APK_MIRROR:-https://dl-cdn.alpinelinux.org}
     image: iam-backend:latest
     pull_policy: build   # 本地构建镜像，跳过 pull（避免 docker.io/library/iam-backend 报错噪音）
@@ -79,7 +80,7 @@ services:
       IDENTITY_BASE_URL: "http://mock-identity:8091"
       JWT_SECRET: "${JWT_SECRET:-demo-jwt-secret-change-in-prod}"
       PEP_SHARED_SECRET: "${PEP_SHARED_SECRET:-pep-shared-secret}"
-      PATROL_INTERVAL: "10s"     # 数据契约巡检周期（清单 A4；demo 短周期 → 分钟级演示新鲜度三态）
+      PATROL_INTERVAL: "5s"     # 数据契约巡检周期（清单 A4；必须显著小于契约 SLA（host=15s），否则 Fresh 态不可达）
       RECONCILE_INTERVAL: "24h"  # 深对账周期（清单 A5b；demo 另有手动 POST /api/v1/sync/reconcile）
     ports:
       - "18080:8080"   # 管理 API + PDP（demo.sh / 本地工具使用），宿主机备用端口
