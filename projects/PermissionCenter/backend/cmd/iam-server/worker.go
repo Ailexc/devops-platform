@@ -39,6 +39,18 @@ func consumeCMDBEvents(ctx context.Context, deps *api.Deps) {
 				}
 				if err := deps.CMDBConnector.HandleEvent(ctx, ev); err != nil {
 					log.Printf("[worker] cmdb event failed: %v", err)
+					continue
+				}
+				// A5a 实例删除级联清理：PG 投影行（HandleEvent 内）+ OpenFGA 关系元组（此处）——
+				// 已删实例的关系授权必须同步失效，否则 check-instance 对已删资源仍放行 = 幽灵授权 = 判多红线
+				if evType, _ := ev["type"].(string); evType == "delete" {
+					modelCode, _ := ev["model"].(string)
+					instID, _ := ev["instance_id"].(string)
+					if modelCode != "" && instID != "" {
+						if perr := deps.DataPlane.PurgeInstanceTuples(ctx, modelCode, instID); perr != nil {
+							log.Printf("[worker] purge tuples %s/%s: %v", modelCode, instID, perr)
+						}
+					}
 				}
 			}
 		}

@@ -29,6 +29,7 @@ func Open(dsn string) (*gorm.DB, error) {
 		&model.AccessRequest{}, &model.ApprovalTask{}, &model.RevokeRequest{},
 		&model.CapabilityPublishTask{},
 		&model.ResourceModel{}, &model.ResourceInstance{},
+		&model.DataContract{}, &model.PatrolLog{},
 		&model.SyncJob{}, &model.Bundle{}, &model.AgentStatus{},
 		&model.AuditLog{}, &model.DecisionLog{},
 	); err != nil {

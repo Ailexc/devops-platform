@@ -3,7 +3,11 @@ package model
 import "time"
 
 // SyncJob 同步任务记录
-// type: 1=openapi 2=cmdb-model 3=cmdb-instance 4=identity
+// type: 1=openapi 2=cmdb-model 3=cmdb-instance 4=identity（1-4 常量在 model.go 同名组）
+//
+//	5=reconcile 深对账（清单 A5b）
+const SyncReconcile = 5
+
 type SyncJob struct {
 	Base
 	Type       int16      `gorm:"index;not null" json:"type"`
@@ -26,10 +30,10 @@ type Bundle struct {
 // AgentStatus agent 上报（升级率/存活监控）
 type AgentStatus struct {
 	Base
-	AgentID        string     `gorm:"uniqueIndex;not null" json:"agent_id"`
-	AppID          uint64     `json:"app_id"`
-	CurrentRev     int64      `json:"current_rev"`
-	LastSeenAt     *time.Time `json:"last_seen_at"`
-	DecisionCount  int64      `json:"decision_count"`
-	HitRate        float64    `json:"hit_rate"`
+	AgentID       string     `gorm:"uniqueIndex;not null" json:"agent_id"`
+	AppID         uint64     `json:"app_id"`
+	CurrentRev    int64      `json:"current_rev"`
+	LastSeenAt    *time.Time `json:"last_seen_at"`
+	DecisionCount int64      `json:"decision_count"`
+	HitRate       float64    `json:"hit_rate"`
 }

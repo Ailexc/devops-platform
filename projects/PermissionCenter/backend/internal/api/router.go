@@ -17,8 +17,8 @@ func NewRouter(d *Deps) *gin.Engine {
 	api := r.Group("/api/v1")
 	api.POST("/auth/login", d.handleLogin)
 	api.POST("/auth/refresh", d.handleRefresh)
-	api.GET("/auth/people", d.handlePeople)          // demo 登录人员列表
-	api.POST("/auth/demo-login", d.handleDemoLogin)  // demo 一键登录（免密码）
+	api.GET("/auth/people", d.handlePeople)         // demo 登录人员列表
+	api.POST("/auth/demo-login", d.handleDemoLogin) // demo 一键登录（免密码）
 
 	// ---- 管理 API（JWT 保护 + 管理面 PEP 授权域边界）----
 	// 网关信任接入：统一网关 forwardAuth 通过后注入 X-Auth-Username，直接放行
@@ -108,6 +108,9 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.GET("/requests", d.listRequests)
 		mg.GET("/requests/:id", d.requestDetail)
 		mg.POST("/requests/:id/approve", d.approveRequest)
+		// A8 定制需求卡：非目录请求创建与 owner 处置（grant 直授带 TTL / package 转为能力包）
+		mg.POST("/apps/:id/custom-requests", d.createCustomRequest)
+		mg.POST("/requests/:id/fulfill", d.fulfillCustomRequest)
 		// 审批中心统一工单视图（内部 mock 聚合）
 		mg.GET("/tickets", d.listTickets)
 		// 系统观测（黑盒显性化：鉴权链路/PEP解析/PIP身份/Agent/分发/同步）
@@ -130,6 +133,10 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.GET("/audit/my-requests", d.auditMyRequests)
 		mg.GET("/audit/my-approvals", d.auditMyApprovals)
 		mg.GET("/audit/my-publishes", d.auditMyPublishes)
+		// 数据契约与新鲜度观测（清单 A2/A4/A5b：契约时钟 / 巡检失败历史 / 手动触发深对账）
+		mg.GET("/sync/contracts", d.listDataContracts)
+		mg.GET("/sync/patrol-logs", d.listPatrolLogs)
+		mg.POST("/sync/reconcile", d.reconcileNow)
 		// 程序化兜底
 		mg.POST("/apps/:id/claim", d.ClaimApp)
 		mg.POST("/owner-check", d.CheckOwnerResponsive)

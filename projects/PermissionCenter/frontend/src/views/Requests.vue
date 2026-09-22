@@ -1,6 +1,6 @@
 <template>
   <div class="requests-page">
-    <PageHeader title="审批中心" desc="按工单类型查看与处理：权限申请 · 接入申请 · 上架/下架 · 授权回收">
+    <PageHeader title="审批中心" desc="按工单类型查看与处理：权限申请 · 接入申请 · 上架/下架 · 授权回收 · 定制需求">
       <template #actions>
         <div class="seg">
           <button class="seg-btn" :class="{ on: role === 'applicant' }" @click="role = 'applicant'; load()">我发起的</button>
@@ -42,12 +42,38 @@
             <td>
               <router-link v-if="t.route" :to="t.route" class="btn btn-sm">详情</router-link>
               <button v-if="role === 'approver' && canApprove(t)" class="btn btn-sm btn-primary" @click="approve(t)">✅ 通过</button>
+              <button v-if="role === 'approver' && t.type === 'custom' && t.status === '待审批'" class="btn btn-sm btn-primary" @click="openFulfill(t)">🧩 处置</button>
               <button v-if="role === 'approver' && canApprove(t)" class="btn btn-sm" @click="reject(t)">驳回</button>
             </td>
           </tr>
         </tbody>
       </table>
       <EmptyState v-else text="暂无工单" />
+    </div>
+
+    <!-- A8 处置弹窗：直授（强制 TTL 到期回收）/ 转为能力包（造包信号） -->
+    <div v-if="fulfill.open" class="modal-mask" @click.self="fulfill.open = false">
+      <div class="modal-card">
+        <div class="modal-head"><b>🧩 处置定制需求 {{ fulfill.t?.ticket_no }}</b>
+          <button class="modal-x" @click="fulfill.open = false">✕</button></div>
+        <p class="modal-hint">申请人：<b>{{ fulfill.t?.requester }}</b> —— {{ fulfill.t?.sub }}</p>
+        <div class="fulfill-modes">
+          <button class="fm" :class="{ on: fulfill.mode === 'grant' }" @click="fulfill.mode = 'grant'">
+            <b>⚡ 直接授权</b><span>立即生效；强制带 TTL、到期自动判定排除并回收（不留游离授权碎片）</span></button>
+          <button class="fm" :class="{ on: fulfill.mode === 'package' }" @click="fulfill.mode = 'package'">
+            <b>📦 转为能力包</b><span>诉求有普适性 → 线下补包上架，申请人走正常申请（高频定制=造包信号）</span></button>
+        </div>
+        <label v-if="fulfill.mode === 'grant'" class="modal-label">有效期 TTL（天，1-365，必填）
+          <input type="number" v-model.number="fulfill.ttl" min="1" max="365" class="m-input" />
+        </label>
+        <label class="modal-label">处置备注（留痕）
+          <input v-model="fulfill.note" class="m-input" placeholder="如：按诉求直授 / 已排期补包" />
+        </label>
+        <div class="modal-foot">
+          <button class="btn" @click="fulfill.open = false">取消</button>
+          <button class="btn btn-primary" @click="submitFulfill">确认处置</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -65,6 +91,7 @@ const TYPES = [
   { v: 'onboard', label: '接入申请' },
   { v: 'publish', label: '上架 / 下架' },
   { v: 'revoke', label: '授权回收' },
+  { v: 'custom', label: '定制需求' }, // A8 非目录请求
 ]
 const type = ref('all')
 const role = ref<'applicant' | 'approver'>('applicant')
@@ -72,7 +99,7 @@ const items = ref<any[]>([])
 const counts = ref<Record<string, number>>({})
 
 function typeTag(t: string) {
-  return { apply: 'tag-blue', onboard: 'tag-violet', publish: 'tag-amber', revoke: 'tag-red' }[t] || 'tag-gray'
+  return { apply: 'tag-blue', onboard: 'tag-violet', publish: 'tag-amber', revoke: 'tag-red', custom: 'tag-green' }[t] || 'tag-gray'
 }
 function statusTag(s: string) {
   if (s === '已通过' || s === '已完成') return 'tag-ok'
@@ -105,6 +132,34 @@ async function reject(t: any) {
   try {
     await api.approveRequest(Number(t.route.split('/').pop()), 2, '驳回')
     ElMessage.success('已驳回')
+    await load()
+    notifyPendingChanged()
+  } catch (e: any) { ElMessage.error(e.message) }
+}
+
+// ---- A8 定制需求处置（grant 直授带 TTL / package 转为能力包）----
+const fulfill = ref<{ open: boolean; t: any; mode: 'grant' | 'package'; ttl: number; note: string }>(
+  { open: false, t: null, mode: 'grant', ttl: 1, note: '' })
+
+function openFulfill(t: any) {
+  fulfill.value = { open: true, t, mode: 'grant', ttl: 1, note: '' }
+}
+async function submitFulfill() {
+  const f = fulfill.value
+  if (!f.t) return
+  if (f.mode === 'grant' && (!f.ttl || f.ttl < 1 || f.ttl > 365)) {
+    ElMessage.error('TTL 天数须在 1-365（直授必须带有效期）')
+    return
+  }
+  try {
+    const rid = Number(f.t.route.split('/').pop())
+    const r: any = await api.fulfillRequest(rid, {
+      mode: f.mode, ttl_days: f.mode === 'grant' ? f.ttl : 0, note: f.note,
+    })
+    ElMessage.success(f.mode === 'grant'
+      ? `已直接授权（TTL ${f.ttl} 天，到期自动回收）：策略 #${r.policy_id}`
+      : '已标记转为能力包——请线下补包上架后通知申请人走正常流程')
+    fulfill.value.open = false
     await load()
     notifyPendingChanged()
   } catch (e: any) { ElMessage.error(e.message) }
@@ -158,6 +213,20 @@ onMounted(load)
 .btn { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); cursor: pointer; text-decoration: none; margin-right: 6px; }
 .btn:hover { background: var(--bg-hover); }
 .btn-primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+/* ---- A8 处置弹窗 ---- */
+.modal-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal-card { width: 460px; max-width: 92vw; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 18px 48px rgba(15, 23, 42, .22); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; margin-bottom: 8px; }
+.modal-x { border: none; background: none; font-size: 16px; cursor: pointer; color: var(--text-secondary); }
+.modal-hint { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 12px; }
+.modal-label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.m-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text); font-size: 13px; font-family: inherit; }
+.m-input:focus { outline: none; border-color: var(--brand); }
+.fulfill-modes { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.fm { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-card); cursor: pointer; transition: all .15s; }
+.fm span { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+.fm.on { border-color: var(--brand); background: var(--brand-soft); }
+.modal-foot { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 8px; }
 .btn-sm { font-size: 12px; }
 .mono { font-family: var(--font-mono); font-size: 12px; }
 .text-secondary { color: var(--text-secondary); }

@@ -3,6 +3,7 @@ package authz
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -88,9 +89,41 @@ func (d *DataPlane) RevokePolicy(ctx context.Context, p *model.Policy) error {
 	return nil
 }
 
+// PurgeInstanceTuples 实例删除级联清理（清单 A5a）：按对象列出全部关系元组并逐条删除——
+// 已删实例的关系式授权必须同步失效，否则 check-instance 对已删资源仍放行 = 幽灵授权 = 判多红线。
+// （原实现只删 PG 投影行、不碰 OpenFGA——architecture.md §5.4 为设计宣称，本方法补齐实现）
+func (d *DataPlane) PurgeInstanceTuples(ctx context.Context, modelCode, externalID string) error {
+	obj := fmt.Sprintf("%s:%s", modelCode, externalID)
+	tuples, err := d.ofga.ReadTuplesByObject(ctx, obj)
+	if err != nil {
+		return fmt.Errorf("read tuples for %s: %w", obj, err)
+	}
+	for _, t := range tuples {
+		if err := d.ofga.DeleteTuple(ctx, t.User, t.Relation, t.Object); err != nil {
+			return fmt.Errorf("delete tuple %s#%s@%s: %w", t.Object, t.Relation, t.User, err)
+		}
+	}
+	if len(tuples) > 0 {
+		log.Printf("[authz] purge %d tuples for deleted instance %s", len(tuples), obj)
+	}
+	return nil
+}
+
 // CheckInstance 点操作 = Casbin(动作) + OpenFGA Check(实例) / 属性求值
-// 短路：无动作权限不查 OpenFGA
-func (d *DataPlane) CheckInstance(ctx context.Context, userKey, actionCode, modelCode, externalID, operation string, matchedPids []string) (bool, error) {
+// 短路：无动作权限不查 OpenFGA。
+// 返回 reason 三态（清单 A6 默认档）："" = 正常判定；"data_missing" = 投影无该记录 →
+// fail-closed 拒单条（记录缺失 ≠ 引擎错误：原实现 condition 分支吞错静默 deny、reason 混在
+// "openfga check" 里，无法区分——本版显式区分供决策日志与验收检索）
+func (d *DataPlane) CheckInstance(ctx context.Context, userKey, actionCode, modelCode, externalID, operation string, matchedPids []string) (bool, string, error) {
+	// 数据存在性前置（fail-closed 三态之"数据缺失"）
+	m, merr := d.res.ModelByCode(modelCode)
+	if merr != nil {
+		return false, "data_missing", nil
+	}
+	inst, ierr := d.res.InstanceByExternal(m.ID, externalID)
+	if ierr != nil {
+		return false, "data_missing", nil
+	}
 	rel := openfga.OpToRelation(operation)
 	obj := fmt.Sprintf("%s:%s", modelCode, externalID)
 	allow := false
@@ -107,9 +140,9 @@ func (d *DataPlane) CheckInstance(ctx context.Context, userKey, actionCode, mode
 			continue
 		}
 		if p.ResourceScope == nil {
-			return true, nil // 无数据范围 → 动作级放行（全量）
+			return true, "", nil // 无数据范围 → 动作级放行（全量）
 		}
-		if m := scopeModelCode(p); m != "" && m != modelCode {
+		if sc := scopeModelCode(p); sc != "" && sc != modelCode {
 			continue
 		}
 		switch {
@@ -120,25 +153,22 @@ func (d *DataPlane) CheckInstance(ctx context.Context, userKey, actionCode, mode
 			}
 			ok, err := d.ofga.Check(ctx, userKey, relToUse, obj)
 			if err != nil {
-				return false, err
+				return false, "", err
 			}
 			if ok {
 				allow = true
 			}
 		case p.ResourceScope["condition"] != nil:
-			// 属性式：对实例 attributes 求值
-			if m, err := d.res.ModelByCode(modelCode); err == nil {
-				if inst, err := d.res.InstanceByExternal(m.ID, externalID); err == nil {
-					if cond, ok := p.ResourceScope["condition"].(map[string]any); ok {
-						if evalAttrCond(cond, inst.Attributes) {
-							allow = true
-						}
-					}
+			// 属性式：对实例 attributes 求值（判定数据=投影属性；"记录在、属性旧"的判多面
+			// 由 A6 新鲜度门槛 + 巡检收敛 + 强一致档收窄——见清单 2.3.1/附录话术 6）
+			if cond, ok := p.ResourceScope["condition"].(map[string]any); ok {
+				if evalAttrCond(cond, inst.Attributes) {
+					allow = true
 				}
 			}
 		}
 	}
-	return allow, nil
+	return allow, "", nil
 }
 
 // FilterResult filter 结果（含实例集 + 维度级范围条件）

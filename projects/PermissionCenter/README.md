@@ -26,6 +26,7 @@
 - **程序授权（M2M）**：OAuth2 Client Credentials，主体 service 与用户共用 PDP
 - **开放自服务/弱管理员**：应用自注册 + owner 模型 + 权限市场 + 申请-审批-开通-回收（IGA）
 - **身份同步**：mock-identity（SCIM 风格）+ Identity Connector + JML
+- **数据契约与新鲜度（2026-09-22）**：数据级发布必填契约（指纹字段/算法档位/SLA）+ 三通道对账（事件 / 指纹巡检增量 / 深对账）+ 确认制时钟三态（Fresh / 降级续判 / 超龄拒绝——**仅拒该数据域数据级，接口级不受影响**），观测端点 `/api/v1/sync/contracts`、`/sync/patrol-logs`
 
 ## 快速开始（OrbStack 全栈部署，统一管理）
 
@@ -82,11 +83,24 @@ curl localhost:19080/api/v1/hosts -H "X-User: alice"
 
 ```bash
 bash scripts/demo.sh
+# 服务器（无 OrbStack 域名）用宿主机端口覆盖：
+IAM_DEMO=http://localhost:18080 GW_DEMO=http://localhost:19080 bash scripts/demo.sh
 ```
 
-覆盖：动作级鉴权 → 无权限拦截 → 数据级 check-instance/filter → 程序身份(M2M) →
+覆盖（15 场景）：动作级鉴权 → 无权限拦截 → 数据级 check-instance/filter → 程序身份(M2M) →
 网关 PEP 链路（Traefik forwardAuth，allow/deny）→ CMDB 宕机降级 → 策略发布即时生效
-（决策缓存失效）→ 本地 agent 决策。
+（决策缓存失效）→ 本地 agent 决策 → **数据契约与集合指纹 → 实例删除级联清理（PG+OpenFGA）→
+新鲜度三态（降级续判→超龄拒绝→恢复自愈）→ 深对账手动触发**。
+
+### 数据契约与巡检配置（2026-09-22，实施清单 A2/A4/A5b）
+
+| 配置 | 默认值 | 说明 |
+|------|--------|------|
+| `PATROL_INTERVAL` | compose demo=5s（代码默认 5m） | 指纹巡检周期——**必须显著小于契约 SLA**，否则 Fresh 态不可达、stale 常驻 |
+| `RECONCILE_INTERVAL` | 24h | 深对账周期；可手动触发 `POST /api/v1/sync/reconcile`（管理 JWT） |
+| 契约 SLA / 上限 | 种子 host=15s/30s | `data_contracts.staleness_sla_sec` / `degrade_max_age_sec`（0 = SLA×6） |
+
+> 三态判定（确认制状态机）与发布门禁的完整语义见 `docs/architecture.md` §5.13 与 §7.6。
 
 ### 数据管理与备份恢复（Seed / Backup / Restore）
 
