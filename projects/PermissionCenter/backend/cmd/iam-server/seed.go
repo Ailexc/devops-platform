@@ -458,7 +458,7 @@ func seedResourceModel(deps *api.Deps, appID uint64, sourceID uint64, code, name
 	if _, err := deps.Res.ModelByCode(code); err == nil {
 		return
 	}
-	if err := deps.Res.UpsertModel(&model.ResourceModel{
+	if _, err := deps.Res.UpsertModel(&model.ResourceModel{
 		SourceID:         sourceID,
 		AppID:            appID,
 		Code:             code,

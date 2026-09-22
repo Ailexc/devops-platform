@@ -64,7 +64,7 @@ func (c *CMDBConnector) SyncModels(ctx context.Context) error {
 		return err
 	}
 	for _, m := range models {
-		if err := c.repo.UpsertModel(&model.ResourceModel{
+		if _, err := c.repo.UpsertModel(&model.ResourceModel{
 			SourceID:         m.ID,
 			AppID:            c.appID,
 			Name:             m.Name,
@@ -91,7 +91,7 @@ func (c *CMDBConnector) SyncInstances(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	total := 0
+	total, written, skipped := 0, 0, 0
 	for _, m := range models {
 		var insts []CMDBInstance
 		if err := c.getJSON(ctx, "/api/v1/models/"+m.Code+"/instances", &insts); err != nil {
@@ -99,21 +99,28 @@ func (c *CMDBConnector) SyncInstances(ctx context.Context) error {
 			return err
 		}
 		for _, inst := range insts {
-			if err := c.repo.UpsertInstance(&model.ResourceInstance{
-				ModelID:    m.ID,
-				ExternalID: fmt.Sprintf("%s-%d", m.Code, inst.ID),
-				Name:       inst.Name,
-				Attributes: inst.Attributes,
-				OwnerID:    inst.OwnerID,
-				SyncedAt:   &now,
-			}); err != nil {
+			ok, err := c.repo.UpsertInstance(&model.ResourceInstance{
+				ModelID:           m.ID,
+				ExternalID:        fmt.Sprintf("%s-%d", m.Code, inst.ID),
+				Name:              inst.Name,
+				Attributes:        inst.Attributes,
+				OwnerID:           inst.OwnerID,
+				UpstreamUpdatedAt: parseUpstreamTS(inst.UpdatedAt),
+				SyncedAt:          &now,
+			})
+			if err != nil {
 				c.syncs.FinishJob(job.ID, 0, map[string]any{"error": err.Error()})
 				return err
+			}
+			if ok {
+				written++
+			} else {
+				skipped++
 			}
 		}
 		total += len(insts)
 	}
-	c.syncs.FinishJob(job.ID, 2, map[string]any{"instances": total})
+	c.syncs.FinishJob(job.ID, 2, map[string]any{"instances": total, "written": written, "skipped": skipped})
 	return nil
 }
 
@@ -135,18 +142,33 @@ func (c *CMDBConnector) HandleEvent(ctx context.Context, event map[string]any) e
 			return err
 		}
 		now := time.Now()
-		return c.repo.UpsertInstance(&model.ResourceInstance{
-			ModelID:    m.ID,
-			ExternalID: fmt.Sprintf("%s-%d", m.Code, inst.ID),
-			Name:       inst.Name,
-			Attributes: inst.Attributes,
-			OwnerID:    inst.OwnerID,
-			SyncedAt:   &now,
+		_, err = c.repo.UpsertInstance(&model.ResourceInstance{
+			ModelID:           m.ID,
+			ExternalID:        fmt.Sprintf("%s-%d", m.Code, inst.ID),
+			Name:              inst.Name,
+			Attributes:        inst.Attributes,
+			OwnerID:           inst.OwnerID,
+			UpstreamUpdatedAt: parseUpstreamTS(inst.UpdatedAt),
+			SyncedAt:          &now,
 		})
+		return err
 	case "delete":
 		return c.repo.DeleteInstanceByExternal(m.ID, instID)
 	}
 	return nil
+}
+
+// parseUpstreamTS 解析上游 updated_at → 对账基准（单调守卫与 A4 水位的比对依据）。
+// 解析失败/缺省返回 nil：未知时间戳不参与单调守卫（fp 去重仍生效），不阻塞同步。
+func parseUpstreamTS(s string) *time.Time {
+	if s == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, s) // RFC3339 解析自动接受小数秒（A3 升毫秒后兼容）
+	if err != nil {
+		return nil
+	}
+	return &t
 }
 
 func (c *CMDBConnector) getJSON(ctx context.Context, path string, out any) error {
