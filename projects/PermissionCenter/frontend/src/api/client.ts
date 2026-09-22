@@ -141,6 +141,9 @@ export const api = {
   requestDetail: (id: number) => request(`/api/v1/requests/${id}`),
   requestsByRole: (role: string) => request(`/api/v1/requests?role=${role}`),
   submitRequest: (r: any) => request('/api/v1/requests', 'POST', r),
+  // A8 定制需求卡：非目录请求（创建）与 owner 处置（grant 直授带 TTL / package 转为能力包）
+  customRequest: (appId: number, body: any) => request(`/api/v1/apps/${appId}/custom-requests`, 'POST', body),
+  fulfillRequest: (id: number, body: any) => request(`/api/v1/requests/${id}/fulfill`, 'POST', body),
   approveRequest: (id: number, action: number, comment: string) =>
     request(`/api/v1/requests/${id}/approve`, 'POST', { action, comment }),
 

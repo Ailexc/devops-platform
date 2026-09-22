@@ -108,6 +108,9 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.GET("/requests", d.listRequests)
 		mg.GET("/requests/:id", d.requestDetail)
 		mg.POST("/requests/:id/approve", d.approveRequest)
+		// A8 定制需求卡：非目录请求创建与 owner 处置（grant 直授带 TTL / package 转为能力包）
+		mg.POST("/apps/:id/custom-requests", d.createCustomRequest)
+		mg.POST("/requests/:id/fulfill", d.fulfillCustomRequest)
 		// 审批中心统一工单视图（内部 mock 聚合）
 		mg.GET("/tickets", d.listTickets)
 		// 系统观测（黑盒显性化：鉴权链路/PEP解析/PIP身份/Agent/分发/同步）

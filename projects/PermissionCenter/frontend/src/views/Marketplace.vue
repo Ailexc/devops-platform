@@ -37,8 +37,53 @@
             <button class="btn btn-primary btn-sm" @click.stop="startApply(cap)">📋 申请</button>
           </div>
         </div>
+        <!-- A8 定制需求卡（虚拟卡，非目录请求入口——对标 SailPoint non-catalog / ServiceNow "Something else"） -->
+        <div class="cap-card custom-card" @click="customOpen = true">
+          <div class="custom-inner">
+            <span class="custom-plus">＋</span>
+            <b>申请定制能力</b>
+            <span class="custom-sub">现有能力包组合不满足？提交诉求 → owner 直授（带 TTL 到期回收）或为你补包</span>
+          </div>
+        </div>
       </div>
       <EmptyState v-if="!filtered.length" text="暂无匹配的能力（应用 owner 需先声明并发布能力）" />
+
+      <!-- A8 定制需求弹窗（非目录请求） -->
+      <div v-if="customOpen" class="modal-mask" @click.self="customOpen = false">
+        <div class="modal-card">
+          <div class="modal-head"><b>＋ 申请定制能力（非目录请求）</b>
+            <button class="modal-x" @click="customOpen = false">✕</button></div>
+          <p class="modal-hint">现有能力包组合不满足时提交诉求——进入该应用 <b>owner 的待办</b>，二选一处置：
+            <b>直接授权</b>（强制带 TTL、到期自动回收）或 <b>补建能力包</b>上架后你走正常申请流程。</p>
+          <label class="modal-label">目标应用
+            <select v-model="customForm.app_id" class="m-input" @change="loadCustomActions">
+              <option value="">请选择…</option>
+              <option v-for="a in apps" :key="a.id" :value="a.id">{{ a.name }}（{{ a.code }}）</option>
+            </select>
+          </label>
+          <label class="modal-label">诉求描述 <span class="req">*</span>
+            <textarea v-model="customForm.description" class="m-input" rows="3"
+              placeholder="为什么现有能力包满足不了？需要完成什么工作？（owner 处置依据）"></textarea>
+          </label>
+          <div v-if="customForm.app_id" class="modal-label">想要的接口动作（可选，来自该应用能力目录）
+            <div class="action-scroll">
+              <label v-for="a in customActions" :key="a.id" class="m-check">
+                <input type="checkbox" :checked="customForm.action_ids.includes(a.id)"
+                  @change="toggleCustomAction(a.id)" />
+                <span class="mono">{{ a.code }}</span>
+              </label>
+              <div v-if="!customActions.length" class="m-empty">该应用暂无能力目录</div>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <span class="m-hint">提交后可在「审批中心 → 我发起的 → 定制需求」跟踪处置</span>
+            <button class="btn btn-ghost" @click="customOpen = false">取消</button>
+            <button class="btn btn-primary"
+              :disabled="customSubmitting || !customForm.app_id || !customForm.description.trim()"
+              @click="submitCustom">{{ customSubmitting ? '提交中…' : '📨 提交定制需求单' }}</button>
+          </div>
+        </div>
+      </div>
     </template>
 
     <!-- 申请向导 4 步 -->
@@ -176,7 +221,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import { ElMessage } from 'element-plus'
@@ -259,6 +304,38 @@ function autoExpr(mc: string) {
 }
 function scopeSelectionsPayload() { const out: any[] = []; for (const mc of applyPreset.value?.data_models || []) { const s = scopeOf(mc); out.push({ model: mc, type: s.type, selectedValue: s.selectedValue, selectedValues: s.selectedValues }) } return out }
 const scopeText = computed(() => scopeSelectionsPayload().map(s => `${s.model}: ${SCOPE_LABEL[s.type] || s.type}`).join(' · '))
+
+// ---- A8 定制需求卡（非目录请求：创建诉求单 → owner 处置）----
+const customOpen = ref(false)
+const customSubmitting = ref(false)
+const customActions = ref<any[]>([])
+const customForm = reactive<{ app_id: number | ''; description: string; action_ids: number[] }>(
+  { app_id: '', description: '', action_ids: [] })
+
+async function loadCustomActions() {
+  customForm.action_ids = []
+  customActions.value = []
+  if (!customForm.app_id) return
+  try { customActions.value = (await api.actions(Number(customForm.app_id))).items || [] }
+  catch { customActions.value = [] }
+}
+function toggleCustomAction(id: number) {
+  const i = customForm.action_ids.indexOf(id)
+  i < 0 ? customForm.action_ids.push(id) : customForm.action_ids.splice(i, 1)
+}
+async function submitCustom() {
+  customSubmitting.value = true
+  try {
+    await api.customRequest(Number(customForm.app_id), {
+      description: customForm.description.trim(),
+      action_ids: customForm.action_ids,
+    })
+    customOpen.value = false
+    customForm.description = ''
+    customForm.action_ids = []
+    ElMessage.success('定制需求单已提交——审批中心「定制需求」可见，owner 将直授（带 TTL）或转为能力包')
+  } catch (e: any) { ElMessage.error(e.message) } finally { customSubmitting.value = false }
+}
 
 // A7 口径固化（清单）：申请向导的实例选择器读 IAM 本地投影（api.instances → ResourceRepo 直查投影表），
 // 不调发布方接口——三理由：鸡生蛋（申请人对目标资源零权限）、解耦（申请不依赖发布方在线）、最小暴露
@@ -501,4 +578,25 @@ onMounted(async () => {
 .empty-state { padding: 40px; text-align: center; color: var(--text-tertiary); font-size: 13px; }
 .mono { font-family: var(--font-mono); font-size: 12px; }
 .text-secondary { color: var(--text-secondary); }
+/* ---- A8 定制需求卡与弹窗 ---- */
+.custom-card { border: 2px dashed var(--border-strong); background: var(--bg-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; min-height: 148px; transition: all .15s; }
+.custom-card:hover { border-color: var(--brand, #2f6fed); background: var(--brand-soft, #eaf1fe); }
+.custom-inner { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 16px; color: var(--text-secondary); }
+.custom-plus { font-size: 28px; font-weight: 300; color: var(--brand, #2f6fed); line-height: 1; }
+.custom-inner b { font-size: 14px; color: var(--text); }
+.custom-sub { font-size: 11px; line-height: 1.5; max-width: 200px; }
+.modal-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal-card { width: 480px; max-width: 92vw; max-height: 86vh; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 18px 48px rgba(15, 23, 42, .22); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; margin-bottom: 8px; }
+.modal-x { border: none; background: none; font-size: 16px; cursor: pointer; color: var(--text-secondary); }
+.modal-hint { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 12px; }
+.modal-label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.modal-label .req { color: var(--danger, #dc2626); }
+.m-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text); font-size: 13px; font-family: inherit; }
+.m-input:focus { outline: none; border-color: var(--brand, #2f6fed); }
+.action-scroll { max-height: 168px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; font-weight: 400; }
+.m-check { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+.m-empty { font-size: 11px; color: var(--text-tertiary, #8a919c); }
+.modal-foot { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.m-hint { margin-right: auto; font-size: 11px; color: var(--text-tertiary, #8a919c); }
 </style>

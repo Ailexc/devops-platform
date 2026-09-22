@@ -8,8 +8,8 @@ import (
 )
 
 // listTickets 审批中心统一工单视图（Phase 前端改造，D9：内部 mock 聚合，暂不真实接入透传）
-// 聚合四类：权限申请（AccessRequest 1/2/3）、接入申请（RequestOnboard=3）、上架/下架（CapabilityPublishTask）、授权回收（RevokeRequest）
-// 查询参数：type=apply|onboard|publish|revoke|all（默认 all）；role=applicant|approver（默认 applicant）
+// 聚合五类：权限申请（AccessRequest 1/2）、接入申请（RequestOnboard=3）、上架/下架（CapabilityPublishTask）、授权回收（RevokeRequest）、定制需求（RequestCustom=5，A8 非目录请求）
+// 查询参数：type=apply|onboard|publish|revoke|custom|all（默认 all）；role=applicant|approver（默认 applicant）
 func (d *Deps) listTickets(c *gin.Context) {
 	tp := c.DefaultQuery("type", "all")
 	role := c.DefaultQuery("role", "applicant")
@@ -23,8 +23,8 @@ func (d *Deps) listTickets(c *gin.Context) {
 		TicketNo    string `json:"ticket_no"`
 		Status      string `json:"status"`
 		Requester   string `json:"requester"`
-		GranteeType string `json:"grantee_type,omitempty"`  // user | org | group | app
-		GranteeName string `json:"grantee_name,omitempty"`  // 授权主体名称
+		GranteeType string `json:"grantee_type,omitempty"` // user | org | group | app
+		GranteeName string `json:"grantee_name,omitempty"` // 授权主体名称
 		CreatedAt   string `json:"created_at"`
 		Approvers   int    `json:"approvers"`
 		Route       string `json:"route"`
@@ -39,8 +39,11 @@ func (d *Deps) listTickets(c *gin.Context) {
 		if tp != "all" {
 			if tp == "onboard" {
 				q = q.Where("request_type = ?", model.RequestOnboard)
+			} else if tp == "custom" {
+				q = q.Where("request_type = ?", model.RequestCustom) // A8 定制需求独立 tab
 			} else {
-				q = q.Where("request_type != ?", model.RequestOnboard)
+				// 权限申请 tab：不混入接入申请与定制需求（各有专属 tab）
+				q = q.Where("request_type NOT IN ?", []int16{model.RequestOnboard, model.RequestCustom})
 			}
 		}
 		if role == "approver" {
@@ -83,6 +86,10 @@ func (d *Deps) listTickets(c *gin.Context) {
 				t.Type = "onboard"
 				t.Title = "接入申请"
 			}
+			if r.RequestType == model.RequestCustom {
+				t.Type = "custom"
+				t.Title = "定制需求"
+			}
 			if u, err := d.Users.ByID(r.ApplicantID); err == nil {
 				t.Requester = u.DisplayName
 			}
@@ -107,11 +114,11 @@ func (d *Deps) listTickets(c *gin.Context) {
 			}
 			items = append(items, ticket{
 				ID: tsk.ID, Type: "publish", Title: title,
-				Sub:      "能力包 #" + strconv.FormatUint(tsk.CapabilityID, 10),
-				TicketNo: tsk.TicketNo,
-				Status:   map[int16]string{1: "已发起", 2: "已完成"}[tsk.Status],
+				Sub:       "能力包 #" + strconv.FormatUint(tsk.CapabilityID, 10),
+				TicketNo:  tsk.TicketNo,
+				Status:    map[int16]string{1: "已发起", 2: "已完成"}[tsk.Status],
 				CreatedAt: tsk.CreatedAt.Format("2006-01-02 15:04"),
-				Route:    "",
+				Route:     "",
 			})
 		}
 	}
@@ -129,11 +136,11 @@ func (d *Deps) listTickets(c *gin.Context) {
 		for _, r := range revs {
 			items = append(items, ticket{
 				ID: r.ID, Type: "revoke", Title: "授权回收",
-				Sub:      "策略 #" + strconv.FormatUint(r.PolicyID, 10),
-				TicketNo: "REV-" + pad4(r.ID),
-				Status:   map[int16]string{1: "待审批", 2: "已通过", 3: "已驳回"}[r.Status],
+				Sub:       "策略 #" + strconv.FormatUint(r.PolicyID, 10),
+				TicketNo:  "REV-" + pad4(r.ID),
+				Status:    map[int16]string{1: "待审批", 2: "已通过", 3: "已驳回"}[r.Status],
 				CreatedAt: r.CreatedAt.Format("2006-01-02 15:04"),
-				Route:    "",
+				Route:     "",
 			})
 		}
 	}

@@ -55,6 +55,8 @@ func main() {
 	go consumeCMDBEvents(ctx, deps)
 	// 数据契约巡检 + 深对账双定时循环（清单 A4/A5b：指纹比对→增量同步→确认制时钟刷新；天级全量兜底）
 	go patrolLoop(ctx, deps)
+	// 策略级 TTL 到期回收（清单 A8 生效链：判定过滤在 ActiveByApp，本循环负责状态/元组/bundle 回收）
+	go ttlSweepLoop(ctx, deps)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := api.NewRouter(deps)

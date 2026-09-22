@@ -305,6 +305,15 @@ func (d *Deps) mgScope(c *gin.Context) {
 		c.Next() // 审批：任何登录用户可尝试审批（SoD 在 handler 中校验）
 		return
 
+	// --- A8 定制需求卡（非目录请求）：申请人任何登录用户；处置 owner 链在 handler 内 inChain 校验 ---
+	case path == "/api/v1/apps/:id/custom-requests" && method == "POST":
+		c.Next() // 提交定制需求单：任何登录用户可提诉求（对标 ServiceNow "Something else" 入口）
+		return
+
+	case path == "/api/v1/requests/:id/fulfill":
+		c.Next() // 定制单处置（grant/package）：链内 owner 准入在 handler 中校验
+		return
+
 	// --- 程序化兜底 ---
 	case path == "/api/v1/owner-check":
 		c.Next() // 巡检：任何登录用户可触发
