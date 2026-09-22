@@ -36,6 +36,14 @@
 | 权限市场 | 应用双向开放：暴露权限点（入方向）与申请访问他人资源（出方向） |
 | 身份源 (Identity Source) | 用户/组织的 Source of Truth（HR/AD/通讯录），IAM 通过 SCIM 同步副本 |
 | JML | Joiner-Mover-Leaver：入职/调动/离职的权限自动跟随 |
+| 数据契约（Data Contract） | 数据级能力包发布必填：指纹字段 + 算法档位 + 新鲜度承诺；"指纹契约"=其指纹义务部分的通称 |
+| 集合指纹 / 记录级指纹（fp） | 域级 hash(ID集合)⊕hash(时间集合)（管"拉不拉"）/ 判定字段规范化哈希（管"写不写"、深对账差异定位） |
+| 确认制时钟 / fresh_age | `last_confirmed_fresh_at`（同步成功落地 或 指纹比对一致 才刷新）及其年龄——新鲜度三态的唯一判定量 |
+| 巡检日志（patrol_log） | 指纹巡检失败历史（reachable/fingerprint_match/sync_ok/fresh_age）——观测与告警分级进，**判定不读此表** |
+| 三元素 | 指纹可判定的三种数据变化：**新增 / 删除 / 更新**——数据契约对发布方的最低要求 |
+| fail-closed（失败关闭） | 判定依据缺失时拒绝（判少可修，判多是事故）；数据判定路径永不 fail-open |
+| 数据平面 / 执行平面 | 权限数据的**来源**系统 vs 操作**真正发生**的系统——上游挂 ≠ 执行面挂（新鲜度论证的地基，见 7.6） |
+| TOCTOU | time-of-check to time-of-use（检查时与使用时之间的时间差漏洞）——写方向用短时效令牌封顶（见 5.8） |
 
 ---
 
@@ -136,8 +144,13 @@ flowchart TB
 
 ### 5.1 鉴权与数据源解耦（治"CMDB 崩 → 全崩"）
 - Connector 抽象 + 事件驱动（webhook）+ 定时增量同步 → 本地资源索引（投影，只存权限判断所需字段）。
-- 鉴权只读本地索引，绝不实时查询外部数据源。
+- 鉴权只读本地索引，**绝不实时查询外部数据源**（唯一例外：高风险 force-remote 动作判定前的指纹快查+前置同步，判定主体仍是权限中心，见 7.6）。
 - CMDB 宕机时 IAM 用"最后同步数据"降级服务；同步水位（synced_at）可见、延迟可告警。
+- **同步三问（2026-09-22 补）**：
+  - **怎么抄**：事件通道（Redis Streams → upsert，秒级）+ 指纹巡检增量（`updated_after` 水位回拨重叠窗口，分钟级）双通道，深对账（天级全量）兜底三类差异（更新 / 孤儿双侧清理 / 静默漂移告警）——三通道与 upsert 三道门（单调守卫 → fp 去重 → 时间戳回填）见 5.13。
+  - **抄到哪**：PG 投影表（resource_instances）+ OpenFGA 关系 + Redis 热索引三分落点；只抄权限判断所需字段（投影裁剪，防数据膨胀）。
+  - **多久过期**：**副本无 TTL——它不是缓存语义**，靠同步持续收敛（删除=事件级联清理+深对账兜底）；新鲜度由数据契约的确认制时钟衡量（5.13），降级演示的 synced_at/fresh_age 全程可观测。
+- **与 02-CloudManager 对照（同一权威源、两种消费策略）**：云管查询经 QuerySet 仿制层**直读** CMDB（用户看列表、低频、要最新），权限中心把判断数据**投影进本地**（每请求都要判、毫秒级、可用性优先）——查询路径不拷数据、鉴权路径拷投影，各自选择解耦深度，不构成矛盾。
 
 ### 5.2 控制面 / 数据面分离
 - 管理配置（低 QPS）与鉴权执行（高 QPS）分层；PDP 无状态可水平扩展。
@@ -148,6 +161,10 @@ flowchart TB
 - 引入角色层：模板 → 角色 → 用户/组，避免逐条勾选。
 - 策略支持 ABAC 条件（时间、IP、数据属性）。
 - **deny-by-default**：OpenAPI 更新产生的新权限点默认不授予任何角色/策略，需显式授权（防权限漂移）。
+- **路由三分类（deny-by-default 的落点，2026-09-22 补）**——路由分类发生在鉴权判定**之前**：
+  - Public（登录页本身、健康检查、公开文档）→ 网关**显式不挂** forwardAuth 中间件（Traefik 按 router 挂载，不挂=直达）；
+  - Protected（全部业务 API）→ 挂 PEP，两级判定；
+  - **未分类 → 归入 Protected**（没分类=要鉴权）。白名单改动是管理面操作、要审计（谁把哪个路由改成公开、何时），粒度到 path；**免鉴权 ≠ 免防护**（HTTPS/防爆破照旧）。
 
 ### 5.4 数据鉴权：OpenFGA（ReBAC）+ check / filter 双接口
 - 执行层采用 **OpenFGA**（CNCF 项目，Zanzibar 开源实现）：数据策略经自研翻译层映射为 OpenFGA 授权模型与关系（Write），鉴权调用 `Check` / `ListObjects`。
@@ -179,6 +196,7 @@ flowchart TB
 - 降级：agent 拉取失败/包过期 → 默认 fail-closed（拒绝），可配置 fail-open 或回源中心。
 - 可观测：agent 上报当前 revision、激活时间、本地决策计数、命中率；控制面可查看各 agent 升级率。
 - 与 CMDB 同步层的区别（面试可讲）：CMDB Connector 是把外部数据**同步进中心**（解耦外部依赖）；bundle 分发是把中心策略**下发到边缘**（解耦中心瓶颈），两个方向相反的数据流。
+- **force-remote 的数据级挂接（2026-09-22 补）**：标记复用是真的（`Policy.ForceRemote` → bundle 动作码列表 → agent 比对回源，既有链路）；数据级请求**不进 bundle**、本就在中心 PDP 判定——其"强一致档"= 判定前指纹快查 + 失配触发前置同步（见 7.6）。**标记复用、数据级行为是本轮新增**——面试如实讲，勿称"完全同一机制"。
 
 ### 5.8 程序授权（M2M / 服务间授权）
 - 下游应用（云管/工单/事件）作为**主体 service**，与用户共用同一 PDP/网关，只是主体类型不同（Casbin/OpenFGA 主体均为字符串，零引擎改动）。
@@ -198,6 +216,7 @@ flowchart TB
   - **基础设施层（组件）**：审计/决策事件走 **Redis Streams** 异步落库，且复用为 CMDB webhook 事件入口（一个组件两用）；生产可演进到 ClickHouse/ES 存储。
 - 进阶（可选叙事）：策略即数据 + GitOps——策略导出 YAML 入 Git 仓库，版本历史/diff/审批/回滚白嫖 Git 能力。
 - 面试要点：业务语义审计无现成组件（Keycloak/Casdoor 亦自建），但该层很薄；真正用组件的是"存储与异步化 + 引擎白送能力"。
+- **现状注记（2026-09-22 代码核对，防面试超前宣称）**：Redis Streams 异步落库**当前仅 CMDB 事件一路实装**（audit/decision 事件的 Streams 化 = 设计目标，现状为 goroutine 直写 PG）；iam-server 的事件消费 XRead 暂无 consumer group——单实例够用，扩多副本前需先补（upsert 幂等、危害有限但需知情）。
 
 ### 5.10 权限分配与申请治理（Access Governance）
 - **去中心化 / 弱管理员模型**：无执行能力的管理员；安全靠**所有权 + 审批 + 审计 + SoD 机制**，而非管理员把关。
@@ -213,6 +232,7 @@ flowchart TB
 - **定期审阅为必需**：资源 owner 定期 review 谁访问了自己的资源，回收异常授权。
 - 开通动作复用"策略发布"链路：审批通过 → publish（版本化）→ 写 Casbin/OpenFGA → 自动生效；带有效期则定时任务到期回收（JIT）。
 - 审批流引擎：demo 用**自建轻量状态机**（薄）；真实场景的处置/下线/转移等走工单系统，可演进 Temporal/Flowable。
+- **数据契约门禁（发布时点，2026-09-22 补）**：勾选数据级的能力包**发布必须携带可算的数据契约**（结构校验 + 指纹端点可达自检，失败二分见 5.13）——这是**机器自动校验、不是人工管理员把关**，与弱管理员模型不冲突（§5.10 反对的是"人治把关"）；算不出指纹的发布方出路 = 不勾数据级、只发接口级（数据级本就是可选深度）。
 
 ### 5.11 身份源与组织架构同步（Identity Sync / JML）
 - 用户/组织的 Source of Truth 在**身份源**（HR/AD/通讯录），IAM 通过 **SCIM 2.0 风格协议**同步副本，IAM 只负责授权、不手工维护主数据。
@@ -229,6 +249,18 @@ flowchart TB
   - **入方向**：owner 暴露自家应用权限点（OpenAPI 自动生成），供他人申请
 - 应用 owner 模型：`apps.owner_id`（注册者）+ `app_owners` **至少 2 个负责人**；负责人失联时按组织树向上查找领导作为处理人（决定转移负责人/自己负责/下线），处置走审批流。
 - 处置（封禁/转移/下线）：真实场景走工单审批；demo 简化（审计管理员发起，走审批流，无直接执行）。
+- **能力包生命周期（2026-09-22 补）**：
+  - **发放两形态**：① 申请式（AccessRequest → 资源 owner 审批 → 自动开通，本节主线）；② 直授式（Policies 直授表单——**"授权即审批"**，source=owner、理由必填、TTL 到期回收防游离碎片；申请者自助只有按包申请，"自选动作"入口 = 演进项）。
+  - **更新四方向（已授权用户要不要重新申请）**：新增接口 → deny-by-default **显式才授**；删除接口 → 自动失效；范围缩小 → 自动收窄；**范围扩大 → 不隐式生效**（集合式实例清单天然不覆盖新数据；属性式走版本锚定 + 影响面重新确认）。**收紧自动生效、扩权从不隐式生效**——对标 OAuth2 scope 快照（token 过期封顶）。
+
+### 5.13 数据契约与指纹对账（2026-09-22 落地，实施清单 A2/A3/A4/A5b）
+- **数据契约（Data Contract，主词）**：数据级验证的能力包**发布必填** `data_contract{fields, algorithm, staleness_sla_sec[, degrade_max_age_sec]}`——字段须可算出**三元素**（新增/删除/更新）确定性指纹。**失败二分**：字段不可算 → 400 拒绝发布 + 算法建议 + 出路（不勾数据级、只发接口级）；发布方指纹端点不可达 → 502 retryable（可重试提示，**不计契约拒绝**——注册是控制面操作、调外部符合 Sync 既有设计，不违反数据面解耦红线）。
+- **算法菜单**：L1 count+max(updated_at) / **L2 集合哈希**（推荐：hash(ID 集合) ⊕ hash(updated_at 集合)）/ L3 判定字段全量哈希。两侧算法**逐字一致**（契约成文于 mock-cmdb `/sync/fingerprint` 代码注释，IAM 侧 `ResourceRepo.SetFingerprint` 同款）；version/count/max_updated_at 为观测字段**不进判定**——判定只认指纹比对、不数版本（版本号发布方自编可能跳号）。
+- **三通道对账**：事件快通道（秒级，Redis Streams）→ **指纹巡检增量**（分钟级，`PATROL_INTERVAL`；⚠️ 设计约束：**巡检周期必须显著小于契约 SLA**，否则 Fresh 态不可达、stale 标注常驻）→ **深对账**（天级全量，`RECONCILE_INTERVAL` + 手动 `POST /api/v1/sync/reconcile`）：三类差异 = 常规更新 upsert / **孤儿双侧清理**（PG 投影 + OpenFGA tuple——天级兜事件删除漏网，幽灵授权=判多红线）/ **静默漂移告警**（ts 相同但记录 fp 不同——L1/L2 集合指纹盲区的唯一兜底）。
+- **upsert 三道门**（增量拉取的写库语义）：① 单调守卫（上游时间戳倒退 → 跳过，防事件乱序旧覆新，regression_skip 日志）→ ② 记录级 fp 去重（判定字段未变不写库）→ ③ 时间戳回填（fp 未变但 ts 推进 → 只回填 ts 列，防集合指纹 ts 侧永不失配死循环）。水位推进语义：**批末推进**（全部写成功才推）、水位值 = 本次查询起始时间戳（不是批内 max——后者在上游乱序时产生永不重拉盲区）、重叠窗口回拨兜两侧时钟偏差。
+- **确认制时钟**：`data_contracts.last_confirmed_fresh_at` 仅在「同步成功落地 或 集合指纹比对一致」时刷新——**不是写入制**（上游三天无变更 = 指纹持续匹配 = 一直新鲜；写入制会把无变更系统误判为太旧）。`fresh_age = now − last_confirmed_fresh_at` 是三态判定的唯一输入（见 7.6）。
+- **观测面**：`patrol_logs` 巡检失败历史（判定**不读**此表，只供观测与告警分级：连续失败 1-2 次记日志、≥3 次通知发布方 owner）；API = `GET /api/v1/sync/contracts`（时钟/水位/承诺参数）、`GET /api/v1/sync/patrol-logs`。
+- **发布方责任制**（业内 producer owns data quality 同款）：发布方负责**数**（新鲜度 SLA、事件推送、指纹契约三元素可判定），权限中心负责**判**（正确/可用/快速/可审计）——IAM 可以做缓存与加速，**不为任何上游数据兜底**；兜底的唯一例外是判定可用性（缓存 + 降级扛，见 7.6）。
 
 ---
 
@@ -252,9 +284,20 @@ role_actions (role_id, action_id)
 policies (id, name, version, effect[allow|deny],
           subject_type[user|group|role|service], subject_id,
           app_id, action_ids, resource_scope jsonb, conditions jsonb,
+          force_remote,          -- 高风险动作标记（强一致档与 5.7 策略分发同一标记）
           status, created_by)
-resource_models (id, source_id, name)                      -- 同步自 CMDB 的模型(表)
-resource_instances (id, model_id, external_id, name, attributes jsonb, synced_at)
+resource_models (id, source_id, name, fp)                -- 同步自 CMDB 的模型(表)；fp=模型定义指纹
+resource_instances (id, model_id, external_id, name, attributes jsonb,
+                    fp,                                 -- 记录级指纹（判定字段哈希：写库去重 + 深对账定位）
+                    upstream_updated_at,                -- 上游最后修改时间（对账基准 + 单调守卫）
+                    synced_at)
+
+data_contracts (id, app_id, model_code, fields jsonb, algorithm[L1|L2|L3],
+                staleness_sla_sec, degrade_max_age_sec, enabled,
+                last_confirmed_fresh_at,                -- 确认制时钟（同步落地或指纹一致才刷新）
+                sync_watermark_at)                      -- 增量水位（批末推进 = 本批查询起始时间戳）
+patrol_logs (id, domain, at, reachable, fingerprint_match,
+             sync_ok, fresh_age_sec)                    -- 巡检失败历史（观测/告警；判定不读）
 
 policy_versions (id, policy_id, version, content, changed_by, reason)
 audit_logs (id, actor, action, resource, detail, ip, at)
@@ -308,30 +351,42 @@ agent 无 bundle / 包过期    → 回源中心 PDP check
 → 审批通过 → 策略发布（自动生效）
 ```
 
+### 7.6 数据新鲜度三态（确认制状态机，2026-09-22 落地，清单 A6）
+判定量：`fresh_age = now − data_contracts.last_confirmed_fresh_at`（确认制：同步成功落地或指纹比对一致才刷新，见 5.13）。
+
+| 状态 | 条件 | check-instance | filter 列表 | 网关接口级 |
+|------|------|----------------|-------------|------------|
+| **Fresh** | age ≤ staleness_sla | 正常判定 | 正常返回，`stale=false` | 不受影响 |
+| **Degraded 降级续判** | sla < age ≤ degrade_max_age（默认 SLA×6） | 用最后已知数据放行，reason 追加 `;stale` | 返回旧允许实例集 + **`stale=true` 标注** | 不受影响 |
+| **Expired 超龄拒绝** | age > degrade_max_age | **403 DATA_STALE_OVERDUE**（仅该数据域的**数据级**请求） | 同左 | **仍放行**——拒绝粒度不外溢 |
+
+- **拒绝条件唯一**：fresh_age 超限——上游挂了还是同步一直失败**殊途同归**（两者都表现为"确认不了新鲜"）。
+- **恢复语义**：**恢复不解禁、同步落地/指纹确认才解禁**（recovery 决策日志可查）；拒绝态自动自愈，无需人工解除。
+- **决策日志三态 reason（可检索）**：`data_missing`（投影无记录 fail-closed 拒单条）/ `data_stale_overdue` / `;stale` / `;force_remote` / `recovery`。
+- **强一致档（force-remote）**：命中策略标记（与 5.7 同一标记合流）→ 判定前**指纹快查**，失配触发**前置同步** → **IAM 以最新投影判定**——判定主体永远是权限中心，上游系统零权限代码、永不判定；2s 超时按本地投影降级判定（strong_sync_error 入日志）。**指纹比对永不进入普通请求热路径**（热路径只读本地 PG 时钟）。
+- **为什么关心数据新鲜度（双平面论证）**：数据平面（CMDB，权限数据**来源**）挂 ≠ 执行平面（云 API + 工单，操作**真正发生**处）挂——读方向判少是纯损失、放行无风险（短故障降级续判的理由）；写方向陈旧放行 = **权限可能已被收回而执行面还活着**（超龄拒绝的真正理由）。写方向风险另由审批受限令牌（scope+TTL）封顶（5.8）——**读方向管新鲜度、写方向管凭证寿命，两条腿**。
+- **判定不判业务死活**：上游/业务挂了由网关熔断（circuit breaker）与业务自身 503 处理——IAM 永远照常判定（授权系统必须比被保护系统更可用）。
+
 ---
 
 ## 8. 仓库结构（单仓库）
 
 ```
-permission_center/
-├── docs/                     # 设计文档
-├── cmd/
-│   ├── iam-server/           # 中心 PDP + 管理 API（控制面+数据面服务）
-│   ├── iam-agent/            # 本地 PDP agent（sidecar，内嵌 Casbin）
-│   └── mock-cmdb/            # 内置 mock CMDB
-├── internal/
-│   ├── api/                  # HTTP handler（管理 API + 鉴权 API）
-│   ├── authz/                # 授权核心（Casbin enforcer + 策略模型层）
-│   ├── openfga/              # OpenFGA 客户端适配（模型/关系/Check/ListObjects）
-│   ├── bundle/               # bundle 生成/校验/拉取（策略分发）
-│   ├── sync/                 # 同步连接器（openapi / cmdb）
-│   ├── model/                # 领域模型
-│   ├── store/                # 存储（pg / redis）
-│   └── audit/                # 审计与决策日志
-├── web/                      # Vue3 管理控制台
-├── deploy/                   # docker-compose（pg, redis, openfga, apisix）
-└── go.mod
+projects/PermissionCenter/
+├── backend/                 # Go 单仓库（go.mod 在此；2026-09-22 核对的真实结构）
+│   ├── cmd/                 # iam-server（PDP+管理 API+Sync+巡检）/ iam-agent / mock-cmdb / mock-identity
+│   ├── internal/            # api / authz / openfga / bundle / sync / model / store / config / auth / knowledge
+│   │                        # ⚠️ 无独立 internal/audit 包——审计=audit_logs 表（store 读写）+ api 层 logDecision 写入
+│   ├── Dockerfile           # 运行时镜像（宿主机交叉编译产物 COPY；make backend-image 用）
+│   └── Dockerfile.build     # 容器内多阶段编译（compose build 用；GOPROXY 走本地缓存双通道）
+├── frontend/                # Vue3 + Element Plus 管理控制台（src/views、components）
+├── scripts/                 # demo.sh 一键演示（15 场景，IAM_DEMO/GW_DEMO 可覆盖访问地址）
+├── deploy/                  # docker-compose（iam-server + openfga + traefik + mock-* + frontend + iam-agent）
+├── docs/                    # 本文档 + 实施清单
+└── README.md
 ```
+
+> ⚠️ 顶层曾存在游离残留 `cmd/`、`internal/`（不在 go.mod 覆盖内、**不可构建**，系历史迁移遗留）——**一切新代码落点必须带 `backend/` 前缀**，残留由 feature 分支清理（实施清单施工红线）。
 
 ---
 

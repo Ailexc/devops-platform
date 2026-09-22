@@ -135,6 +135,9 @@ watch(() => form.scope_model, async (code) => {
   }
 })
 
+// 直授表单 = 能力包发放两形态之二（清单 2.6.3）：**授权即审批**——owner 自由勾选动作+实例+TTL+
+// 理由必填，createPolicy 直接落策略（source=owner），不走审批流：授权者身份即审批留痕；
+// TTL 到期回收防游离授权碎片（对标 AWS 反模式 inline policy）。与"能力市场按包申请"（申请式）并存。
 async function create() {
   if (!form.reason) {
     ElMessage.warning('请填写授权理由（留痕依据）')

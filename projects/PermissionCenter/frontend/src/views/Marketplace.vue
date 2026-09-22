@@ -260,6 +260,9 @@ function autoExpr(mc: string) {
 function scopeSelectionsPayload() { const out: any[] = []; for (const mc of applyPreset.value?.data_models || []) { const s = scopeOf(mc); out.push({ model: mc, type: s.type, selectedValue: s.selectedValue, selectedValues: s.selectedValues }) } return out }
 const scopeText = computed(() => scopeSelectionsPayload().map(s => `${s.model}: ${SCOPE_LABEL[s.type] || s.type}`).join(' · '))
 
+// A7 口径固化（清单）：申请向导的实例选择器读 IAM 本地投影（api.instances → ResourceRepo 直查投影表），
+// 不调发布方接口——三理由：鸡生蛋（申请人对目标资源零权限）、解耦（申请不依赖发布方在线）、最小暴露
+// （选择器只需判断字段）。代价=分钟级新鲜度窗口（新资源投影未同步到时选不到）：演示前先触发一轮同步。
 async function loadInstances(mc: string) {
   if (instMap.value[mc]) return
   try {

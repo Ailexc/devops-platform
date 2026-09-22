@@ -158,7 +158,7 @@
 
       <div class="sub-title">🗄️ 数据权限控制（每预设独立）</div>
       <label class="check switch-row">
-        <input type="checkbox" v-model="p.data_control" :disabled="viewOnly" />
+        <input type="checkbox" v-model="p.data_control" :disabled="viewOnly" @change="onDataControlChange(p)" />
         <span>{{ p.data_control ? '开启：绑定接口 + 数据范围双重控制' : '关闭：绑定接口可访问全部数据' }}</span>
       </label>
 
@@ -220,6 +220,34 @@
             <button v-for="t in ['select','multi_select','variable','input']" :key="t" class="btn btn-sm"
               @click="addScopeOpt(p, mc, t)">＋ {{ SCOPE_LABEL[t] }}</button>
           </div>
+        </div>
+      </template>
+
+      <!-- 数据契约（清单 A2 发布必填：字段 + 算法档位 + 新鲜度承诺；
+           发布时后端另有失败二分自检：字段不可算=400 拒绝+出路；端点不可达=502 可重试非拒绝） -->
+      <template v-if="p.data_control && p.data_contract">
+        <div class="sub-title">📜 数据契约 <span class="text-secondary">（勾选数据级 → 发布必填）</span></div>
+        <p class="field-hint">字段须能算出确定性指纹（三元素：新增/删除/更新可判定）——算不出的出路：不勾数据级、只发接口级能力包。发布时自动做指纹端点可达自检（不可达=可重试提示，不算契约拒绝）。</p>
+        <div class="form-grid">
+          <label class="span2">指纹字段
+            <div class="chip-row">
+              <span v-for="f in contractFieldOptions(p)" :key="f" class="chip" :class="{ on: p.data_contract.fields.includes(f) }"
+                @click="!viewOnly && toggleContractField(p, f)">{{ f }}</span>
+            </div>
+          </label>
+          <label>算法档位
+            <select v-model="p.data_contract.algorithm" :disabled="viewOnly" class="input">
+              <option value="L1">L1 · count + max(updated_at)（最简）</option>
+              <option value="L2">L2 · 集合哈希（推荐）</option>
+              <option value="L3">L3 · 判定字段全量哈希（最强）</option>
+            </select>
+          </label>
+          <label>新鲜度承诺 SLA（秒）
+            <input type="number" v-model.number="p.data_contract.staleness_sla_sec" :disabled="viewOnly" class="input" min="1" />
+          </label>
+          <label>降级容忍上限（秒，0 = SLA×6）
+            <input type="number" v-model.number="p.data_contract.degrade_max_age_sec" :disabled="viewOnly" class="input" min="0" />
+          </label>
         </div>
       </template>
     </div>
@@ -396,6 +424,27 @@ function addFromPicker(p: any, kind: string) {
   if (kind === 'people' && filteredPeople.value.length) pickPerson(p, filteredPeople.value[0])
   picker.query = ''
 }
+// ---- 数据契约（清单 A2：发布必填，UI 闭环）----
+function defaultContract() {
+  return { fields: ['name', 'owner_id'], algorithm: 'L2', staleness_sla_sec: 300, degrade_max_age_sec: 0 }
+}
+// ensureContract：data_control 开启的预设必须持有契约对象（load/YAML 应用/开关三入口自愈填充默认）
+function ensureContract(p: any) {
+  if (p.data_control && !p.data_contract) p.data_contract = defaultContract()
+}
+function onDataControlChange(p: any) { ensureContract(p) }
+// 字段白名单 = 能力包资源模型字段 ∪ 基础判定字段（与后端 validateDataContractSpec 同一集合）
+function contractFieldOptions(p: any) {
+  const base = ['name', 'owner_id', 'external_id', 'updated_at']
+  const names = (fieldsOf(p.data_models?.[0]) || []).map((f: any) => f.name).filter(Boolean)
+  return [...new Set([...names, ...base])]
+}
+function toggleContractField(p: any, f: string) {
+  ensureContract(p)
+  const arr = p.data_contract.fields as string[]
+  const i = arr.indexOf(f)
+  i < 0 ? arr.push(f) : arr.splice(i, 1)
+}
 
 function toggleTag(t: string) {
   const i = form.tags.indexOf(t)
@@ -485,6 +534,7 @@ function manifestForYaml() {
         apply_scope: p.apply_scope,
         data_control: p.data_control,
         data_models: p.data_models,
+        data_contract: p.data_contract,
       })),
     },
   }
@@ -516,6 +566,7 @@ function applyYaml() {
       grantee_types: p.grantee_types || [],
       scopeOptions: {},
     }))
+    for (const p of form.presets) ensureContract(p)
     saveMsg.value = '已从 YAML 应用到表单'
     saveErr.value = false
   } catch (e: any) {
@@ -552,6 +603,7 @@ async function load() {
   }))
   // 加载各预设×模型的范围选项（独立表）
   for (const p of form.presets) {
+    ensureContract(p) // A2：已开数据级但缺契约的旧预设 → 回填默认（发布门禁可正向通过）
     p.scopeOptions = {}
     for (const mc of p.data_models || []) {
       try {
@@ -591,6 +643,7 @@ async function save() {
         id: p.id, name: p.name, status: p.status, desc: p.desc,
         action_codes: p.action_codes, grantee_types: p.grantee_types,
         apply_scope: p.apply_scope, data_control: p.data_control, data_models: p.data_models,
+        data_contract: p.data_contract, // A2：数据契约随预设透传（发布门禁校验对象）
       })),
     }
     await api.updateCapability(appId, cid, payload)
