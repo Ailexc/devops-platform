@@ -21,8 +21,8 @@ type ResourceInstance struct {
 	ExternalID        string     `gorm:"size:128;uniqueIndex:idx_model_ext;not null" json:"external_id"`
 	Name              string     `gorm:"size:128" json:"name"`
 	Attributes        JSONMap    `gorm:"type:jsonb" json:"attributes"`
-	OwnerID           *uint64    `gorm:"index" json:"owner_id"`    // 关系锚点
-	FP                string     `gorm:"size:64" json:"fp"`        // 记录级指纹：判定字段规范化哈希——写库去重 + 深对账差异定位（清单 A1）
-	UpstreamUpdatedAt *time.Time `json:"upstream_updated_at"`      // 上游最后修改时间：对账基准 + upsert 单调守卫（防事件乱序旧覆新）
+	OwnerID           *uint64    `gorm:"index" json:"owner_id"` // 关系锚点
+	FP                string     `gorm:"size:64" json:"fp"`     // 记录级指纹：判定字段规范化哈希——写库去重 + 深对账差异定位（清单 A1）
+	UpstreamUpdatedAt *time.Time `json:"upstream_updated_at"`   // 上游最后修改时间：对账基准 + upsert 单调守卫（防事件乱序旧覆新）
 	SyncedAt          *time.Time `json:"synced_at"`
 }

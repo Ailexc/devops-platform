@@ -134,9 +134,9 @@ func seed(reset bool) error {
 		"vpc": "vpc-itsm", "subnet": "subnet-itsm-app", "sg": "sg-itsm-app",
 	}, model.JSONAny{
 		map[string]any{"icon": "🔑", "name": "OAuth 2.0 · Authorization Code", "type": "oauth2_auth_code", "strength": "high", "strengthLabel": "高",
-		"desc": "人工访问首选：走企业 SSO 登录后换取访问令牌，支持用户级审计"},
+			"desc": "人工访问首选：走企业 SSO 登录后换取访问令牌，支持用户级审计"},
 		map[string]any{"icon": "🔧", "name": "API Key", "type": "api_key", "strength": "medium", "strengthLabel": "中",
-		"desc": "SDK 接入常用：请求头携带固定 Key，适合工具类脚本"},
+			"desc": "SDK 接入常用：请求头携带固定 Key，适合工具类脚本"},
 	})
 	seedAppMeta(deps, cloudApp, model.JSONMap{
 		"cloud": "腾讯云", "account": "act-ops", "region": "ap-guangzhou",
@@ -186,13 +186,13 @@ func seed(reset bool) error {
 			model.JSONAny{
 				map[string]any{
 					"id": "readonly", "name": "只读监控", "status": "published",
-					"action_codes": []any{"xh-monitor:host:list", "xh-monitor:host:read"},
+					"action_codes":  []any{"xh-monitor:host:list", "xh-monitor:host:read"},
 					"grantee_types": []any{"user", "org"},
 					"data_control":  true, "data_models": []any{"host"},
 				},
 				map[string]any{
 					"id": "full", "name": "完整监控", "status": "draft",
-					"action_codes": []any{"xh-monitor:host:list", "xh-monitor:host:read", "xh-monitor:host:create"},
+					"action_codes":  []any{"xh-monitor:host:list", "xh-monitor:host:read", "xh-monitor:host:create"},
 					"grantee_types": []any{"user", "org"},
 					"data_control":  true, "data_models": []any{"host"},
 				},
@@ -225,7 +225,7 @@ func seed(reset bool) error {
 			model.JSONAny{
 				map[string]any{
 					"id": "viewer", "name": "报告查看", "status": "published",
-					"action_codes": []any{"xh-analytics:report:list", "xh-analytics:report:read"},
+					"action_codes":  []any{"xh-analytics:report:list", "xh-analytics:report:read"},
 					"grantee_types": []any{"user"},
 				},
 			},
@@ -565,8 +565,8 @@ func grantViaRequest(deps *api.Deps, ctx context.Context, applicantID, appID uin
 		}
 	}
 	req := &model.AccessRequest{
-		AppID:               appID,
-		ApplicantID:         applicantID,
+		AppID:                appID,
+		ApplicantID:          applicantID,
 		ApplicantSubjectType: applicantSubjectType,
 		ApplicantSubjectID:   applicantSubjectID,
 		RequestType:          model.RequestApply,
@@ -1277,17 +1277,17 @@ func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID,
 		policySubjectType = model.SubjectService
 	}
 	p := &model.Policy{
-		AppID:          appID,
-		Name:           fmt.Sprintf("cap:%s:%s", presetID, granteeName),
-		ActionIDs:      ids,
-		SubjectType:    policySubjectType,
-		SubjectID:      granteeID,
-		Effect:         model.EffectAllow,
-		Status:         model.PolicyActive,
-		Source:         model.SourceViaRequest,
-		RequestID:      &req.ID,
-		ResourceScope:  resScope,
-		DataScopeType:  dataScopeType,
+		AppID:         appID,
+		Name:          fmt.Sprintf("cap:%s:%s", presetID, granteeName),
+		ActionIDs:     ids,
+		SubjectType:   policySubjectType,
+		SubjectID:     granteeID,
+		Effect:        model.EffectAllow,
+		Status:        model.PolicyActive,
+		Source:        model.SourceViaRequest,
+		RequestID:     &req.ID,
+		ResourceScope: resScope,
+		DataScopeType: dataScopeType,
 	}
 	if err := deps.DB.Create(p).Error; err != nil {
 		log.Printf("[seed] capability policy warn: %v", err)

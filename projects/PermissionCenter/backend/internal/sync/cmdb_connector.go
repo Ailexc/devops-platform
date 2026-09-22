@@ -15,9 +15,9 @@ import (
 
 // CMDBModel mock-cmdb 数据模型
 type CMDBModel struct {
-	ID              uint64         `json:"id"`
-	Name            string         `json:"name"`
-	Code            string         `json:"code"`
+	ID               uint64         `json:"id"`
+	Name             string         `json:"name"`
+	Code             string         `json:"code"`
 	AttributesSchema map[string]any `json:"attributes_schema"`
 }
 
