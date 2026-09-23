@@ -84,7 +84,11 @@ func (d *DataPlane) RevokePolicy(ctx context.Context, p *model.Policy) error {
 		return err
 	}
 	for _, inst := range insts {
-		d.ofga.DeleteTuple(ctx, subj, rel, fmt.Sprintf("%s:%s", model.Code, inst.ExternalID))
+		// S6①：错误必须上抛——原实现丢弃返回值，OFGA 瞬断时调用方无从感知失败、
+		// 照样置 status=0 → 过期授权元组永久残留且永不再扫（幽灵授权面）
+		if err := d.ofga.DeleteTuple(ctx, subj, rel, fmt.Sprintf("%s:%s", model.Code, inst.ExternalID)); err != nil {
+			return fmt.Errorf("delete tuple %s#%s@%s: %w", model.Code, inst.ExternalID, subj, err)
+		}
 	}
 	return nil
 }

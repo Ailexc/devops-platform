@@ -1,11 +1,10 @@
-// iam-server：中心 PDP + 管理 API + Sync（控制面+数据面主体服务）
+// iam-server：中心 PDP + 管理 API（判定与控制面 HTTP——后台同步三循环已迁独立进程 cmd/iam-sync，清单 S1）
 package main
 
 import (
 	"context"
 	"log"
 	"os"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xcy/permission-center/internal/api"
@@ -45,18 +44,14 @@ func main() {
 	// 初始化 OpenFGA：store + 授权模型（幂等）
 	// 启动初期 OpenFGA 可能未就绪（容器编排时序），重试直至成功，避免 storeID 为空导致数据级鉴权失效
 	ctx := context.Background()
-	if err := ensureOpenFGA(ctx, deps); err != nil {
+	if err := deps.EnsureOpenFGA(ctx); err != nil {
 		log.Printf("[iam-server] openfga init warn: %v（数据级鉴权将降级 fail-closed）", err)
 	} else {
 		log.Println("[iam-server] openfga schema ready")
 	}
 
-	// 后台 worker：消费 CMDB 变更事件（Redis Streams，与审计事件总线两用）
-	go consumeCMDBEvents(ctx, deps)
-	// 数据契约巡检 + 深对账双定时循环（清单 A4/A5b：指纹比对→增量同步→确认制时钟刷新；天级全量兜底）
-	go patrolLoop(ctx, deps)
-	// 策略级 TTL 到期回收（清单 A8 生效链：判定过滤在 ActiveByApp，本循环负责状态/元组/bundle 回收）
-	go ttlSweepLoop(ctx, deps)
+	// （S1 迁移）后台同步三循环（worker/patrol/ttl）已迁至独立进程 cmd/iam-sync——
+	// 判定可用性不再被后台任务绑架，本进程此后可独立多副本
 
 	gin.SetMode(gin.ReleaseMode)
 	r := api.NewRouter(deps)
@@ -66,19 +61,4 @@ func main() {
 	}
 }
 
-// ensureOpenFGA 重试 EnsureSchema（最多 10 次，间隔 2s）
-func ensureOpenFGA(ctx context.Context, deps *api.Deps) error {
-	var err error
-	for i := 1; i <= 10; i++ {
-		if err = deps.DataPlane.EnsureSchema(ctx); err == nil {
-			return nil
-		}
-		log.Printf("[iam-server] openfga init retry %d/10: %v", i, err)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(2 * time.Second):
-		}
-	}
-	return err
-}
+// ensureOpenFGA 已抽至 internal/api 的 (*Deps).EnsureOpenFGA——cmd/iam-server 与 cmd/iam-sync 共用（清单 S1）

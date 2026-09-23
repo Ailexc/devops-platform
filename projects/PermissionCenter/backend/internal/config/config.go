@@ -35,6 +35,10 @@ type Config struct {
 	PatrolInterval           time.Duration // 巡检周期：指纹比对+增量同步+确认制时钟刷新（默认 5m；demo 10s 分钟级演示三态）
 	ReconcileInterval        time.Duration // 深对账周期：全量三类差异兜底（默认 24h；demo 可手动 POST /sync/reconcile）
 	StrongConsistencyTimeout time.Duration // 强一致档指纹快查+前置同步的热路径超时（超时按本地投影判定，不阻塞）
+	// 同步组件独立进程 iam-sync 专属（清单 S7 env 清单）
+	SyncHealthAddr     string        // healthz 仅容器内网（默认 :8090；宿主 8090 已被 devops-gateway 占用——compose 禁发布宿主口）
+	ReconcileLockTTL   time.Duration // 深对账单活锁 TTL（单轮分钟级，独立于周期/2，默认 10m）
+	WorkerClaimMinIdle time.Duration // 消费组 XAUTOCLAIM min-idle（S3，默认 60s）
 }
 
 func getenv(key, def string) string {
@@ -81,5 +85,8 @@ func Load() *Config {
 		PatrolInterval:           getdur("PATROL_INTERVAL", 5*time.Minute),
 		ReconcileInterval:        getdur("RECONCILE_INTERVAL", 24*time.Hour),
 		StrongConsistencyTimeout: getdur("STRONG_CONSISTENCY_TIMEOUT", 2*time.Second),
+		SyncHealthAddr:           getenv("SYNC_HEALTH_ADDR", ":8090"),
+		ReconcileLockTTL:         getdur("RECONCILE_LOCK_TTL", 10*time.Minute),
+		WorkerClaimMinIdle:       getdur("WORKER_CLAIM_MIN_IDLE", 60*time.Second),
 	}
 }

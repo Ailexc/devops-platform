@@ -49,18 +49,30 @@ func (r *ContractRepo) UpsertContract(in *model.DataContract) (*model.DataContra
 	existing.StalenessSlaSec = in.StalenessSlaSec
 	existing.DegradeMaxAgeSec = in.DegradeMaxAgeSec
 	existing.Enabled = true
-	return &existing, r.db.Save(&existing).Error
+	// S5③：Updates(map) 显式列字段——Save 会把 37 行读入的旧时钟/旧水位整行回写，
+	// 双副本/并发下绕过 TouchFresh/UpdateWatermark 的单调守卫（对抗审查 L-2 绕行路径）
+	return &existing, r.db.Model(&existing).Updates(map[string]any{
+		"fields":              existing.Fields,
+		"algorithm":           existing.Algorithm,
+		"staleness_sla_sec":   existing.StalenessSlaSec,
+		"degrade_max_age_sec": existing.DegradeMaxAgeSec,
+		"enabled":             true,
+	}).Error
 }
 
 // TouchFresh 确认制时钟刷新（同步成功落地 或 指纹比对一致——清单 2.3.1 裁定①）
+// S5② 单调守卫：只进不退——双副本竞态下旧值不允许覆写新时钟
 func (r *ContractRepo) TouchFresh(id uint64, at time.Time) error {
-	return r.db.Model(&model.DataContract{}).Where("id = ?", id).
+	return r.db.Model(&model.DataContract{}).
+		Where("id = ? AND (last_confirmed_fresh_at IS NULL OR last_confirmed_fresh_at < ?)", id, at).
 		Update("last_confirmed_fresh_at", at).Error
 }
 
 // UpdateWatermark 增量水位推进——调用方保证批末语义：本批全部写成功后才调用（清单 A4 三句）
+// S5① CAS：条件更新只允许单调前进，双副本竞态下旧水位写入自动失效（影响行数 0）
 func (r *ContractRepo) UpdateWatermark(id uint64, at time.Time) error {
-	return r.db.Model(&model.DataContract{}).Where("id = ?", id).
+	return r.db.Model(&model.DataContract{}).
+		Where("id = ? AND (sync_watermark_at IS NULL OR sync_watermark_at < ?)", id, at).
 		Update("sync_watermark_at", at).Error
 }
 
