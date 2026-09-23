@@ -80,14 +80,42 @@ services:
       IDENTITY_BASE_URL: "http://mock-identity:8091"
       JWT_SECRET: "${JWT_SECRET:-demo-jwt-secret-change-in-prod}"
       PEP_SHARED_SECRET: "${PEP_SHARED_SECRET:-pep-shared-secret}"
-      PATROL_INTERVAL: "5s"     # 数据契约巡检周期（清单 A4；必须显著小于契约 SLA（host=15s），否则 Fresh 态不可达）
-      RECONCILE_INTERVAL: "24h"  # 深对账周期（清单 A5b；demo 另有手动 POST /api/v1/sync/reconcile）
+      # PATROL_INTERVAL/RECONCILE_INTERVAL 已挪至 iam-sync（S1 拆分——后台循环专属 env）
     ports:
       - "18080:8080"   # 管理 API + PDP（demo.sh / 本地工具使用），宿主机备用端口
     restart: unless-stopped
     depends_on:
       openfga:
         condition: service_started   # openfga 无 healthcheck（distroless）；iam-server 内置 ensureOpenFGA 重试
+    networks:
+      - default
+      - devops-net
+
+  # S1 拆分：同步组件独立进程（同镜像双 workload——判定与同步进程级隔离，双方可独立多副本）
+  iam-sync:
+    image: iam-backend:latest
+    pull_policy: build
+    command: ["iam-sync"]
+    environment:
+      PG_DSN: "postgresql://devops:devops@devops-postgres:5432/devops_iam?sslmode=disable"
+      REDIS_ADDR: "devops-redis:6379"
+      OPENFGA_ADDR: "openfga:8080"
+      # 删除级联/事件 upsert 写路径 + 强一致档 EnsureFresh 均需上游地址
+      CMDB_BASE_URL: "http://mock-cmdb:8090"
+      PATROL_INTERVAL: "5s"      # 巡检周期（清单 A4；必须显著小于契约 SLA（host=15s），否则 Fresh 态不可达）
+      RECONCILE_INTERVAL: "24h"  # 深对账周期（清单 A5b；手动 POST /api/v1/sync/reconcile 在 API 侧）
+      RECONCILE_LOCK_TTL: "10m"  # S4 深对账单活锁 TTL（单轮分钟级，独立于周期/2）
+      WORKER_CLAIM_MIN_IDLE: "60s" # S3 XAUTOCLAIM min-idle
+      SYNC_HEALTH_ADDR: ":8090"  # 仅容器内网——宿主 8090 已被 devops-gateway 占用，禁映射宿主口（S7/scale 前提）
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      openfga:
+        condition: service_started
     networks:
       - default
       - devops-net

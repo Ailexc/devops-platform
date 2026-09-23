@@ -10,9 +10,9 @@
 控制面（低 QPS，管理）       数据面（高 QPS，鉴权执行）
   PAP 管理控制台 (Vue3)  ──▶  iam-server (PDP)
   Sync Connector         ──▶    Casbin（动作级 RBAC/ABAC）
-                              OpenFGA（实例级 ReBAC：Check/ListObjects）
-                              Redis（策略/决策缓存 + 事件流）
-                              PostgreSQL（主存储）
+  iam-sync (同步独立进程) ─▶    OpenFGA（实例级 ReBAC：Check/ListObjects）
+   三循环: 事件worker/巡检patrol/TTL回收    Redis（策略/决策缓存 + 事件流）
+   单活锁 + 消费组 + 逐轮 recover           PostgreSQL（主存储）
 下游接入 PEP：Traefik（forwardAuth → PDP） / mock-cmdb / mock-identity
 ```
 
@@ -27,11 +27,12 @@
 - **开放自服务/弱管理员**：应用自注册 + owner 模型 + 权限市场 + 申请-审批-开通-回收（IGA）
 - **身份同步**：mock-identity（SCIM 风格）+ Identity Connector + JML
 - **数据契约与新鲜度（2026-09-22）**：数据级发布必填契约（指纹字段/算法档位/SLA）+ 三通道对账（事件 / 指纹巡检增量 / 深对账）+ 确认制时钟三态（Fresh / 降级续判 / 超龄拒绝——**仅拒该数据域数据级，接口级不受影响**），观测端点 `/api/v1/sync/contracts`、`/sync/patrol-logs`
+- **同步组件进程隔离（2026-09-23，清单 S1-S10）**：三后台循环（事件 worker / 巡检 patrol / TTL 回收）拆**独立进程 `iam-sync`**——同镜像双 workload，判定与同步 panic/重启/资源互不牵连、双双可独立多副本；防重三层 = 消费组分摊（`iam-sync-workers`，死信流兜底）+ 分布式锁单活（三把锁四执行点）+ 幂等兜底（upsert 三道门 / 水位与确认制时钟 CAS）；健康探活容器内 `/healthz`；本地开发 `make run-sync`；天级深对账开标准 API `POST /api/v1/sync/reconcile` 供任务平台经网关编排（快慢分治）
 
 ## 快速开始（OrbStack 全栈部署，统一管理）
 
 ```bash
-# 1. 构建镜像并启动全栈（基础设施 + iam-server/mock-cmdb/mock-identity/iam-agent/frontend）
+# 1. 构建镜像并启动全栈（基础设施 + iam-server/iam-sync/mock-cmdb/mock-identity/iam-agent/frontend）
 #    后端：宿主机交叉编译 Linux/arm64 → alpine 最小运行时（golang 镜像源不可用）
 #    前端：宿主机构建 dist → nginx 运行时（容器内 npm install 网络不稳定）
 make up

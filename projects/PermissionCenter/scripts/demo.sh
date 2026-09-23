@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 一键演示脚本：正常链路 → 无权限 → CMDB 宕机降级 → 策略发布生效 → 本地 agent 决策
-# 前置：make up && make seed && make run && make run-cmdb && make run-id
+# 前置：make up（含 iam-server+iam-sync 双进程——S1 拆分后巡检/事件/TTL 循环在 iam-sync）
+#       && make seed && make run && make run-cmdb && make run-id（本地模式另需 make run-sync）
 set -eu
 
 # 访问地址可用环境变量覆盖——服务器（无 OrbStack 域名）用宿主机端口映射：
@@ -132,9 +133,14 @@ for c in json.load(sys.stdin)["items"]:
         bool(c.get("last_confirmed_fresh_at")), bool(c.get("sync_watermark_at"))))'
 echo "> 巡检日志最近 3 条（reachable / fingerprint_match / sync_ok / fresh_age）："
 curl -s "$IAM/api/v1/sync/patrol-logs?limit=3" -H "$AUTH" | python3 -c 'import json,sys
-for l in json.load(sys.stdin)["items"]:
+items=json.load(sys.stdin)["items"]
+if not items:
+    print("  ✗ FAIL：patrol-logs 为空——iam-sync 巡检循环未运行（S10 硬断言1）", file=sys.stderr)
+    sys.exit(1)
+for l in items[:3]:
     print("  %s reachable=%s match=%s sync_ok=%s age=%ss" % (
-        l["domain"], l["reachable"], l["fingerprint_match"], l["sync_ok"], l["fresh_age_sec"]))'
+        l["domain"], l["reachable"], l["fingerprint_match"], l["sync_ok"], l["fresh_age_sec"]))
+print("  ✓ 硬断言1：巡检日志非空（iam-sync patrol 循环在跑）")'
 echo "> 增量过滤（A4 L1 义务：updated_after 远古=全量、未来=空）："
 curl -s "$MOCKP/api/v1/models/host/instances?updated_after=2000-01-01T00:00:00Z" | python3 -c 'import json,sys;print("  count(远古)=",len(json.load(sys.stdin)))'
 curl -s "$MOCKP/api/v1/models/host/instances?updated_after=2999-01-01T00:00:00Z" | python3 -c 'import json,sys;print("  count(未来)=",len(json.load(sys.stdin)))'
@@ -146,7 +152,12 @@ echo "> 删除 mock 实例 host-5（事件 → 投影行 + OpenFGA 关系级联�
 curl -s -X DELETE "$MOCKP/api/v1/models/host/instances/5"; echo
 sleep 2
 echo "> 事件链清理后重查（应 deny code=DATA_MISSING，fail-closed 拒单条）："
-curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-5","operation":"read"}'; echo
+R19=$(curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-5","operation":"read"}')
+echo "$R19"
+if ! echo "$R19" | grep -q DATA_MISSING; then
+  echo "  ✗ FAIL：应 deny code=DATA_MISSING——事件删除级联未生效（worker 消费链断裂，S10 硬断言2）" >&2; exit 1
+fi
+echo "  ✓ 硬断言2：DATA_MISSING（事件级联在 iam-sync 消费链上生效）"
 echo "> OpenFGA 关系残留（应 tuples:[] —— purge 生效，无幽灵授权）："
 SID=$(curl -s "$OFGA/stores" | python3 -c 'import json,sys;print(json.load(sys.stdin)["stores"][0]["id"])')
 curl -s -X POST "$OFGA/stores/$SID/read" -H "$CT" -d '{"tuple_key":{"object":"host:host-5"}}' | python3 -m json.tool | head -5
@@ -159,14 +170,24 @@ docker compose -f deploy/docker-compose.yml stop mock-cmdb >/dev/null
 echo "> 2) 等待 40s（年龄越过 30s 上限 → Expired）…"
 sleep 40
 echo "> 3) Expired 判定（应 deny code=DATA_STALE_OVERDUE，仅该数据域数据级）："
-curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-6","operation":"read"}'; echo
+R20=$(curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-6","operation":"read"}')
+echo "$R20"
+if ! echo "$R20" | grep -q DATA_STALE_OVERDUE; then
+  echo "  ✗ FAIL：应 deny code=DATA_STALE_OVERDUE——确认制时钟三态未生效（S10 硬断言3a）" >&2; exit 1
+fi
+echo "  ✓ 硬断言3a：DATA_STALE_OVERDUE（超龄拒绝生效）"
 echo "> 4) 接口级鉴权不受影响（应仍 allow —— Expired 只拒该域数据级）："
 curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read"}'; echo
-echo "> 5) 恢复 mock → 巡检（≤10s）指纹确认 → 时钟刷新 → recovery（恢复不解禁、同步落地才解禁）"
+echo "> 5) 恢复 mock → 巡检（≤10s）指纹确认 → 时钟刷新 → recovery（恢复不解禁、 同步落地才解禁）"
 docker compose -f deploy/docker-compose.yml start mock-cmdb >/dev/null
 sleep 15
 echo "> 6) 恢复后判定（应 allow）："
-curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-6","operation":"read"}'; echo
+R20B=$(curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-6","operation":"read"}')
+echo "$R20B"
+if ! echo "$R20B" | grep -q '"decision":"allow"'; then
+  echo "  ✗ FAIL：恢复后应 allow——同步落地解禁未生效（S10 硬断言3b）" >&2; exit 1
+fi
+echo "  ✓ 硬断言3b：恢复后 allow（自愈闭环）"
 echo "> 7) 决策日志检索（data_stale_overdue / recovery / force_remote 三类 reason 可查）："
 curl -s "$IAM/api/v1/decision-logs?limit=200" -H "$AUTH" | python3 -c 'import json,sys
 d=json.load(sys.stdin); items=d.get("items") if isinstance(d,dict) else d
@@ -196,7 +217,12 @@ sleep 66
 echo "> 5) TTL 到期后判定（应 deny —— ActiveByApp 已排除过期策略）："
 curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"bob","app":"cmdb","action":"cmdb:host:delete"}'; echo
 echo "> 6) 回收落地核验（status 应已置 0、expires_at 已过）："
-docker exec devops-postgres psql -U devops -d devops_iam -t -c "select 'policy#' || $CUSTOM_POLICY || ' status=' || status || ' expired=' || (expires_at <= now()) from policies where id = $CUSTOM_POLICY;"
+R22=$(docker exec devops-postgres psql -U devops -d devops_iam -t -c "select 'policy#' || $CUSTOM_POLICY || ' status=' || status || ' expired=' || (expires_at <= now()) from policies where id = $CUSTOM_POLICY;")
+echo "$R22"
+if ! echo "$R22" | grep -q "status=0"; then
+  echo "  ✗ FAIL：status≠0——TTL 回收未落地（iam-sync ttlSweep 未跑，S10 硬断言4）" >&2; exit 1
+fi
+echo "  ✓ 硬断言4：status=0（TTL 回收在 iam-sync 上生效）"
 echo "> 7) 申请人视角：审批中心工单（定制需求类型可见、已处置）："
 curl -s "$IAM/api/v1/tickets?type=all&role=applicant" -H "Authorization: Bearer $BOB_TOKEN" | python3 -c 'import json,sys
 for t in json.load(sys.stdin)["items"][:4]:

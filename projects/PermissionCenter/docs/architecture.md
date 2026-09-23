@@ -151,6 +151,7 @@ flowchart TB
   - **抄到哪**：PG 投影表（resource_instances）+ OpenFGA 关系 + Redis 热索引三分落点；只抄权限判断所需字段（投影裁剪，防数据膨胀）。
   - **多久过期**：**副本无 TTL——它不是缓存语义**，靠同步持续收敛（删除=事件级联清理+深对账兜底）；新鲜度由数据契约的确认制时钟衡量（5.13），降级演示的 synced_at/fresh_age 全程可观测。
 - **与 02-CloudManager 对照（同一权威源、两种消费策略）**：云管查询经 QuerySet 仿制层**直读** CMDB（用户看列表、低频、要最新），权限中心把判断数据**投影进本地**（每请求都要判、毫秒级、可用性优先）——查询路径不拷数据、鉴权路径拷投影，各自选择解耦深度，不构成矛盾。
+- **进程形态（2026-09-23 拆分，部署视图）**：Sync 投影代理 = `iam-server` 进程内的**库层**（三个 Connector + 手动同步 API 直调）+ **独立进程 `iam-sync`** 承载全部后台循环（事件消费 worker / 指纹巡检与深对账 patrol / TTL 回收，各带单活锁与逐轮 panic recover）——compose 同镜像双服务、`make run-sync` 本地同款；健康探活走容器内 `/healthz`（不映射宿主口）。**快慢分治**：秒/分钟级 duty loop（事件/巡检/回收）与判定状态机紧耦合、进程内自治不外包；天级深对账是批任务，开标准 API `POST /api/v1/sync/reconcile` 供任务平台/任何人经网关调度。
 
 ### 5.2 控制面 / 数据面分离
 - 管理配置（低 QPS）与鉴权执行（高 QPS）分层；PDP 无状态可水平扩展。
@@ -196,6 +197,7 @@ flowchart TB
 - 降级：agent 拉取失败/包过期 → 默认 fail-closed（拒绝），可配置 fail-open 或回源中心。
 - 可观测：agent 上报当前 revision、激活时间、本地决策计数、命中率；控制面可查看各 agent 升级率。
 - 与 CMDB 同步层的区别（面试可讲）：CMDB Connector 是把外部数据**同步进中心**（解耦外部依赖）；bundle 分发是把中心策略**下发到边缘**（解耦中心瓶颈），两个方向相反的数据流。
+- **后台任务防重与进程隔离（2026-09-23 补，清单 S1/S3/S4）**：同步三循环（事件消费/巡检深对账/TTL 回收）已拆**独立进程 `iam-sync`**（同镜像双 workload——与判定进程隔离，panic/重启/资源互不牵连，双双可独立多副本）；防重三层：事件通道**消费组分摊**（同一事件仅一个 consumer）+ 定时任务**分布式锁单活**（`lock:iam:patrol|reconcile|ttl` 三把锁覆盖四执行点，`SET NX PX` + Lua 仅-owner 释放 + 崩溃等 TTL 接管）+ **幂等兜底**（upsert 三道门 / 水位与确认制时钟 CAS 单调守卫 / TTL 回收 status 守卫——锁或消费组任一层失效也不产生错误结果）。
 - **force-remote 的数据级挂接（2026-09-22 补）**：标记复用是真的（`Policy.ForceRemote` → bundle 动作码列表 → agent 比对回源，既有链路）；数据级请求**不进 bundle**、本就在中心 PDP 判定——其"强一致档"= 判定前指纹快查 + 失配触发前置同步（见 7.6）。**标记复用、数据级行为是本轮新增**——面试如实讲，勿称"完全同一机制"。
 
 ### 5.8 程序授权（M2M / 服务间授权）
@@ -216,7 +218,7 @@ flowchart TB
   - **基础设施层（组件）**：审计/决策事件走 **Redis Streams** 异步落库，且复用为 CMDB webhook 事件入口（一个组件两用）；生产可演进到 ClickHouse/ES 存储。
 - 进阶（可选叙事）：策略即数据 + GitOps——策略导出 YAML 入 Git 仓库，版本历史/diff/审批/回滚白嫖 Git 能力。
 - 面试要点：业务语义审计无现成组件（Keycloak/Casdoor 亦自建），但该层很薄；真正用组件的是"存储与异步化 + 引擎白送能力"。
-- **现状注记（2026-09-22 代码核对，防面试超前宣称）**：Redis Streams 异步落库**当前仅 CMDB 事件一路实装**（audit/decision 事件的 Streams 化 = 设计目标，现状为 goroutine 直写 PG）；iam-server 的事件消费 XRead 暂无 consumer group——单实例够用，扩多副本前需先补（upsert 幂等、危害有限但需知情）。
+- **现状注记（2026-09-22 代码核对、2026-09-23 更新，防面试超前宣称）**：Redis Streams 异步落库**当前仅 CMDB 事件一路实装**（audit/decision 事件的 Streams 化 = 设计目标，现状为 goroutine 直写 PG）；事件消费已升级**消费组**（`XREADGROUP` 组 `iam-sync-workers`：起点 `$` 防历史重放、仅成功 ACK、XAUTOCLAIM 认领 + 认领计数上限 5 → 死信流 `cmdb-events:dlq`）——**多副本分摊前置条件已具备**（2026-09-23 拆分实证：双副本 consumers≥2、pending=0）。
 
 ### 5.10 权限分配与申请治理（Access Governance）
 - **去中心化 / 弱管理员模型**：无执行能力的管理员；安全靠**所有权 + 审批 + 审计 + SoD 机制**，而非管理员把关。
@@ -374,7 +376,7 @@ agent 无 bundle / 包过期    → 回源中心 PDP check
 ```
 projects/PermissionCenter/
 ├── backend/                 # Go 单仓库（go.mod 在此；2026-09-22 核对的真实结构）
-│   ├── cmd/                 # iam-server（PDP+管理 API+Sync+巡检）/ iam-agent / mock-cmdb / mock-identity
+│   ├── cmd/                 # iam-server（PDP+管理 API）/ iam-sync（同步三循环+healthz，S1 拆分）/ iam-agent / mock-cmdb / mock-identity
 │   ├── internal/            # api / authz / openfga / bundle / sync / model / store / config / auth / knowledge
 │   │                        # ⚠️ 无独立 internal/audit 包——审计=audit_logs 表（store 读写）+ api 层 logDecision 写入
 │   ├── Dockerfile           # 运行时镜像（宿主机交叉编译产物 COPY；make backend-image 用）
