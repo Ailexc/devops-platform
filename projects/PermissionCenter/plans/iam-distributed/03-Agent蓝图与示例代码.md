@@ -77,32 +77,39 @@ func (m *BundleManager) pull(ctx context.Context) {
 
 ```go
 // evaluator.go —— 判定材料进、结论出；零 I/O
-func (e *Evaluator) CheckData(user string, rule Rule, m core.Material,
-	changes map[string]any) (allow bool, reason string) {
-
+// ★ 条件语言 = 中心 CEL 子集（== / != / in / !in / contains / startsWith，对齐存量 expr.go 白名单）——
+//   两种裁决二选一（P0 契约任务）：① 边缘嵌 cel-go 全语义；② 发布期把 CEL 归一化为受限谓词
+//   档位入包，**翻译失败=拒发**（防"翻译丢 op = 过度放行"）。变量四枚对齐存量 scopeVariableContext：
+//   $user / $org / $group / $account（运行时按请求者解析，带前缀归一化）。
+func (e *Evaluator) CheckData(user string, rule Rule, m core.Material) (allow bool, reason string) {
 	switch rule.Scope.Kind {
-	case "none": // 无数据范围 → 接口级过了就是全量
+	case "none", "all":
 		return true, ""
-	case "all": // 模型/域全量
-		return true, ""
-	case "instance_set": // 集合式：清单命中即过（µs 哈希查找）
+	case "instance_set":
 		return rule.Scope.IDs.Has(m.ID), "no_matching_scope"
-	case "condition", "variable": // 条件式/变量式：谓词对单行属性求值
-		return evalPredicate(rule.Scope.Predicate, m.Attributes, e.requester(user)), "no_matching_scope"
-	case "dimension": // 维度式：列表场景交 SDK 拼条件；点场景等价条件求值
-		return evalPredicate(dimToPredicate(rule.Scope), m.Attributes, ""), "no_matching_scope"
-	case "relation": // ⚠️ 关系式=预留形态：材料在中心关系图，边缘不判 → 回源（§5 边界）
+	case "condition", "variable":
+		return evalPredicate(rule.Scope.Predicate, m.Attributes, e.varCtx(user)), "no_matching_scope"
+	case "dimension":
+		// 点判 = 等价谓词求值；列表 = 范围声明交 SDK 下推预过滤，**行内维度字段仍过本求值器二次判**
+		// ——下推只是性能优化，正确性裁决永远在 Agent（"点判与列表判一致"进契约测试，M4 修订）
+		return evalPredicate(dimToPredicate(rule.Scope), m.Attributes, e.varCtx(user)), "no_matching_scope"
+	case "relation": // ⚠️ 关系式=预留形态：材料在中心关系图，边缘不判 → 回源档（05 边界）
 		return false, "relation_scope_requires_center"
 	}
 	return false, "unknown_scope"
 }
 
-// evalPredicate：{field, op(eq|neq|in|gte), value} → 对属性求值；$requester 运行时替换成请求者
-// changes（改的新值）参与"改向"校验：变更后的属性也须满足谓词（防改向越界）
-func evalPredicate(p Predicate, attrs, requester string) bool {
-	v := attrs[p.Field]
-	if p.Value == "$requester" {
-		v = requester
+// evalPredicate：谓词 {field, op, value} 对属性求值；**缺 key = 拒**（fail-closed）
+// ★ 改向校验（S4 修订）：调用方先 merge——PATCH 部分更新 = merge(旧属性, changes) 后对合并结果求值，
+//   "把 host 改到没权限的账号下"即被拒；批量 Updates（无实体在手）须在 Hook 内先取旧属性再 merge
+//   （语义在 P0 契约写死：缺字段按旧值合并；谓词引用的字段缺失 = 拒）。
+func evalPredicate(p Predicate, attrs map[string]any, vc varCtx) bool {
+	v, ok := attrs[p.Field]
+	if !ok {
+		return false // 缺字段=拒（fail-closed）
+	}
+	if val, isVar := vc.resolve(p.Value); isVar {
+		v = val // 变量（$user/$org/$group/$account）运行时替换
 	}
 	return compare(v, p.Op, p.Value)
 }
@@ -122,17 +129,23 @@ mux.HandleFunc("/v1/check", func(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := m.store.Load()
 	if rs == nil {
-		writeDeny(w, "no_bundle") // ★ 无包=拒（fail-closed；启动竞态短暂出现属预期）
-		return
+		writeDeny(w, "no_bundle") // ★ 无包=拒（fail-closed）；启动窗口的可用性账见 05 风险 M 行
+		return                       //   （healthz 区分 starting/ready + 迁移期回源过渡档），不是"属预期"
 	}
 	// ① 接口级（包内存）
 	if !rs.AllowsAction(req.User, req.Action) {
 		writeDeny(w, "no_matching_action")
 		return
 	}
-	// ② 数据级（带 attributes 才判；create 免——请求参数即"未来的行"）
-	if req.Operation != "create" && req.Attributes != nil {
-		allow, reason := e.CheckData(req.User, rs.RuleFor(req.Action), core.Material{ID: req.InstanceID, Attributes: req.Attributes}, req.Changes)
+	// ② 数据级：**有数据范围就必须有材料——缺材料=拒（data_missing），绝不跳过判定**（S1 修订）
+	rule := rs.RuleFor(req.Action)
+	if req.Operation != "create" && rule.HasDataScope() {
+		if req.Attributes == nil {
+			writeDeny(w, "data_missing") // ★ 材料缺失=判定失败=拒；把信任外包给被判定方=穿透
+			return
+		}
+		merged := mergeAttrs(req.Attributes, req.Changes) // ★ 改向校验：合并新值后求值（S4）
+		allow, reason := e.CheckData(req.User, rule, core.Material{ID: req.InstanceID, Attributes: merged})
 		if !allow {
 			writeDeny(w, reason)
 			return
@@ -148,20 +161,22 @@ mux.HandleFunc("/v1/check", func(w http.ResponseWriter, r *http.Request) {
 
 ## 5. 决策回传（⑤ AuditBuffer）
 
-- 环形缓冲（如 10k 条）+ 每 N 条/每 T 秒批量 `POST /v1/decisions`；**缓冲满丢最旧并计数**（判定绝不因回传阻塞——审计是尽力而为，决策正确性优先；丢弃数在 healthz 暴露指标）；
-- 中心侧聚合为决策日志视图（"谁在何时被怎么判"）——补足分布式后审计集中化。
+- 环形缓冲（如 10k 条）+ 每 N 条/每 T 秒批量 `POST /v1/decisions`；**溢出策略两档**（M7 修订）：默认本地磁盘溢写（丢弃降为异常），资源受限环境退"丢最旧 + 计数"——丢弃窗口必须能通过告警圈定时段（合规口径），判定绝不因回传阻塞；
+- 中心侧聚合为决策日志视图（"谁在何时被怎么判"**尽力查全**）——分布式后审计集中化，但不承诺"无损全量"（边界表措辞）。
 
 ## 6. 契约测试（P2 验收，6 条全绿才发版）
 
 1. 接口级：包内无该动作 → deny；有 → allow；
 2. 数据级集合式：ID 在/不在清单各一次；
-3. 数据级条件式：属性命中/不命中 + **改向越界被拒**（changes 把 owner 改到范围外 → deny）；
-4. fail-closed：无包、包损坏、未知 scope 形态 → 一律 deny（reason 可区分）；
-5. last-known-good：新包拉取失败/签名错 → 继续用旧包判定；旧 revision 重放被拒；
-6. 性能基线：单次 check（含数据级）本地 < 1ms（P99），bundle 激活不阻塞在途判定。
+3. 数据级条件式：属性命中/不命中 + **改向越界被拒**（changes 把 owner 改到范围外 → deny）+ **仅带变更字段的 PATCH**（merge 后求值）+ 批量 Updates（无实体 → Hook 内取旧属性再判）；
+4. fail-closed 五连：无包、包损坏、未知 scope 形态、**缺判定材料（data_missing）**、谓词缺字段 → 一律 deny（reason 可区分）；
+5. last-known-good：新包拉取失败/校验错 → 继续用旧包判定；旧 revision 重放被拒；
+6. **维度式一致性**：同一资源点判与列表判结果一致（下推预过滤 + 行内二次判）；
+7. 条件语言一致性：CEL 归一化档位样本（含 contains/!in）边缘求值与中心求值结果一致；
+8. 性能基线：单次 check（含数据级）本地 < 1ms（P99），bundle 激活不阻塞在途判定。
 
 ## 7. 依赖与部署
 
-- 依赖：仅 redis/http 客户端 + 可选 Casbin 库（接口级）——**不引任何数据源驱动**（铁律）；
+- 依赖：http 客户端 + Casbin 库（接口级）+ **cel-go（若 P0 裁决①：边缘全语义求值；裁决②则不引）**——**不引任何数据源驱动**（铁律）；
 - 部署：同镜像双入口延续（`command: ["iam-agent"]`），env 见接入手册 §2.3；
 - 升级：Agent 独立发版，与中心兼容矩阵随发行说明。

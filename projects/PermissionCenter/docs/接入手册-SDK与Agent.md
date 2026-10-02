@@ -156,7 +156,8 @@ def host_update(request, id):
     return JsonResponse(...)
 
 def host_list(request):
-    qs = Host.objects.filter(cloud="aws")  # 中间件自动过滤：只留有权限的行
+    qs = Host.objects.filter(cloud="aws")  # 业务正常查（DB 条件下推=预过滤）
+    # 中间件自动过滤：候选行过 Agent 挑行（行内字段二次判——正确性裁决在 Agent）
     return render(qs)
 ```
 

@@ -258,8 +258,8 @@ func Middleware(cfg Config) gin.HandlerFunc {
 
 		// ② 取材（读/列表：候选行）——取不到=接入问题=报错拒绝（取材铁律）
 		rows, err := cfg.Fetch(c, rt)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "material fetch failed", "detail": err.Error()})
+		if err != nil || len(rows) == 0 { // ★ 空结果=取材失败=拒（防 rows[0] 越界 + 防"空即放行"）
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "material fetch failed", "detail": fmt.Sprint(err)})
 			return
 		}
 
@@ -491,7 +491,7 @@ func FetchByDecl(hc *http.Client, decl QueryDecl, idParam string) Fetcher {
 }
 ```
 
-**BK-CMDB 的"特殊"（全 POST + 条件体）只是它的声明特殊，取材器不特殊**——模板替换原样覆盖。各系统取材差异归位：
+**BK-CMDB 的"特殊"（全 POST + 条件体）只是它的声明特殊，取材器不特殊**——模板替换原样覆盖。**列表/聚合场景（P0 契约定约）**：列表取材走独立声明（候选查询模板 + 参数透传，非单 ID 模板）；过滤双模式 = DB 条件下推（预过滤）+ **行内字段仍过 Agent 二次判**（下推只是性能优化）；聚合端点（count/sum）**默认拒 + 显式声明改写**。各系统取材差异归位：
 
 | 系统 | 框架壳（按框架，3 个一次性复用） | 声明（按系统，注册能力包时填） | 取材器 |
 |---|---|---|---|
