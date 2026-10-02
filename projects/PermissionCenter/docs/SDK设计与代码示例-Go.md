@@ -182,6 +182,25 @@ func (r *Router) Match(method, path string) (Rule, bool) {
 }
 ```
 
+### 1.4 路由表从哪来（重要——不要手写逐条登记）
+
+**这张表是翻译表，不是权限规则**：判定的单位是**动作码**（`cmdb:host:read`，策略围绕动作码组织），而请求只有 URL——表干的唯一一件事是 **HTTP 请求 → 动作码** 翻译。数据级判定不走它（走取材+范围比对）。手写逐条正则只是示例/兜底形态，**登记动作按三级来源自动化**：
+
+| 级 | 来源 | 地位 |
+|---|---|---|
+| ① **OpenAPI 自动生成** | 能力包发布本就携带 OpenAPI——动作码与路由映射**同源生成**，零手写 | **常态（首选）** |
+| ② 框架路由扫描 + 约定推导 | 启动导出框架路由表（gin 有 `r.Routes()`）按 REST 约定推导：`GET /hosts/:id` → `host:read`、`POST /hosts` → `host:create` | 无 OpenAPI 时主路 |
+| ③ 手写规则 | **前缀/通配批量**登记（`AddPrefix("/api/v3/", "cmdb:")`），不逐条正则 | 老系统兜底 |
+
+```go
+// ① 从能力包的 OpenAPI 生成（常态）——与发布方注册能力包时用同一份 OpenAPI
+router, err := core.BuildRouterFromOpenAPI(openapiSpec, appCode) // 动作码/路由映射同源
+// ② 从框架路由表推导
+router = core.BuildRouterFromGin(r, appCode, overrides) // 约定推导 + 少量人工覆盖
+```
+
+**"未登记 → 403"是刻意设计**（路由三分类：没分类的默认要鉴权，防新接口悄悄裸奔）——登记自动化之后这道防线才真正站得住。示例中的 `/api/hosts` 是占位业务路径，实际为接入方自己的 API 路径。
+
 ---
 
 ## 2. 壳①：icguard-gin（咱自己的 Go 后端）
@@ -322,7 +341,12 @@ func RegisterGORMHooks(db *gorm.DB, client *core.AgentClient, actionFor func(mod
 
 ```go
 // main.go —— 一次接入，全接口覆盖
-agent := core.NewAgentClient("http://127.0.0.1:9090")
+// ★ Agent 地址从配置/环境变量读，不写死 IP：
+//   sidecar 同 Pod（推荐）= http://127.0.0.1:9090（回环即通信，刻意为之）
+//   独立部署            = http://iam-agent:9090（compose/K8s 服务名，DNS 解析）
+agent := core.NewAgentClient(cfg.GetString("ICGUARD_AGENT_URL"))
+
+// 路由表：常态由 OpenAPI/框架路由自动生成（见 §1.4）——手写仅为示意/兜底
 router := core.NewRouter().
 	Add("GET",    `^/api/hosts/(?P<id>\d+)$`, "cmdb:host:read",   "host", "read").
 	Add("POST",   `^/api/hosts$`,            "cmdb:host:create", "host", "create").
@@ -466,6 +490,7 @@ func normalize(row bson.M) map[string]any { /* ... */ return nil }
 container := restful.NewContainer()
 
 // ★ 全 POST 风格：method 留空（或断言 "POST"），语义动词全在路径上
+//   （本表为示意；常态由 OpenAPI/路径前缀规则批量生成，见 §1.4）
 router := core.NewRouter().
 	Add("", `^/api/v3/find/hosts/?$`,                  "cmdb:host:read",   "host", "read").
 	Add("", `^/api/v3/create/inst/host/?$`,            "cmdb:host:create", "host", "create").
@@ -473,7 +498,7 @@ router := core.NewRouter().
 	Add("", `^/api/v3/delete/inst/host/(?P<id>\d+)/?$`, "cmdb:host:delete", "host", "delete")
 
 container.Filter(icguardgoful.Filter(icguardgoful.Config{
-	Client: core.NewAgentClient("http://127.0.0.1:9090"), // 旁挂 Agent
+	Client: core.NewAgentClient(cfg.GetString("ICGUARD_AGENT_URL")), // 配置读取：sidecar=127.0.0.1 / 独立=iam-agent 服务名
 	Router: router,
 	Fetch:  icguardgoful.FetchByID(hostColl, "id"),
 	Exempt: []string{"/healthz", "/api/v3/find/hosts/biz/.*"}, // 内部取数路由豁免
