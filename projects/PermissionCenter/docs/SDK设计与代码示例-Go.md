@@ -19,7 +19,7 @@ icguard/                        # 一个 Go module
 │   └── gormhook.go             #   GORM Callback：改/删先判后执行（实体在手零额外查询）
 └── goful/                      # 壳②：go-restful 用（BK-CMDB apiserver 风格）
     ├── filter.go               #   restful.FilterFunction：三步判定收口
-    └── fetcher.go              #   取材器（借 CMDB 查询语义，见 3.2——不直摸存储）
+    └── fetcher.go              #   通用取材器（契约声明驱动，见 3.2——零系统知识）
 ```
 
 **分层逻辑一句话**：判定"是什么"（core）与判定"挂在哪"（壳）彻底分开——core 管协议、取材归一化、路由匹配、fail-closed；壳只干两件事：**挂钩子 + 从业务数据通道取材**。所以 gin 和 go-restful 不是两个 SDK，是**同一个 SDK 的两件衣服**。
@@ -452,48 +452,56 @@ func Filter(cfg Config) restful.FilterFunction {
 }
 ```
 
-### 3.2 fetcher.go —— 取材器（借 CMDB 自己的查询语义，不是直摸存储）
+### 3.2 fetcher.go —— 取材器（契约声明驱动的通用件，零系统知识）
+
+**认知（比"借语义"再进一步）**：SDK 不可能知道你要走什么查询接口——**取材由能力包声明的查询接口驱动**（数据契约 L1：URL + Method + Payload/Schema，能力包注册时登记、`/v1/manifest` 下发）。系统间差异（REST 的 GET `/hosts/{id}` vs BK-CMDB 全 POST 条件体）**全部被声明吸收**，取材器本身零系统知识：
+
+```
+声明（QueryDecl，来自能力包数据契约）      通用取材器（core，一份所有系统共用）
+  url_template:      /hosts/{id}         ① 路由参数取 id → URL 模板替换
+  method:            GET / POST          ② 请求体模板替换（POST 系）
+  payload_template:  {…{id}…}            ③ 按 Method+URL+Body 拼装发请求
+  fields:            [account, owner…]   ④ 响应按声明挑判定字段 → Material
+```
 
 ```go
 package icguardgoful
 
-import (
-	restful "github.com/emicklei/go-restful/v3"
-	"your.corp/icguard/core"
-)
-
-// ★ 取材原则（铁律）：取材走数据持有方自己的查询语义，SDK 不重新理解它的数据模型。
-// bk-cmdb 三维度（模型元数据 / 实例 / 实例关联）的查询语义都在它自己的服务层——
-// 直接摸 Mongo = 重新实现一份对它内部 schema 的理解（集合布局/拓扑层级/字段类型系统
-// 都是实现细节不是契约，版本升级或二开演进即碎）→ 反模式，禁止。
-//
-// 形态 A（首选，二开同仓）：进程内调它自己的查询函数（与 find handler 同一条代码路径）
-// 形态 B（跨进程）：调它自己的通用查询接口（POST /api/v3/find/...）
-// 两者都只借语义；SDK 唯一的工作 = 从返回结果挑判定字段归一化成 Material。
-
-// CmdbQuerier CMDB 查询语义的窄接口（形态 A）——由二开代码给出实现，绑到 coreservice
-type CmdbQuerier interface {
-	FindInstance(ctx context.Context, model, id string) (map[string]any, error) // 实例维度
-	FindInstAsst(ctx context.Context, model, id string) ([]map[string]any, error) // 关联维度（按需）
+// QueryDecl 查询接口声明——能力包数据契约 L1 的结构化形态（/v1/manifest 下发）
+type QueryDecl struct {
+	URLTemplate     string         `json:"url_template"`     // "/hosts/{id}"
+	Method          string         `json:"method"`           // "GET"；全 POST 系="POST"
+	PayloadTemplate map[string]any `json:"payload_template"` // POST 系：{"condition":{"bk_host_id":"{id}"}}
+	Fields          []string       `json:"fields"`           // 判定字段清单
 }
 
-// FetchByCmdbQuery 进程内取材：调 CMDB 自己的查询语义取行（零网络、语义与业务查询一致）
-func FetchByCmdbQuery(q CmdbQuerier, param string) Fetcher {
+// FetchByDecl 通用取材器——按声明拼装请求，**零系统知识**（所有系统共用这一份）。
+// 判定材料 = 它返回结果里的判定字段归一化；取不到 = 报错拒绝（取材铁律，绝不"取不到就放行"）。
+func FetchByDecl(hc *http.Client, decl QueryDecl, idParam string) Fetcher {
 	return func(req *restful.Request, rt core.Route) ([]core.Material, error) {
-		id := req.PathParameter(param) // 例：/api/v3/update/inst/host/{bk_host_id}
-		inst, err := q.FindInstance(req.Request.Context(), rt.Model, id)
+		id := req.PathParameter(idParam)                 // 例：/api/v3/update/inst/host/{bk_host_id}
+		url := expand(decl.URLTemplate, id)              // ① URL 模板替换
+		body := expandPayload(decl.PayloadTemplate, id)  // ② 请求体模板替换（POST 系）
+		resp, err := doCall(hc, decl.Method, url, body)  // ③ 拼装即完成，无任何系统特定逻辑
 		if err != nil {
 			return nil, err // ★ 取不到=报错拒绝（取材铁律：绝不"取不到就放行"）
 		}
-		return []core.Material{{ID: id, Attributes: pickJudgmentFields(inst)}}, nil
+		return []core.Material{{ID: id, Attributes: pickFields(resp, decl.Fields)}}, nil // ④ 挑判定字段
 	}
 }
-
-// pickJudgmentFields 从查询结果挑判定字段（account/owner/env…）——能力包数据契约声明的字段清单
-func pickJudgmentFields(inst map[string]any) map[string]any { /* ... */ return nil }
 ```
 
-> **为什么不让 SDK 直查 Mongo**（反模式警示）：实例按模型分集合、关联独立成表、模型属性本身是元数据——SDK 直查就得重新理解这三维度的全部布局与语义，**查不全且必碎**；借查询语义则三维度（模型/实例/关联）天然完整，升级不动 SDK。"取材走业务原生通道"的本义就是这个。
+**BK-CMDB 的"特殊"（全 POST + 条件体）只是它的声明特殊，取材器不特殊**——模板替换原样覆盖。各系统取材差异归位：
+
+| 系统 | 框架壳（按框架，3 个一次性复用） | 声明（按系统，注册能力包时填） | 取材器 |
+|---|---|---|---|
+| Django 系 | icguard-django | REST GET 声明 | **通用，零代码** |
+| Go/Gin | icguard-gin | REST GET 声明 | **通用，零代码** |
+| BK-CMDB | icguard-goful | 全 POST + 条件体声明 | **通用，零代码** |
+
+**二开同仓的可选优化（非必需，不是通用形态）**：SDK 壳恰好写在数据持有方代码库里时，可进程内直调自己的查询函数省一跳 HTTP——`CmdbQuerier`（`FindInstance/FindInstAsst` 覆盖实例与关联维度）即此优化的窄接口。**通用路径永远是声明驱动**；关联维度（"关联着的资源才能动"）同样借声明的关联查询接口。
+
+> **为什么不直查 Mongo**（反模式警示）：实例按模型分集合、关联独立成表、模型属性本身是元数据——直查 = 重新实现一份对它内部 schema 的理解（实现细节不是契约），**查不全且升级即碎**；声明驱动则三维度（模型/实例/关联）天然完整、升级不动 SDK。
 
 ### 3.3 apiserver 接入（全 POST 路由表 + 一个 Filter，业务零改动）
 
@@ -512,7 +520,7 @@ router := core.NewRouter().
 container.Filter(icguardgoful.Filter(icguardgoful.Config{
 	Client: core.NewAgentClient(cfg.GetString("ICGUARD_AGENT_URL")), // 配置读取：sidecar=127.0.0.1 / 独立=iam-agent 服务名
 	Router: router,
-	Fetch:  icguardgoful.FetchByCmdbQuery(cmbdQuerier, "id"), // ★ 取材借 CMDB 查询语义（§3.2），不直摸存储
+	Fetch:  icguardgoful.FetchByDecl(httpClient, queryDecl, "id"), // ★ 声明驱动通用取材（§3.2）——queryDecl 来自能力包声明
 	Exempt: []string{"/healthz", "/api/v3/find/hosts/biz/.*"}, // 内部取数路由豁免
 }))
 // 其余 apiserver 路由、coreservice 调用、Mongo 会话——全部不动
@@ -525,8 +533,8 @@ container.Filter(icguardgoful.Filter(icguardgoful.Config{
 | | 壳① icguard-gin | 壳② icguard-goful |
 |---|---|---|
 | 挂钩点 | `gin.HandlerFunc` 中间件 | `restful.FilterFunction`（Container.Filter） |
-| 改/删取材位置 | **GORM Callback**（实体在手，零额外查询） | **Filter 内借 CMDB 查询语义取行**（进程内调用零网络） |
-| 读/列表取材 | 业务 DAO（fetcher 函数注入） | CMDB 查询语义（coreservice 函数 / 通用查询接口） |
+| 改/删取材位置 | **GORM Callback**（实体在手，零额外查询） | **Filter 内声明驱动取材**（按能力包声明拼装查询） |
+| 读/列表取材 | 业务 DAO（fetcher 函数注入） | **声明驱动通用取材器**（QueryDecl 模板拼装；进程内直调为二开优化） |
 | 身份头 | `X-Auth-*` | `X-Bk-Username`（蓝鲸风格，可配） |
 | 路由风格 | REST（method+path） | **全 POST（path 动词，method 留空）** |
 | 业务代码改动 | 零 | 零（一个 Filter + 一段路由表） |
