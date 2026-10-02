@@ -16,18 +16,26 @@
 | **能力包契约**（声明） | 数据契约声明标准查询接口（L1 义务），SDK/Agent 据此取判定材料 | 发布能力包时登记 |
 
 ```
-请求 ──▶ [SDK 中间件（业务后端入口，一次接入全接口覆盖）]
+请求 ──▶ [网关（如在链路上）：只做用户认证（JWT 校验）+ 注入身份头 —— 不做鉴权判定]
+       ──▶ [SDK 中间件（业务后端入口，一次接入全接口覆盖）]
            │ ① 接口级：查本地 Agent 的策略包（内存比对，µs 级）
-           │ ② 取判定材料：SDK 走你原生数据通道取那一行（默认）
-           │               或 Agent 按能力包声明的查询接口回查（兜底）
+           │ ② 取判定材料：SDK 走你原生数据通道取那一行（查不到=接入问题=报错，不做兜底）
            │ ③ 数据级：清单/条件/变量比对（内存，µs 级）
            ▼
          全过 → 执行业务逻辑（此刻才落库）；任一不过 → 拒，零副作用
 
-Agent（旁挂容器，随业务部署）：轮询拉 bundle ──策略+范围声明+查询接口声明──▶ 权限中心（低 QPS）
+Agent（旁挂容器，随业务部署）：轮询拉 bundle ──策略+范围声明──▶ 权限中心（低 QPS）
 ```
 
-**核心设计一句话**：逻辑前置（判定在请求最前面）、物理旁挂（Agent 是独立容器）、取材走原生（数据查询用你自己的数据通道，不透传、不过权限中心）。
+**核心设计一句话**：网关只认证（判断是不是合法用户），鉴权统一收口在业务侧 SDK+Agent——**接入网关与不接网关是同一套逻辑**（鉴权都在你业务侧，再分两层没有意义）；逻辑前置（判定在请求最前面）、物理旁挂（Agent 是独立容器）、取材走原生（数据查询用你自己的数据通道，不透传、不过权限中心）。
+
+### 0.5 设计背景（为什么是这套——三步演进）
+
+1. **第一版（高度集成时代）的痛**：权限判定集中且实时直查上游，体验差、性能瓶颈全压在权限中心、过度依赖 CMDB 数据——"感觉像给 CMDB 做了一套前置校验"；
+2. **调研**：OPA（分发强没治理）、Google Zanzibar（数据自治没生命周期）、Spring Security（拦截强没数据级）、XACML（属性供给标准但重）——各有半边，拼不齐；
+3. **目标架构（本文）**：判定下沉到业务侧（SDK+Agent），中心只管**策略生命周期**（申请/审批/版本/到期/审计）——"判定跟着数据走"；**企业内部实践定制**：统一契约可强制、SDK 可要求、语言栈收敛（Django/Gin/Spring）、私有仓库分发——市面开源产品做不了的恰是这些，这也是本方案成立的前提。
+
+**与既有接入的兼容（迁移路径）**：已按旧两层（网关判定接口级）接入的应用可平移——路由→动作映射同款，网关判定退场为纯认证后身份头不变，业务侧逐步挂 SDK 即可，不用推倒重来。
 
 ---
 
@@ -49,7 +57,8 @@ Agent（旁挂容器，随业务部署）：轮询拉 bundle ──策略+范围
 ### 2.1 形态与拓扑
 
 - **独立容器**，与业务服务同机或同 Pod（K8s sidecar：同 Pod 双容器共享 localhost）；**不进业务容器、不拦流量**——它是纯判定器，业务调它的 localhost 接口。
-- 网关场景同款：网关的 forwardAuth 回调也可以指向本地 Agent（与部署在网关旁的 agent 完全同构）。
+- **Agent 的职责边界（铁律）**：只做内存/CPU 级判定运算（查包、比对、求值）——**不查数据、不发外呼、不做取材兜底**。判定材料由 SDK 负责取（见 §6）。
+- **网关的职责边界**：只做用户认证（JWT 校验）+ 注入身份头，**不做鉴权判定**——网关内外同一套接入逻辑（都要装 SDK+Agent）。网关仍保留流量防护（防爆破/TLS，免鉴权≠免防护）。
 
 ### 2.2 部署样例（docker compose）
 
@@ -82,8 +91,8 @@ Agent（旁挂容器，随业务部署）：轮询拉 bundle ──策略+范围
 | `APP_ID` / `APP_SECRET` | ✅ | 应用凭证（拉包，app 维度切分——你只拿得到自己应用的策略） |
 | `POLL_INTERVAL` | 默认 30s | 拉包周期；**策略变更/撤销的生效窗口 ≈ 该值**，高危应用可调短 |
 | `AGENT_ADDR` | 默认 :9090 | 本地判定接口监听地址 |
-| `FETCH_MODE` | 默认 `sdk` | 取材模式：`sdk`（SDK 取行）/ `agent-query`（Agent 按契约回查） |
-| `QUERY_SECRET` | agent-query 时 | Agent 回查业务查询接口用的 M2M（程序对程序）凭证，最小只读权限 |
+
+（取材不归 Agent——`FETCH_MODE`/`QUERY_SECRET` 等取材类配置一律不存在：Agent 纯判定、取材归 SDK，见 §6）
 
 ### 2.4 运维要点
 
@@ -105,15 +114,15 @@ Agent（旁挂容器，随业务部署）：轮询拉 bundle ──策略+范围
 │   路由映射：method+path → 动作码                     │
 ├─────────────────────────────────────────────┤
 │ 适配层（每框架一个薄壳，~100 行，只做"挂钩子"）          │
-│   Django: Middleware + pre_save/pre_delete 信号     │
+│   Django: Middleware + pre_save/pre_delete 信号（样板）│
 │   FastAPI/Flask: ASGI/WSGI 中间件 + 依赖注入         │
 │   Go/Gin: gin.HandlerFunc + GORM Callbacks         │
 │   Spring: Filter + AOP 切面                        │
-│   Express: middleware + ORM hook                   │
+│   其他框架：按需扩（企业内部技术栈收敛，不追求大而全）      │
 └─────────────────────────────────────────────┘
 ```
 
-**为什么 Python 系全能接**：Django/Flask/FastAPI 共用同一个 core（判定逻辑一模一样），只换"把判定挂在哪"（中间件/信号/依赖注入）——**框架差异只存在于适配层那一百行**，Go/Java 同理。
+**语言栈范围（企业内部定制）**：三栈为主——**Python=Django**（内部 Python 项目统一样板；FastAPI/Flask 兼容支持，Demo 用 FastAPI 纯属开发快）、**Go=Gin**（后端框架就这一个）、**Java=Spring**——**公司用什么就做什么，不为通用而通用**；新增语言 = 新增一个适配层薄壳 + 过一遍契约测试套件（§3.5）。
 
 ### 3.2 业务侧长什么样（Django 示例——注意业务代码零权限逻辑）
 
@@ -159,7 +168,7 @@ def middleware(request):
     if not agent.check(action, user=who(request)):   # ① 接口级（内存，µs）
         return 403
     # ② 取判定材料（点操作）：ORM 取行 → 归一化成 {id, attrs}；列表：候选行交给 filter
-    rows = fetch_material(request)                   #    fetch_mode=agent-query 时由 Agent 回查
+    rows = fetch_material(request)                   #    取不到 → 报错拒绝（见 §6）
     verdict = agent.check_data(user, action, rows)   # ③ 数据级（内存，µs）
     if not verdict.allow:
         return 403
@@ -168,20 +177,79 @@ def middleware(request):
 # 判不过直接抛异常 → 事务不提交 → 零副作用（顺序铁律：备料→判→执行）
 ```
 
+**Go/Gin 示例（重点语言）**：
+
+```go
+// main.go —— 一次接入
+r := gin.New()
+r.Use(icguard.Middleware(icguard.Config{
+    Agent: "http://127.0.0.1:9090",
+    Routes: map[icguard.Route]string{
+        {Method: "GET",    Pattern: "/api/hosts/:id"}: "cmdb:host:read",
+        {Method: "PATCH",  Pattern: "/api/hosts/:id"}: "cmdb:host:update",
+        {Method: "DELETE", Pattern: "/api/hosts/:id"}: "cmdb:host:delete",
+        {Method: "POST",   Pattern: "/api/hosts"}:     "cmdb:host:create",
+    },
+    Exempt: []string{"/healthz"},
+}))
+
+// 业务 handler —— 零权限逻辑（判定藏在中间件 + GORM Callback 里）
+func updateHost(c *gin.Context) {
+    var h Host
+    db.First(&h, c.Param("id"))          // 中间件已判：能不能读/改这台（取材顺手）
+    h.Name = c.PostForm("name")
+    db.Save(&h)                           // GORM Callback 已判：改前判定，判不过事务不提交
+    c.JSON(200, h)
+}
+```
+
+**Java/Spring 示例**：
+
+```java
+// 配置一次（icguard 注册 Filter + AOP 切面）
+@Configuration
+class GuardConfig {
+  @Bean IamGuard iamGuard() {
+    return IamGuard.builder()
+        .agent("http://127.0.0.1:9090")
+        .route("GET",    "/api/hosts/{id}", "cmdb:host:read")
+        .route("PATCH",  "/api/hosts/{id}", "cmdb:host:update")
+        .route("DELETE", "/api/hosts/{id}", "cmdb:host:delete")
+        .exempt("/healthz")
+        .build();
+  }
+}
+
+// 业务代码 —— 零权限逻辑（实体在手即判定材料）
+@RestController
+class HostController {
+    @PatchMapping("/api/hosts/{id}")
+    public Host update(@PathVariable long id, @RequestBody HostForm form) {
+        Host h = repo.findById(id);        // 判定材料：实体在手
+        h.setName(form.getName());
+        return repo.save(h);               // 切面已判：判不过抛 403，事务回滚，零副作用
+    }
+}
+```
+
 ### 3.3 各语言 SDK 差异表（差异只在适配层）
 
 | 语言/框架 | 集成点（挂哪） | 取材方式 | 备注 |
 |---|---|---|---|
-| Python · Django | Middleware + `pre_save`/`pre_delete` 信号 | ORM 行内取（对象已在手） | **样板实现**，最顺 |
-| Python · FastAPI/Flask | ASGI/WSGI 中间件 + 依赖注入 | 请求上下文 + DAO 取行 | 与 Django 共用 core |
-| Go · Gin | `gin.HandlerFunc` 中间件 + GORM Callbacks | GORM 行 | 语言无关协议直接调 |
-| Java · Spring | Filter + AOP 切面（`@WithPermission` 风格） | JPA 实体 | |
-| Node · Express | express middleware + ORM hook | ORM 行 | |
+| Python · Django | Middleware + `pre_save`/`pre_delete` 信号 | ORM 行内取（对象已在手） | **内部样板**，最顺 |
+| Python · FastAPI/Flask | ASGI/WSGI 中间件 + 依赖注入 | 请求上下文 + DAO 取行 | 与 Django 共用 core，兼容支持 |
+| Go · Gin | `gin.HandlerFunc` 中间件 + GORM Callbacks | GORM 行 | 重点语言 |
+| Java · Spring | Filter + AOP 切面 | JPA 实体 | 重点语言 |
+| 其他框架 | 按需扩适配层 | 同款 | 技术栈收敛，不追求大而全 |
 
-### 3.4 分发与引入（下载从哪来）
+### 3.4 分发与引入（私有仓库——企业内部标配）
 
-- **内网私有源**（企业标准做法）：PyPI（`pip install icguard-django -i https://pypi.internal`）/ npm（`@org/icguard-gin`）/ Maven / Go module（goproxy 内网缓存）——我们环境已有 npm 与 goproxy 本地缓存基建，直接挂；
-- 备选：制品库附件下载 + 手动 vendor（老项目无源管理时）；
+- **内网私有仓库**（企业标配，SDK/镜像都发这里）——常见选型：
+  - **多格式制品库**：Nexus Repository（PyPI/npm/Maven/Go 一站）、JFrog Artifactory（企业级标准）、GitLab Package Registry；
+  - **Docker 镜像仓**：Harbor（最常见自建）、GitLab Container Registry、阿里云 ACR；
+  - **语言级小件**：Verdaccio（npm 私服）、devpi（PyPI 私服）、Athens（Go proxy）；
+  - 典型组合：**Harbor（镜像）+ Nexus/Artifactory（语言包）**；
+- **引入**：`pip install icguard-django -i https://pypi.internal` / `go get`（goproxy 内网缓存）/ Maven 坐标——与日常拉内部包无异，零额外流程；老项目无源管理走制品库附件 vendor；
 - **版本策略**：core 与适配层同仓同版本；跟随中心发行说明的兼容矩阵。
 
 ### 3.5 通用性的验收标准（跨语言怎么保证"行为一致"）
@@ -226,14 +294,13 @@ GET  http://127.0.0.1:9090/v1/manifest      ← 本应用生效的能力包声�
 
 ---
 
-## 6. Agent 回查模式（agent-query）与防递归
+## 6. 取材铁律：SDK 取材，Agent 纯判（不做回查兜底）
 
-适用：数据层不便挂钩（老旧存储、异构数据源）。流程：SDK 只发 `{ID, changes}` → Agent 按 §4 声明的查询接口点查那行 → 比对判定。
+**分工一句话：Agent 只算不算数，SDK 只数不算**——判定材料的获取 100% 是 SDK 的职责，Agent 100% 是纯函数式判定器。
 
-**三条纪律**：
-1. **豁免防递归**：查询路由（如 `/pip/query/`）必须登记进 SDK 豁免清单——否则 Agent 回查又触发判定 = 无限递归；
-2. **凭证最小化**：`QUERY_SECRET` 只读、只按 ID、只限声明数据域；
-3. **优先 SDK 取**（默认模式）：进程内取行零网络成本；agent-query 是不便挂钩时的兜底，不是默认。
+1. **Agent 纯判定**：只做内存/CPU 运算（查包、比对、求值），不查数据源、不发外呼、不持有任何数据凭证——职责纯化、故障域最小、部署最轻；
+2. **SDK 取材**：走业务原生数据通道取行（ORM/DAO），取不到 → **按语义报错拒绝**（资源不存在=404；取材链路异常=系统错误）——**"取不到"= 接入问题，排查接入方取材链路**，绝不"取不到就放行"（fail-closed）；
+3. **免掉两类坑**（这就是不回查的设计收益）：不存在"Agent 回查触发 SDK 判定"的递归豁免问题，也不存在"Agent 持有数据源凭证"的权限扩散问题。
 
 ---
 
@@ -242,7 +309,7 @@ GET  http://127.0.0.1:9090/v1/manifest      ← 本应用生效的能力包声�
 1. 接口级：无权限用户调接口 → 403，且业务视图未执行（看日志/计数）；
 2. 数据级·点：对范围外资源改/删 → 403，**库里零变化**（零副作用验证）；
 3. 数据级·列表：列表只返回范围内行；
-4. 豁免：healthz/PIP 查询路由正常放行、无递归（agent-query 模式必测）；
+4. 取材失败语义：SDK 取不到判定材料 → 报错拒绝（fail-closed），不静默放行（"取不到=接入问题"可查可定位）；
 5. 故障：停掉 Agent → 请求 fail-closed 拒绝（不是放行），恢复后自动恢复。
 
 ---
