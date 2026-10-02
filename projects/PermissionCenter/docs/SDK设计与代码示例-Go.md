@@ -19,7 +19,7 @@ icguard/                        # 一个 Go module
 │   └── gormhook.go             #   GORM Callback：改/删先判后执行（实体在手零额外查询）
 └── goful/                      # 壳②：go-restful 用（BK-CMDB apiserver 风格）
     ├── filter.go               #   restful.FilterFunction：三步判定收口
-    └── fetcher.go              #   Mongo 取材器（按 ID 点查一行）
+    └── fetcher.go              #   取材器（借 CMDB 查询语义，见 3.2——不直摸存储）
 ```
 
 **分层逻辑一句话**：判定"是什么"（core）与判定"挂在哪"（壳）彻底分开——core 管协议、取材归一化、路由匹配、fail-closed；壳只干两件事：**挂钩子 + 从业务数据通道取材**。所以 gin 和 go-restful 不是两个 SDK，是**同一个 SDK 的两件衣服**。
@@ -423,7 +423,7 @@ func Filter(cfg Config) restful.FilterFunction {
 			chain.ProcessFilter(req, resp)
 			return
 		}
-		rows, err := cfg.Fetch(req, rt) // ★ 取材：CMDB 场景=Mongo 按 ID 点查（3.2）
+		rows, err := cfg.Fetch(req, rt) // ★ 取材：借 CMDB 自己的查询语义（3.2），不直摸存储
 		if err != nil {
 			resp.WriteErrorString(http.StatusNotFound, "material fetch failed")
 			return
@@ -452,36 +452,48 @@ func Filter(cfg Config) restful.FilterFunction {
 }
 ```
 
-### 3.2 fetcher.go —— Mongo 取材器（bk-cmdb 场景）
+### 3.2 fetcher.go —— 取材器（借 CMDB 自己的查询语义，不是直摸存储）
 
 ```go
 package icguardgoful
 
 import (
-	"context"
-
 	restful "github.com/emicklei/go-restful/v3"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"your.corp/icguard/core"
 )
 
-// FetchByID 按 ID 点查一行 → 归一化成 Material。
-// bk-cmdb 的"取材"就是这么朴素：Mongo 索引命中一次（ms 级），数据不出本系统。
-func FetchByID(coll *mongo.Collection, param string) Fetcher {
+// ★ 取材原则（铁律）：取材走数据持有方自己的查询语义，SDK 不重新理解它的数据模型。
+// bk-cmdb 三维度（模型元数据 / 实例 / 实例关联）的查询语义都在它自己的服务层——
+// 直接摸 Mongo = 重新实现一份对它内部 schema 的理解（集合布局/拓扑层级/字段类型系统
+// 都是实现细节不是契约，版本升级或二开演进即碎）→ 反模式，禁止。
+//
+// 形态 A（首选，二开同仓）：进程内调它自己的查询函数（与 find handler 同一条代码路径）
+// 形态 B（跨进程）：调它自己的通用查询接口（POST /api/v3/find/...）
+// 两者都只借语义；SDK 唯一的工作 = 从返回结果挑判定字段归一化成 Material。
+
+// CmdbQuerier CMDB 查询语义的窄接口（形态 A）——由二开代码给出实现，绑到 coreservice
+type CmdbQuerier interface {
+	FindInstance(ctx context.Context, model, id string) (map[string]any, error) // 实例维度
+	FindInstAsst(ctx context.Context, model, id string) ([]map[string]any, error) // 关联维度（按需）
+}
+
+// FetchByCmdbQuery 进程内取材：调 CMDB 自己的查询语义取行（零网络、语义与业务查询一致）
+func FetchByCmdbQuery(q CmdbQuerier, param string) Fetcher {
 	return func(req *restful.Request, rt core.Route) ([]core.Material, error) {
 		id := req.PathParameter(param) // 例：/api/v3/update/inst/host/{bk_host_id}
-		var row bson.M
-		if err := coll.FindOne(req.Request.Context(), bson.M{param: id}).Decode(&row); err != nil {
+		inst, err := q.FindInstance(req.Request.Context(), rt.Model, id)
+		if err != nil {
 			return nil, err // ★ 取不到=报错拒绝（取材铁律：绝不"取不到就放行"）
 		}
-		return []core.Material{{ID: id, Attributes: normalize(row)}}, nil
+		return []core.Material{{ID: id, Attributes: pickJudgmentFields(inst)}}, nil
 	}
 }
 
-// normalize bson.M → map[string]any（值统一转 string/number/bool，供 Agent 比对）
-func normalize(row bson.M) map[string]any { /* ... */ return nil }
+// pickJudgmentFields 从查询结果挑判定字段（account/owner/env…）——能力包数据契约声明的字段清单
+func pickJudgmentFields(inst map[string]any) map[string]any { /* ... */ return nil }
 ```
+
+> **为什么不让 SDK 直查 Mongo**（反模式警示）：实例按模型分集合、关联独立成表、模型属性本身是元数据——SDK 直查就得重新理解这三维度的全部布局与语义，**查不全且必碎**；借查询语义则三维度（模型/实例/关联）天然完整，升级不动 SDK。"取材走业务原生通道"的本义就是这个。
 
 ### 3.3 apiserver 接入（全 POST 路由表 + 一个 Filter，业务零改动）
 
@@ -500,7 +512,7 @@ router := core.NewRouter().
 container.Filter(icguardgoful.Filter(icguardgoful.Config{
 	Client: core.NewAgentClient(cfg.GetString("ICGUARD_AGENT_URL")), // 配置读取：sidecar=127.0.0.1 / 独立=iam-agent 服务名
 	Router: router,
-	Fetch:  icguardgoful.FetchByID(hostColl, "id"),
+	Fetch:  icguardgoful.FetchByCmdbQuery(cmbdQuerier, "id"), // ★ 取材借 CMDB 查询语义（§3.2），不直摸存储
 	Exempt: []string{"/healthz", "/api/v3/find/hosts/biz/.*"}, // 内部取数路由豁免
 }))
 // 其余 apiserver 路由、coreservice 调用、Mongo 会话——全部不动
@@ -513,8 +525,8 @@ container.Filter(icguardgoful.Filter(icguardgoful.Config{
 | | 壳① icguard-gin | 壳② icguard-goful |
 |---|---|---|
 | 挂钩点 | `gin.HandlerFunc` 中间件 | `restful.FilterFunction`（Container.Filter） |
-| 改/删取材位置 | **GORM Callback**（实体在手，零额外查询） | **Filter 内按 ID 点查**（Mongo 一次索引命中） |
-| 读/列表取材 | 业务 DAO（fetcher 函数注入） | Mongo fetcher |
+| 改/删取材位置 | **GORM Callback**（实体在手，零额外查询） | **Filter 内借 CMDB 查询语义取行**（进程内调用零网络） |
+| 读/列表取材 | 业务 DAO（fetcher 函数注入） | CMDB 查询语义（coreservice 函数 / 通用查询接口） |
 | 身份头 | `X-Auth-*` | `X-Bk-Username`（蓝鲸风格，可配） |
 | 路由风格 | REST（method+path） | **全 POST（path 动词，method 留空）** |
 | 业务代码改动 | 零 | 零（一个 Filter + 一段路由表） |
