@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/xcy/permission-center/internal/model"
@@ -43,10 +44,11 @@ func (r *AccessRepo) UpsertAction(a *model.Action) error {
 	return r.db.Save(&existing).Error
 }
 
-// Actions 应用的权限点清单（排除通用接口路由：PEP 提示，非可授予权限点）
+// Actions 应用的权限点清单（排除通用接口路由：PEP 提示，非可授予权限点；排除归档=可查不可用）
 func (r *AccessRepo) Actions(appID uint64) ([]model.Action, error) {
 	var as []model.Action
-	if err := r.db.Where("app_id = ? AND is_generic = ?", appID, false).Order("resource, operation").Find(&as).Error; err != nil {
+	if err := r.db.Where("app_id = ? AND is_generic = ? AND COALESCE(status,'') <> ?",
+		appID, false, "archived").Order("resource, operation").Find(&as).Error; err != nil {
 		return nil, err
 	}
 	return as, nil
@@ -119,6 +121,8 @@ type ResolveTrace struct {
 }
 
 // ResolveActionSteps 步骤化解析：字面优先 → 通用模板（槽位/X-Resource-Type）→ 真实权限点
+// 匹配顺序 = specificity 钉死（§3.8）：方法先比（查询已过滤）→ 静态段数多者优先 →
+// 同数逐段从左比（静态段 > 参数段）→ 全等按登记序（id 升序）；归档动作不参与解析。
 func (r *AccessRepo) ResolveActionSteps(appID uint64, method, path, resourceTypeHeader string) *ResolveTrace {
 	method = strings.ToUpper(method)
 	trace := &ResolveTrace{
@@ -126,7 +130,8 @@ func (r *AccessRepo) ResolveActionSteps(appID uint64, method, path, resourceType
 		Steps: []ResolveStep{}, MatchMode: "none",
 	}
 	var acts []model.Action
-	if err := r.db.Where("app_id = ? AND method = ?", appID, method).Find(&acts).Error; err != nil {
+	if err := r.db.Where("app_id = ? AND method = ? AND COALESCE(status,'') <> ?",
+		appID, method, "archived").Find(&acts).Error; err != nil {
 		trace.Steps = append(trace.Steps, ResolveStep{Step: "error", Label: "查询权限点失败", OK: false, Detail: map[string]any{"error": err.Error()}})
 		return trace
 	}
@@ -143,6 +148,9 @@ func (r *AccessRepo) ResolveActionSteps(appID uint64, method, path, resourceType
 			literals = append(literals, a)
 		}
 	}
+	// specificity 排序（§3.8 钉死：静态段多者优先 → 逐段静态>参数 → 登记序）
+	sort.SliceStable(literals, func(i, j int) bool { return moreSpecific(literals[i], literals[j]) })
+	sort.SliceStable(generics, func(i, j int) bool { return moreSpecific(generics[i], generics[j]) })
 	trace.Steps = append(trace.Steps, ResolveStep{
 		Step: "list_literal", Label: "扫描该方法的字面权限点",
 		OK: len(literals) > 0, Detail: map[string]any{"count": len(literals), "patterns": actionPaths(literals)},
@@ -223,6 +231,7 @@ func genericPaths(acts []model.Action) []string {
 // resolveGenericResource 从通用路由提取真实资源：
 //   - 路径槽位：/api/v1/{model} + /api/v1/hosts → hosts → host
 //   - X-Resource-Type 兜底：统一查询入口 /api/v1/entities
+//
 // 写操作（create/update/delete）无法解析到具体资源 → 失败（调用方按 deny-by-default 拒绝）
 func resolveGenericResource(a *model.Action, path, resourceTypeHeader string) (string, bool) {
 	if a.ResourceSlot != "" && a.ResourceSlot != "header" {
@@ -280,6 +289,44 @@ func matchPath(pattern, path string) bool {
 	}
 	sb.WriteString("$")
 	return regexp.MustCompile(sb.String()).MatchString(path)
+}
+
+// --- 路由 specificity（§3.8 钉死：静态段数多者优先 → 同数逐段从左比（静态>参数）→ 全等按登记序）---
+
+func routeSegs(p string) []string { return strings.Split(strings.Trim(p, "/"), "/") }
+
+func staticSegCount(p string) int {
+	n := 0
+	for _, s := range routeSegs(p) {
+		if s != "" && !strings.HasPrefix(s, "{") {
+			n++
+		}
+	}
+	return n
+}
+
+// moreSpecific a 是否比 b 更具体（决定谁先参与 matchPath）
+func moreSpecific(a, b model.Action) bool {
+	ca, cb := staticSegCount(a.Path), staticSegCount(b.Path)
+	if ca != cb {
+		return ca > cb
+	}
+	sa, sb := routeSegs(a.Path), routeSegs(b.Path)
+	n := len(sa)
+	if len(sb) < n {
+		n = len(sb)
+	}
+	for i := 0; i < n; i++ {
+		aPar := strings.HasPrefix(sa[i], "{")
+		bPar := strings.HasPrefix(sb[i], "{")
+		if aPar != bPar {
+			return !aPar // 静态段优先（同位比：静态 > 参数）
+		}
+	}
+	if len(sa) != len(sb) {
+		return len(sa) > len(sb)
+	}
+	return a.ID < b.ID // 登记序
 }
 
 // --- Templates ---

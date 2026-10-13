@@ -17,6 +17,12 @@ type Action struct {
 	// v12 前端改造：接口树展示 请求/响应示例（D5：后端补字段）
 	ReqExample  string `gorm:"type:text" json:"req_example,omitempty"`
 	RespExample string `gorm:"type:text" json:"resp_example,omitempty"`
+	// v1.5 T1 五格登记（§3.7）——登记发生在应用接入侧，能力包只勾选已登记的动作
+	RW         string  `gorm:"size:8" json:"rw"`           // read|write——唯一被消费的分类（空=按 operation 推导）
+	NeedData   bool    `gorm:"default:false" json:"need_data"` // 数据级（条件式）勾选
+	Material   JSONMap `gorm:"type:jsonb" json:"material"`     // 取材声明三选一 {mode:id_path|envelope|fetch_source,...}
+	ScopeParam JSONMap `gorm:"type:jsonb" json:"scope_param"`  // list 动作范围参数 {param,location}
+	Status     string  `gorm:"size:16;default:active" json:"status"` // active|archived——归档=可查不可用
 }
 
 // PermissionTemplate 权限板块（如"主机管理"）

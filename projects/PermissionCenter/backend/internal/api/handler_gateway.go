@@ -63,7 +63,9 @@ func (d *Deps) handleGatewayCheck(c *gin.Context) {
 		"match_mode": trace.MatchMode, "pattern": trace.PathPattern,
 		"resolved_resource": trace.ResolvedResource,
 		"action":            trace.Action.Code,
-		"steps":             trace.Steps,
+		// 路由表版本快照（§3.9）：判定审计可复现"当时按哪版路由表判的"
+		"route_version": d.Access.CurrentRouteVersion(app.ID),
+		"steps":         trace.Steps,
 	}
 	dec, _, err := d.Checker.CheckWithPids(c.Request.Context(), authz.CheckRequest{
 		User:    user,

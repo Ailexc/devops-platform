@@ -44,13 +44,15 @@ type SchemaProp struct {
 
 // Operation 单个路径操作：权限点来源 + 接口契约（参数/请求体/响应）
 type Operation struct {
-	Tags        []string                `json:"tags"`
-	OperationID string                  `json:"operationId"`
-	Summary     string                  `json:"summary"`
-	Description string                  `json:"description"`
-	Parameters  []ParamDef              `json:"parameters"`
-	RequestBody *RequestBody            `json:"requestBody"`
-	Responses   map[string]ResponseDef  `json:"responses"`
+	Tags        []string               `json:"tags"`
+	OperationID string                 `json:"operationId"`
+	Summary     string                 `json:"summary"`
+	Description string                 `json:"description"`
+	Parameters  []ParamDef             `json:"parameters"`
+	RequestBody *RequestBody           `json:"requestBody"`
+	Responses   map[string]ResponseDef `json:"responses"`
+	// v1.5 T1：x-action 源头标注（§3.8 建表方式一：OpenAPI 官方 x- 扩展字段，100% 准确度）
+	XAction string `json:"x-action"`
 }
 
 // ParamDef 参数定义（query/path/header）
@@ -64,14 +66,14 @@ type ParamDef struct {
 
 // RequestBody 请求体（仅取 content schema 生成示例）
 type RequestBody struct {
-	Required bool                   `json:"required"`
-	Content  map[string]MediaType   `json:"content"`
+	Required bool                 `json:"required"`
+	Content  map[string]MediaType `json:"content"`
 }
 
 // ResponseDef 响应定义（取 2xx 的 content schema 生成示例）
 type ResponseDef struct {
-	Description string                `json:"description"`
-	Content     map[string]MediaType  `json:"content"`
+	Description string               `json:"description"`
+	Content     map[string]MediaType `json:"content"`
 }
 
 // MediaType 媒体类型（application/json 等）
@@ -196,8 +198,17 @@ func ParseOpenAPI(raw []byte, appCode string) ([]ParsedAction, error) {
 			if len(op.Tags) > 0 {
 				tag = op.Tags[0]
 			}
+			code := fmt.Sprintf("%s:%s:%s", appCode, codeRes, operation)
+			// x-action 源头标注优先（§3.8 方式一）：动作码跟代码走，重构不漂移；
+			// 三段合法才覆盖，operation 跟随第三段（资源段保持路径推导，一致性由体检收口）
+			if x := strings.TrimSpace(op.XAction); x != "" && strings.Count(x, ":") == 2 {
+				if parts := strings.Split(x, ":"); parts[0] != "" && parts[1] != "" && parts[2] != "" {
+					code = x
+					operation = parts[2]
+				}
+			}
 			out = append(out, ParsedAction{
-				Code:         fmt.Sprintf("%s:%s:%s", appCode, codeRes, operation),
+				Code:         code,
 				Name:         name,
 				Resource:     resource,
 				Operation:    operation,

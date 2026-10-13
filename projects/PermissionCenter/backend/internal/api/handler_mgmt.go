@@ -182,6 +182,18 @@ func (d *Deps) mgScope(c *gin.Context) {
 		c.AbortWithStatusJSON(403, gin.H{"error": "not owner of this application"})
 		return
 
+	// v1.5 T1 动作码路由表：仅 owner（admin 已在前面放行）——deny-by-default，不登记必 403
+	case path == "/api/v1/apps/:id/routes" ||
+		strings.HasPrefix(path, "/api/v1/apps/:id/routes/") ||
+		strings.HasPrefix(path, "/api/v1/apps/:id/pending-routes/"):
+		appID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+		if d.isAppOwner(actor.ID, appID) {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(403, gin.H{"error": "not owner of this application"})
+		return
+
 	// 策略模板写操作：仅 owner
 	case path == "/api/v1/apps/:id/templates" ||
 		path == "/api/v1/apps/:id/templates/:tid" ||

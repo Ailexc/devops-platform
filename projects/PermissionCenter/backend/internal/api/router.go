@@ -49,6 +49,15 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.POST("/apps", d.registerApp)
 		mg.POST("/apps/:id/sync", d.syncApp)
 		mg.GET("/apps/:id/actions", d.listActions)
+		// v1.5 T1 动作码路由表（§3.7 五格登记 / §3.8 导入推断 / §3.9 生命周期）
+		mg.GET("/apps/:id/routes", d.listRoutes)
+		mg.POST("/apps/:id/routes", d.importRoutes)
+		mg.PATCH("/apps/:id/routes/:rid", d.updateRouteRegistration)
+		mg.POST("/apps/:id/routes/:rid/migrate-code", d.migrateRouteCode)
+		mg.POST("/apps/:id/routes/:rid/archive", d.archiveRoute)
+		mg.POST("/apps/:id/routes/:rid/restore", d.restoreRoute)
+		mg.POST("/apps/:id/pending-routes/:pid/confirm", d.confirmPending)
+		mg.POST("/apps/:id/pending-routes/:pid/discard", d.discardPending)
 		// 能力声明（L1，仅 owner）
 		mg.GET("/apps/:id/capabilities", d.listCapabilities)
 		mg.POST("/apps/:id/capabilities", d.createCapability)
