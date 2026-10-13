@@ -411,10 +411,27 @@ func main() {
 			g.JSON(404, gin.H{"error": "resource not found"})
 			return
 		}
+		idParam := g.Param("id")
 		c.mu.RLock()
 		defer c.mu.RUnlock()
+		// 三种形态兼容（与回查端点 /__perm/query 同构）：数字 id / 外部 id（<model>-<n>）/ 实例名
+		find := func(n uint64) bool {
+			if inst, ok := m.Instances[n]; ok {
+				g.JSON(200, inst)
+				return true
+			}
+			return false
+		}
+		if strings.HasPrefix(idParam, m.Code+"-") {
+			if n, err := strconv.ParseUint(strings.TrimPrefix(idParam, m.Code+"-"), 10, 64); err == nil && find(n) {
+				return
+			}
+		}
+		if n, err := strconv.ParseUint(idParam, 10, 64); err == nil && find(n) {
+			return
+		}
 		for _, inst := range m.Instances {
-			if fmt.Sprintf("%d", inst.ID) == g.Param("id") {
+			if inst.Name == idParam {
 				g.JSON(200, inst)
 				return
 			}

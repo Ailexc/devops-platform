@@ -51,7 +51,7 @@ func (d *Deps) debugResolve(c *gin.Context) {
 	c.JSON(200, out)
 }
 
-// debugPIP 身份解析图谱（C）：主体 → 组织/组/祖先链 → 组权限 → 个人策略 → OpenFGA 关系
+// debugPIP 身份解析图谱（C）：主体 → 组织/组/祖先链 → 组权限 → 个人策略
 // GET /api/v1/debug/pip/:user
 func (d *Deps) debugPIP(c *gin.Context) {
 	user := c.Param("user")

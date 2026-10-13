@@ -114,7 +114,7 @@ func (r *SyncRepo) DecisionSummary() (map[string]any, error) {
 	r.db.Model(&model.DecisionLog{}).Where("decision = ?", model.DecisionDeny).Count(&deny)
 	out["allow"] = allow
 	out["deny"] = deny
-	// 来源分布：PEP jsonb 的 from 字段（cache / remote / local / openfga）
+	// 来源分布：PEP jsonb 的 from 字段（cache / remote / local）
 	type row struct {
 		From  string `gorm:"column:from"`
 		Count int64  `gorm:"column:cnt"`

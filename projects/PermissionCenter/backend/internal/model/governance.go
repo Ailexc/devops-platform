@@ -63,7 +63,7 @@ const (
 )
 
 // RevokeRequest 授权回收申请（阶段 6：回收走审批，新增状态机）
-// 流程：owner/管理员发起 → 应用其他 owner 审批 → 通过后停用策略 + 撤销 OpenFGA 关系
+// 流程：owner/管理员发起 → 应用其他 owner 审批 → 通过后停用策略（1.5：集合式=点查行比对，无关系需撤）
 type RevokeRequest struct {
 	Base
 	PolicyID    uint64     `gorm:"index;not null" json:"policy_id"`

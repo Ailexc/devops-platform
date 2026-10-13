@@ -42,6 +42,10 @@ curl -s -X PATCH "$IAM/api/v1/apps/1/routes/$ACTION_READ" -H "$AUTH" -d '{"need_
 REQ4=$(curl -s -o /tmp/iam-req4.json -X POST "$IAM/api/v1/policies" -H "$CT" -H "$AUTH" -d "{\"name\":\"demo:bob:host-read-ip11\",\"effect\":1,\"subject_type\":1,\"subject_id\":$BOB_ID,\"app_id\":1,\"action_ids\":[$ACTION_READ],\"resource_scope\":{\"model\":\"host\",\"condition\":{\"op\":\"eq\",\"field\":\"ip\",\"value\":\"10.0.0.11\"}},\"conditions\":{},\"reason\":\"只允许读网段巡检机（demo）\"}" && python3 -c 'import json;print(json.load(open("/tmp/iam-req4.json"))["id"])')
 curl -s -o /tmp/iam-alice.json -X POST "$IAM/api/v1/auth/login" -H "$CT" -d '{"username":"alice","password":"pass123"}'
 ALICE_T4=$(python3 -c 'import json;print(json.load(open("/tmp/iam-alice.json"))["access_token"])')
+curl -s -o /tmp/iam-bob.json -X POST "$IAM/api/v1/auth/login" -H "$CT" -d '{"username":"bob","password":"pass123"}'
+BOB_T4=$(python3 -c 'import json;print(json.load(open("/tmp/iam-bob.json"))["access_token"])')
+echo "> 审批链两级：① bob 本人确认（被授权方——让他知道、让他同意）→ ② alice 复核（应用 owner）"
+curl -s -X POST "$IAM/api/v1/requests/$REQ4/approve" -H "$CT" -H "Authorization: Bearer $BOB_T4" -d '{"action":1,"comment":"我知道并同意"}' -o /dev/null
 curl -s -X POST "$IAM/api/v1/requests/$REQ4/approve" -H "$CT" -H "Authorization: Bearer $ALICE_T4" -d '{"action":1,"comment":"同意（demo 条件授权）"}' -o /dev/null
 # ⑤ 网关链路即判：中心查表→按约定点查权威行→验谓词（业务零配合）
 echo "> bob GET /api/v1/hosts/host-4（ip=.11 命中条件 → 应 200）"

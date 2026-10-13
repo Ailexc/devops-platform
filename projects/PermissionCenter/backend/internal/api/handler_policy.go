@@ -153,7 +153,7 @@ func (d *Deps) updatePolicy(c *gin.Context) {
 	c.JSON(200, p)
 }
 
-// publishPolicy 发布：version++ + 快照 + 生成 bundle + 数据策略写 OpenFGA 关系
+// publishPolicy 发布：version++ + 快照 + 生成 bundle（1.5：集合式=点查行比对，无关系物化）
 func (d *Deps) publishPolicy(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	var req struct {
