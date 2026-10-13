@@ -51,4 +51,4 @@ func main() {
 	}
 }
 
-// ensureOpenFGA 已抽至 internal/api 的 (*Deps).EnsureOpenFGA——cmd/iam-server 与 cmd/iam-sync 共用（清单 S1）
+// （1.5 T3）EnsureOpenFGA 已随 OpenFGA 数据面退役移除——数据级判定=点查权威行（material/CheckRow）

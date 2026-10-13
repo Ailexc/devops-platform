@@ -338,7 +338,7 @@ func seed(reset bool) error {
 		log.Printf("[seed] openapi sync done: %v", res)
 	}
 
-	// 8.2 爱丽丝演示权限（须在资源模型/实例同步之后：限定实例范围需解析到实例 ID，并写 OpenFGA tuple）
+	// 8.2 爱丽丝演示权限（须在资源模型/实例同步之后：自建组限定实例范围）
 	seedAliceDemo(deps, ctx)
 
 	// 9. 应用版本（放在最后：前面的 Apps.Update（如 OpenAPI 同步）会用旧对象覆盖 version 字段）
@@ -1264,7 +1264,7 @@ type seedDataScope struct {
 
 // grantCapabilityViaRequest 已通过的能力包申请单 + 策略落库（“我的权限”展示 & 授权真实生效）
 // 幂等：同一 grantee × 能力包 × 预设 已有已通过申请单则跳过，避免重复 seed 产生重复授权
-// scope=nil 表示数据范围“全部”；scope.Type=instance 时写 OpenFGA instance tuple（数据级鉴权真实限定）
+// scope=nil 表示数据范围“全部”；scope.Type=instance 时落 Policy.ResourceScope 的 instance_ids（集合式范围谓词，判定=点查行 id 比对）
 func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID, appID, capID uint64, presetID, granteeType, granteeName string, granteeID uint64, scope *seedDataScope, reason string) {
 	var existing int64
 	deps.DB.Model(&model.AccessRequest{}).
@@ -1281,7 +1281,7 @@ func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID,
 	}
 	ids := presetActionIDs(deps, cap, presetID)
 
-	// 数据范围：展示（Content.scope_selections）与真实生效（Policy.ResourceScope + OpenFGA tuple）
+	// 数据范围：展示（Content.scope_selections）与真实生效（Policy.ResourceScope——集合式=点查行 id 比对）
 	var scopeSel model.JSONAny
 	var resScope model.JSONMap
 	dataScopeType := ""
@@ -1297,7 +1297,7 @@ func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID,
 			"instance_ids": toAnyFloats(instanceIDsByExternal(deps, scope.Model, scope.Instances)),
 		}
 		dataScopeType = "instance"
-		expr = "// OpenFGA 直接授权 tuple（instance 类型）\n"
+		expr = "// 集合式范围谓词（勾选实例——判定：点查行 id ∈ 集合）\n"
 		for _, ext := range scope.Instances {
 			expr += fmt.Sprintf("(%s:%s, reader, %s)\n", scope.Model, ext, granteeName)
 		}
@@ -1324,7 +1324,7 @@ func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID,
 			"preset_id":         presetID,
 			"scope_selections":  scopeSel,
 			"scope_expression":  expr,
-			"expression_engine": "OpenFGA",
+			"expression_engine": "CheckRow",
 		},
 		Reason:    reason,
 		RiskLevel: model.RiskLow,
@@ -1394,7 +1394,7 @@ func instanceIDsByExternal(deps *api.Deps, modelCode string, externals []string)
 }
 
 // seedAliceDemo 爱丽丝演示权限：自建组 + 个人/组织/自建组 三个维度的能力包授权
-// 数据范围差异化：个人/组织 = 全部；自建组 = 限定主机实例（web-01/web-02，真实 OpenFGA 元组）
+// 数据范围差异化：个人/组织 = 全部；自建组 = 限定主机实例（web-01/web-02，集合式范围谓词）
 func seedAliceDemo(deps *api.Deps, ctx context.Context) {
 	alice := userID(deps, "alice")
 	cmdb := appByCode(deps, "cmdb")
