@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# 一键演示脚本：正常链路 → 无权限 → CMDB 宕机降级 → 策略发布生效 → 本地 agent 决策
-# 前置：make up（含 iam-server+iam-sync 双进程——S1 拆分后巡检/事件/TTL 循环在 iam-sync）
-#       && make seed && make run && make run-cmdb && make run-id（本地模式另需 make run-sync）
+# 一键演示脚本（1.5）：正常链路 → 数据级点查（网关即判/带体调用）→ M2M → 网关 PEP →
+#   授权即审批 → 本地 agent → 能力包 → 点查链路展示 → 行删除 fail-closed → TTL 回收
+# 前置：make up（iam-server + iam-sync 仅 TTL 回收）&& make seed && make run && make run-cmdb && make run-id
+# 数据级前提：应用回查配置/路由取材声明由场景 4/6 自动登记（1.5 投影已退役，判定材料一律实时点查）
 set -eu
 
 # 访问地址可用环境变量覆盖——服务器（无 OrbStack 域名）用宿主机端口映射：
@@ -25,14 +26,57 @@ curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"alice","ap
 say "3. 无权限拦截：bob 创建主机（应 deny）"
 curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"bob","app":"cmdb","action":"cmdb:host:create"}'; echo
 
-say "4. 数据级鉴权：bob 只读 web-01（应 allow，组授权的主机实例）"
-curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"bob","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-4","operation":"read"}'; echo
+say "4. 数据级鉴权（1.5 点查取材）：bob 只读 host-4（条件授权 ip=10.0.0.11，网关链路即判）"
+# ① 管理员登录（数据级配置与后续场景共用）
+curl -s -o /tmp/iam-login.json -X POST "$IAM/api/v1/auth/login" -H "$CT" -d '{"username":"admin","password":"admin123"}'
+LOGIN=$(python3 -c 'import json;print(json.load(open("/tmp/iam-login.json"))["access_token"])')
+AUTH="Authorization: Bearer $LOGIN"
+curl -s -o /tmp/iam-users.json -X GET "$IAM/api/v1/users?limit=100" -H "$AUTH"
+BOB_ID=$(python3 -c 'import json;d=json.load(open("/tmp/iam-users.json"));print([u["id"] for u in d["items"] if u["username"]=="bob"][0])')
+# ② 应用回查配置（§3.1 一系统一约定：内部地址不过网关=零豁免）
+curl -s -X PUT "$IAM/api/v1/apps/1/perm-query" -H "$AUTH" -d '{"url":"http://mock-cmdb:8090/__perm/query","token":"demo-perm-token"}' -o /dev/null -w "  perm-query 配置 http=%{http_code}\n"
+# ③ 五格登记：cmdb:host:read 勾数据级 + 取材声明 path.id（§3.7——网关持有 URI 自提取）
+ACTION_READ=$(curl -s "$IAM/api/v1/apps/1/actions" -H "$AUTH" | python3 -c 'import json,sys;print([a["id"] for a in json.load(sys.stdin)["items"] if a["code"]=="cmdb:host:read"][0])')
+curl -s -X PATCH "$IAM/api/v1/apps/1/routes/$ACTION_READ" -H "$AUTH" -d '{"need_data":true,"material":{"mode":"id_path","path":"path.id"}}' -o /dev/null -w "  取材声明登记 http=%{http_code}\n"
+# ④ 条件授权（申请-审批）：bob host:read × ip=10.0.0.11（组的空集合策略不放行，判少安全）
+REQ4=$(curl -s -o /tmp/iam-req4.json -X POST "$IAM/api/v1/policies" -H "$CT" -H "$AUTH" -d "{\"name\":\"demo:bob:host-read-ip11\",\"effect\":1,\"subject_type\":1,\"subject_id\":$BOB_ID,\"app_id\":1,\"action_ids\":[$ACTION_READ],\"resource_scope\":{\"model\":\"host\",\"condition\":{\"op\":\"eq\",\"field\":\"ip\",\"value\":\"10.0.0.11\"}},\"conditions\":{},\"reason\":\"只允许读网段巡检机（demo）\"}" && python3 -c 'import json;print(json.load(open("/tmp/iam-req4.json"))["id"])')
+curl -s -o /tmp/iam-alice.json -X POST "$IAM/api/v1/auth/login" -H "$CT" -d '{"username":"alice","password":"pass123"}'
+ALICE_T4=$(python3 -c 'import json;print(json.load(open("/tmp/iam-alice.json"))["access_token"])')
+curl -s -X POST "$IAM/api/v1/requests/$REQ4/approve" -H "$CT" -H "Authorization: Bearer $ALICE_T4" -d '{"action":1,"comment":"同意（demo 条件授权）"}' -o /dev/null
+# ⑤ 网关链路即判：中心查表→按约定点查权威行→验谓词（业务零配合）
+echo "> bob GET /api/v1/hosts/host-4（ip=.11 命中条件 → 应 200）"
+SC4=$(curl -s -o /tmp/iam-gw4.txt -w "%{http_code}" "$GW/api/v1/hosts/host-4" -H "X-User: bob")
+echo "  http=$SC4"
+if [ "$SC4" != "200" ]; then
+  echo "  ✗ FAIL：点查+谓词应放行 200（硬断言1）——回查配置/取材声明/条件授权链路断裂" >&2; cat /tmp/iam-gw4.txt >&2; exit 1
+fi
+echo "  ✓ 硬断言1：网关点查放行 200（权威行 ip=10.0.0.11 × 条件授权）"
 
-say "5. 数据级鉴权：bob 读 db-01（应 deny，不在组授权实例范围）"
-curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"bob","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-6","operation":"read"}'; echo
+say "5. 谓词不匹配拒单条：bob 读 host-5（ip=10.0.0.12≠授权 .11 → 应 403 NO_PERMISSION）"
+SC5=$(curl -s -o /tmp/iam-gw5.txt -w "%{http_code}" "$GW/api/v1/hosts/host-5" -H "X-User: bob")
+echo "  http=$SC5"
+[ "$SC5" = "403" ] || { echo "  ✗ FAIL：谓词不匹配应 403（硬断言2）" >&2; exit 1; }
+grep -q NO_PERMISSION /tmp/iam-gw5.txt || { echo "  ✗ FAIL：应 NO_PERMISSION" >&2; cat /tmp/iam-gw5.txt >&2; exit 1; }
+echo "  ✓ 硬断言2：谓词不匹配 403 NO_PERMISSION（行在、条件不命中=判少方向）"
+echo "> 未登记路由 deny-by-default（运行期纯查表零推断）："
+curl -s -o /dev/null -w "  http=%{http_code}\n" "$GW/api/v1/not-registered" -H "X-User: bob"
 
-say "6. filter 列表：bob 可见实例（应 2 个）"
-curl -s -X POST "$IAM/v1/authz/filter" -H "$CT" -H "$PEP" -d '{"user":"bob","app":"cmdb","action":"cmdb:host:read","model":"host"}'; echo
+say "6. 带体调用（创建=信封材料 fetch-and-bring）：alice 对 disk-create 的条件授权两连判"
+# 五格登记：cmdb:disk:create 勾数据级 + 信封声明 .meta.type
+ACTION_DCREATE=$(curl -s "$IAM/api/v1/apps/1/actions" -H "$AUTH" | python3 -c 'import json,sys;print([a["id"] for a in json.load(sys.stdin)["items"] if a["code"]=="cmdb:disk:create"][0])')
+curl -s -X PATCH "$IAM/api/v1/apps/1/routes/$ACTION_DCREATE" -H "$AUTH" -d '{"need_data":true,"material":{"mode":"envelope","field_path":".meta.type"}}' -o /dev/null
+# 条件授权：alice disk-create × type=ssd
+REQ6=$(curl -s -o /tmp/iam-req6.json -X POST "$IAM/api/v1/policies" -H "$CT" -H "$AUTH" -d "{\"name\":\"demo:alice:disk-create-ssd\",\"effect\":1,\"subject_type\":1,\"subject_id\":2,\"app_id\":1,\"action_ids\":[$ACTION_DCREATE],\"resource_scope\":{\"condition\":{\"op\":\"eq\",\"field\":\"type\",\"value\":\"ssd\"}},\"conditions\":{},\"reason\":\"只允许建高效盘（demo）\"}" && python3 -c 'import json;print(json.load(open("/tmp/iam-req6.json"))["id"])')
+curl -s -X POST "$IAM/api/v1/requests/$REQ6/approve" -H "$CT" -H "Authorization: Bearer $ALICE_T4" -d '{"action":1,"comment":"同意（demo）"}' -o /dev/null
+echo "> 带体判定：material.meta.type=ssd（应 allow）"
+R6A=$(curl -s -X POST "$IAM/v1/authz/check-material" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:disk:create","material":{"meta":{"type":"ssd"}},"trace_id":"demo-6a"}')
+echo "  $R6A"
+echo "$R6A" | grep -q '"allow"' || { echo "  ✗ FAIL：信封 ssd 应 allow（硬断言3a）" >&2; exit 1; }
+echo "> 带体判定：material.meta.type=hdd（应 deny NO_PERMISSION）"
+R6B=$(curl -s -X POST "$IAM/v1/authz/check-material" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:disk:create","material":{"meta":{"type":"hdd"}},"trace_id":"demo-6b"}')
+echo "  $R6B"
+echo "$R6B" | grep -q NO_PERMISSION || { echo "  ✗ FAIL：信封 hdd 应 deny NO_PERMISSION（硬断言3b）" >&2; exit 1; }
+echo "  ✓ 硬断言3：信封创建两连判 allow(ssd)/deny(hdd)——材料即‘未来的行’，伪造被授权集封顶"
 
 say "7. 程序身份（M2M）：云管只读（应 allow）、写（应 deny）"
 curl -s -o /tmp/iam-token.json -X POST "$IAM/v1/oauth/token" -H "$CT" -d '{"grant_type":"client_credentials","client_id":"cloud-mgmt","client_secret":"cloud-mgmt-secret"}'
@@ -50,12 +94,9 @@ curl -s -o /dev/null -w "  http=%{http_code}\n" "$GW/api/v1/hosts"
 echo "> 程序身份 client:cloud-mgmt GET（应 200，只读服务）"
 curl -s -o /dev/null -w "  http=%{http_code}\n" "$GW/api/v1/hosts" -H "X-User: client:cloud-mgmt"
 
-say "9. CMDB 宕机降级演示（可选：停掉 mock-cmdb 后仍可鉴权）"
-if [ -n "${STOP_CMDB:-}" ]; then
-  echo "> 停止 mock-cmdb 进程…（请手动 Ctrl-C mock-cmdb 终端）"
-fi
+say "9. 动作级判定不依赖上游（策略快照本地；数据级点查的上游依赖见场景 20）"
 curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"bob","app":"cmdb","action":"cmdb:host:read"}'; echo
-echo "> 关系已物化在 OpenFGA 与本地索引，CMDB 宕机不影响鉴权（stale-but-available）"
+echo "> 动作级读本地策略快照，上游宕机不影响；数据级=点查权威行，不可达时 fail-closed"
 
 say "10. 授权即审批：admin 给 bob 授 host:update（发起申请单 → bob 确认 → alice 复核 → 生效留痕）"
 curl -s -o /tmp/iam-login.json -X POST "$IAM/api/v1/auth/login" -H "$CT" -d '{"username":"admin","password":"admin123"}'
@@ -68,7 +109,7 @@ BOB_ID=$(python3 -c 'import json;d=json.load(open("/tmp/iam-users.json"));print(
 curl -s -o /tmp/iam-actions.json -X GET "$IAM/api/v1/apps/1/actions" -H "$AUTH"
 ACTION_ID=$(python3 -c 'import json;d=json.load(open("/tmp/iam-actions.json"));print([a["id"] for a in d["items"] if a["code"]=="cmdb:host:update"][0])')
 # 发起授权申请单（createPolicy 不再直授，返回申请单 id + 审批链）
-REQ_ID=$(curl -s -o /tmp/iam-req.json -X POST "$IAM/api/v1/policies" -H "$CT" -H "$AUTH" -d "{\"name\":\"grant:bob:update\",\"effect\":1,\"subject_type\":1,\"subject_id\":$BOB_ID,\"app_id\":1,\"action_ids\":[$ACTION_ID],\"resource_scope\":null,\"conditions\":{},\"force_remote\":false,\"reason\":\"上线变更需要主机更新权限（demo）\"}" && python3 -c 'import json;print(json.load(open("/tmp/iam-req.json"))["id"])')
+REQ_ID=$(curl -s -o /tmp/iam-req.json -X POST "$IAM/api/v1/policies" -H "$CT" -H "$AUTH" -d "{\"name\":\"grant:bob:update\",\"effect\":1,\"subject_type\":1,\"subject_id\":$BOB_ID,\"app_id\":1,\"action_ids\":[$ACTION_ID],\"resource_scope\":null,\"conditions\":{},\"reason\":\"上线变更需要主机更新权限（demo）\"}" && python3 -c 'import json;print(json.load(open("/tmp/iam-req.json"))["id"])')
 echo "> 授权申请单 #$REQ_ID 已创建，审批链: $(python3 -c 'import json;print(json.load(open("/tmp/iam-req.json")).get("approval_chain"))')"
 echo "> 步骤一：bob 本人确认（被授权方）"
 curl -s -o /tmp/iam-bob.json -X POST "$IAM/api/v1/auth/login" -H "$CT" -d '{"username":"bob","password":"pass123"}'
@@ -90,10 +131,6 @@ if curl -s -m 2 $AGENT/healthz >/dev/null 2>&1; then
 else
   echo "（agent 未运行，跳过；启动方式：make run-agent）"
 fi
-
-# ===== 数据契约与新鲜度演示（实施清单 A3/A4/A5a/A5b/A6，2026-09-22）=====
-MOCKP=http://localhost:18090
-OFGA=http://localhost:18081
 
 say "12. 能力包 v12：应用元数据（网络信息 + 鉴权方式）"
 curl -s -X GET "$IAM/api/v1/apps/1" -H "$AUTH" | python3 -c 'import json,sys;d=json.load(sys.stdin);a=d["app"];print("  net:", sorted((a.get("net_info") or {}).keys()));print("  auth:", [m.get("type") for m in (a.get("auth") or [])])'
@@ -122,82 +159,66 @@ echo "  接入申请单 #$OID 已提交（凭证待审批后签发）"
 say "17. 授权管理聚合（预设状态 + 四维概况）"
 curl -s -X GET "$IAM/api/v1/apps/1/capabilities/$CAP_ID/authz" -H "$AUTH" | python3 -c 'import json,sys;d=json.load(sys.stdin);print("  presets:", [(p["id"],p["status"]) for p in d["presets"]]);print("  grants:", d["grants"])'
 
-say "18. 数据契约 · 集合指纹 · 巡检失败历史（A3/A4）"
-echo "> 上游集合指纹（mock /sync/fingerprint?model=host）："
-curl -s "$MOCKP/sync/fingerprint?model=host" | python3 -m json.tool | head -10
-echo "> 数据契约与确认制时钟（GET /api/v1/sync/contracts）："
+# ===== 点查取材演示（1.5——投影机制已退役：判定材料一律实时点查权威行）=====
+MOCKP=http://localhost:18090
+
+say "18. 点查链路三件套：应用回查配置 + 契约白名单 + 路由取材声明"
+echo "> ① 应用回查配置（系统内部地址，零豁免）："
+curl -s "$IAM/api/v1/apps/1" -H "$AUTH" | python3 -c 'import json,sys;a=json.load(sys.stdin)["app"];print("  perm_query_url:", a.get("perm_query_url") or "（未配置）");print("  凭证:", "已配置" if a.get("perm_query_token") else "缺失")'
+echo "> ② 数据契约登记（fields=判定字段清单；点查模型白名单）："
 curl -s "$IAM/api/v1/sync/contracts" -H "$AUTH" | python3 -c 'import json,sys
-for c in json.load(sys.stdin)["items"]:
-    print("  %s algo=%s sla=%ss max=%ss clock_running=%s watermarked=%s" % (
-        c["model"], c["algorithm"], c["staleness_sla_sec"], c["degrade_max_age_sec"],
-        bool(c.get("last_confirmed_fresh_at")), bool(c.get("sync_watermark_at"))))'
-echo "> 巡检日志最近 3 条（reachable / fingerprint_match / sync_ok / fresh_age）："
-curl -s "$IAM/api/v1/sync/patrol-logs?limit=3" -H "$AUTH" | python3 -c 'import json,sys
 items=json.load(sys.stdin)["items"]
+if not any(c["model"]=="host" for c in items):
+    print("  ✗ FAIL：契约登记缺 host 域（点查白名单不完整）", file=sys.stderr); sys.exit(1)
+for c in items: print("  %s fields=%s algo=%s" % (c["model"], c["fields"], c["algorithm"]))
+print("  ✓ 硬断言4：契约登记含 host（白名单就绪）")'
+echo "> ③ 路由取材声明（五格登记的 need_data 动作清单）："
+curl -s "$IAM/api/v1/apps/1/routes" -H "$AUTH" | python3 -c 'import json,sys
+items=[a for a in json.load(sys.stdin)["items"] if a.get("need_data")]
 if not items:
-    print("  ✗ FAIL：patrol-logs 为空——iam-sync 巡检循环未运行（S10 硬断言1）", file=sys.stderr)
-    sys.exit(1)
-for l in items[:3]:
-    print("  %s reachable=%s match=%s sync_ok=%s age=%ss" % (
-        l["domain"], l["reachable"], l["fingerprint_match"], l["sync_ok"], l["fresh_age_sec"]))
-print("  ✓ 硬断言1：巡检日志非空（iam-sync patrol 循环在跑）")'
-echo "> 增量过滤（A4 L1 义务：updated_after 远古=全量、未来=空）："
-curl -s "$MOCKP/api/v1/models/host/instances?updated_after=2000-01-01T00:00:00Z" | python3 -c 'import json,sys;print("  count(远古)=",len(json.load(sys.stdin)))'
-curl -s "$MOCKP/api/v1/models/host/instances?updated_after=2999-01-01T00:00:00Z" | python3 -c 'import json,sys;print("  count(未来)=",len(json.load(sys.stdin)))'
+    print("  ✗ FAIL：无 need_data 路由（场景4/6 的取材声明未生效？）", file=sys.stderr); sys.exit(1)
+for a in items: print("  %s %s → %s" % (a["code"], a.get("path") or "-", (a.get("material") or {}).get("mode")))'
 
-say "19. 实例删除级联清理（A5a：PG+OpenFGA 双侧，幽灵授权=判多红线）"
-echo "> 删除前：alice 读 host-5（web-01，应 allow）"
-curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-5","operation":"read"}'; echo
-echo "> 删除 mock 实例 host-5（事件 → 投影行 + OpenFGA 关系级联清理）："
-curl -s -X DELETE "$MOCKP/api/v1/models/host/instances/5"; echo
+say "19. 行删除 → 点查 data_missing（fail-closed 拒单条——判少不判多）"
+echo "> 删除前：bob 读 host-4（条件 ip=.11 命中 → 应 200）"
+curl -s -o /dev/null -w "  http=%{http_code}\n" "$GW/api/v1/hosts/host-4" -H "X-User: bob"
+echo "> 删除 mock 实例 host-4（权威源行没了——无投影无级联，判定实时看权威源）"
+curl -s -X DELETE "$MOCKP/api/v1/models/host/instances/4"; echo
 sleep 2
-echo "> 事件链清理后重查（应 deny code=DATA_MISSING，fail-closed 拒单条）："
-R19=$(curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-5","operation":"read"}')
-echo "$R19"
+echo "> 重查（应 403 DATA_MISSING）："
+R19=$(curl -s "$GW/api/v1/hosts/host-4" -H "X-User: bob")
+echo "  $R19"
 if ! echo "$R19" | grep -q DATA_MISSING; then
-  echo "  ✗ FAIL：应 deny code=DATA_MISSING——事件删除级联未生效（worker 消费链断裂，S10 硬断言2）" >&2; exit 1
+  echo "  ✗ FAIL：应 deny code=DATA_MISSING——点查 404 未走 fail-closed（硬断言5）" >&2; exit 1
 fi
-echo "  ✓ 硬断言2：DATA_MISSING（事件级联在 iam-sync 消费链上生效）"
-echo "> OpenFGA 关系残留（应 tuples:[] —— purge 生效，无幽灵授权）："
-SID=$(curl -s "$OFGA/stores" | python3 -c 'import json,sys;print(json.load(sys.stdin)["stores"][0]["id"])')
-curl -s -X POST "$OFGA/stores/$SID/read" -H "$CT" -d '{"tuple_key":{"object":"host:host-5"}}' | python3 -m json.tool | head -5
+echo "  ✓ 硬断言5：DATA_MISSING（行删除即判少，幽灵授权不存在）"
 
-say "20. 新鲜度三态：降级续判 → 超龄拒绝 → 恢复自愈（2.3.1 确认制状态机）"
-echo "> 0) 当前（应 allow，fresh）：alice 读 host-6"
-curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-6","operation":"read"}'; echo
-echo "> 1) 停 mock-cmdb（上游不可达 → 确认制时钟不再刷新；host 契约 SLA=15s/上限=30s，巡检周期 5s）"
+say "20. 点查源不可用 = fail-closed + 恢复复通（1.5 的『上游挂了还鉴权吗』）"
+echo "> 0) 正常：alice 读 host-6（alice 全量只读 → 应 200）"
+SC20=$(curl -s -o /dev/null -w "%{http_code}" "$GW/api/v1/hosts/host-6" -H "X-User: alice")
+echo "  http=$SC20"
+[ "$SC20" = "200" ] || { echo "  ✗ FAIL：正常态应 200（硬断言6a 前置）" >&2; exit 1; }
+echo "> 1) 停 mock-cmdb（权威源不可达）"
 docker compose -f deploy/docker-compose.yml stop mock-cmdb >/dev/null
-echo "> 2) 等待 40s（年龄越过 30s 上限 → Expired）…"
-sleep 40
-echo "> 3) Expired 判定（应 deny code=DATA_STALE_OVERDUE，仅该数据域数据级）："
-R20=$(curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-6","operation":"read"}')
-echo "$R20"
-if ! echo "$R20" | grep -q DATA_STALE_OVERDUE; then
-  echo "  ✗ FAIL：应 deny code=DATA_STALE_OVERDUE——确认制时钟三态未生效（S10 硬断言3a）" >&2; exit 1
+echo "> 2) 点查失败 → deny（应 403 DATA_SOURCE_UNAVAILABLE——fail-closed，无静默放行）"
+R20=$(curl -s "$GW/api/v1/hosts/host-6" -H "X-User: alice")
+echo "  $R20"
+if ! echo "$R20" | grep -q DATA_SOURCE_UNAVAILABLE; then
+  echo "  ✗ FAIL：应 DATA_SOURCE_UNAVAILABLE（硬断言6a）——先恢复环境" >&2
+  docker compose -f deploy/docker-compose.yml start mock-cmdb >/dev/null; exit 1
 fi
-echo "  ✓ 硬断言3a：DATA_STALE_OVERDUE（超龄拒绝生效）"
-echo "> 4) 接口级鉴权不受影响（应仍 allow —— Expired 只拒该域数据级）："
+echo "  ✓ 硬断言6a：DATA_SOURCE_UNAVAILABLE（取材失败 fail-closed，无隐式降级）"
+echo "> 3) 动作级不受影响（策略快照本地，不依赖上游）："
 curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read"}'; echo
-echo "> 5) 恢复 mock → 巡检（≤10s）指纹确认 → 时钟刷新 → recovery（恢复不解禁、 同步落地才解禁）"
+echo "> 4) 恢复 mock-cmdb → 点查复通（应 200）"
 docker compose -f deploy/docker-compose.yml start mock-cmdb >/dev/null
-sleep 15
-echo "> 6) 恢复后判定（应 allow）："
-R20B=$(curl -s -X POST "$IAM/v1/authz/check-instance" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read","model":"host","instance_id":"host-6","operation":"read"}')
-echo "$R20B"
-if ! echo "$R20B" | grep -q '"decision":"allow"'; then
-  echo "  ✗ FAIL：恢复后应 allow——同步落地解禁未生效（S10 硬断言3b）" >&2; exit 1
-fi
-echo "  ✓ 硬断言3b：恢复后 allow（自愈闭环）"
-echo "> 7) 决策日志检索（data_stale_overdue / recovery / force_remote 三类 reason 可查）："
-curl -s "$IAM/api/v1/decision-logs?limit=200" -H "$AUTH" | python3 -c 'import json,sys
-d=json.load(sys.stdin); items=d.get("items") if isinstance(d,dict) else d
-if not isinstance(items,list): items=[]
-for tok in ("data_stale_overdue","recovery","force_remote"):
-    print("  %s: %d" % (tok, sum(1 for i in items if tok in str(i.get("reason","")))))'
+sleep 3
+SC20B=$(curl -s -o /dev/null -w "%{http_code}" "$GW/api/v1/hosts/host-6" -H "X-User: alice")
+echo "  http=$SC20B"
+[ "$SC20B" = "200" ] || { echo "  ✗ FAIL：恢复后应 200（硬断言6b）" >&2; exit 1; }
+echo "  ✓ 硬断言6b：恢复复通（无缓存放行——点查即实时）"
 
-say "21. 深对账手动触发（A5b：三类差异——常规更新 / 孤儿双侧清理 / 静默漂移告警）"
-curl -s -X POST "$IAM/api/v1/sync/reconcile" -H "$AUTH" | python3 -m json.tool | head -30
-echo "> （干净状态下 orphans/drift 为空；静默漂移=改数据不改 updated_at 的 L1/L2 盲区，由本通道天级兜底）"
+#（原场景21『深对账』已随投影机制退役下线：判定不再依赖投影库，无对账对象）
 
 say "22. 定制需求卡（A8 非目录请求：包覆盖不到 → 定制单 → owner 直授带 TTL → 判定排除+回收）"
 echo "> 0) 授权前：bob 用 cmdb:host:delete（能力目录里有但无人授权 → 应 deny）"
@@ -212,7 +233,7 @@ echo "> 策略 #$CUSTOM_POLICY 已创建（expires_at=now+1d）——立即生�
 curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"bob","app":"cmdb","action":"cmdb:host:delete"}'; echo
 echo "> 3) TTL 快进（演示用 psql 把该策略 expires_at 改到 1 分钟前）"
 docker exec devops-postgres psql -U devops -d devops_iam -t -c "update policies set expires_at = now() - interval '1 minute' where id = $CUSTOM_POLICY;" >/dev/null && echo "  已快进"
-echo "> 4) 等待 66s（builder 缓存 30s 重建排除 + ttlSweep 60s 回收元组/重发布 bundle）…"
+echo "> 4) 等待 66s（builder 缓存 30s 重建排除 + ttlSweep 60s 回收策略/重发布 bundle）…"
 sleep 66
 echo "> 5) TTL 到期后判定（应 deny —— ActiveByApp 已排除过期策略）："
 curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"bob","app":"cmdb","action":"cmdb:host:delete"}'; echo
@@ -220,9 +241,9 @@ echo "> 6) 回收落地核验（status 应已置 0、expires_at 已过）："
 R22=$(docker exec devops-postgres psql -U devops -d devops_iam -t -c "select 'policy#' || $CUSTOM_POLICY || ' status=' || status || ' expired=' || (expires_at <= now()) from policies where id = $CUSTOM_POLICY;")
 echo "$R22"
 if ! echo "$R22" | grep -q "status=0"; then
-  echo "  ✗ FAIL：status≠0——TTL 回收未落地（iam-sync ttlSweep 未跑，S10 硬断言4）" >&2; exit 1
+  echo "  ✗ FAIL：status≠0——TTL 回收未落地（iam-sync ttlSweep 未跑，硬断言7）" >&2; exit 1
 fi
-echo "  ✓ 硬断言4：status=0（TTL 回收在 iam-sync 上生效）"
+echo "  ✓ 硬断言7：status=0（TTL 回收在 iam-sync 上生效）"
 echo "> 7) 申请人视角：审批中心工单（定制需求类型可见、已处置）："
 curl -s "$IAM/api/v1/tickets?type=all&role=applicant" -H "Authorization: Bearer $BOB_TOKEN" | python3 -c 'import json,sys
 for t in json.load(sys.stdin)["items"][:4]:
