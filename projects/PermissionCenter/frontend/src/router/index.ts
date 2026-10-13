@@ -38,7 +38,6 @@ const routes = [
       { path: 'observability/pip', name: 'obs-pip', component: () => import('../views/PipExplorer.vue'), meta: { title: '身份解析（PIP）' } },
       { path: 'observability/cache', name: 'obs-cache', component: () => import('../views/ObsCache.vue'), meta: { title: '决策缓存工作台' } },
       { path: 'observability/metrics', name: 'obs-metrics', component: () => import('../views/ObsMetrics.vue'), meta: { title: '鉴权指标面板' } },
-      { path: 'observability/ofga', name: 'obs-ofga', component: () => import('../views/ObsOfga.vue'), meta: { title: '数据面图谱（OpenFGA）' } },
       { path: 'observability/owners', name: 'obs-owners', component: () => import('../views/ObsOwners.vue'), meta: { title: 'Owner 巡检视图' } },
       { path: 'observability/agents', name: 'obs-agents', component: () => import('../views/Agents.vue'), meta: { title: 'Agent · 分发 · 同步' } },
       // 系统知识库（复盘文档 / 面试题库）

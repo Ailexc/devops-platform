@@ -162,7 +162,6 @@ async function create() {
     action_ids: form.action_ids,
     resource_scope,
     conditions: {},
-    force_remote: false,
     reason: form.reason,
     expires_at,
   })

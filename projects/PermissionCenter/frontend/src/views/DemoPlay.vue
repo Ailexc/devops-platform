@@ -108,7 +108,6 @@ import PEPResolverScreen from '../components/demo/screens/PEPResolverScreen.vue'
 import AuditLogScreen from '../components/demo/screens/AuditLogScreen.vue'
 import ObsCacheScreen from '../components/demo/screens/ObsCacheScreen.vue'
 import ObsMetricsScreen from '../components/demo/screens/ObsMetricsScreen.vue'
-import ObsOfgaScreen from '../components/demo/screens/ObsOfgaScreen.vue'
 import ObsOwnersScreen from '../components/demo/screens/ObsOwnersScreen.vue'
 // 场景 6: 端到端
 import GatewayCheckScreen from '../components/demo/screens/GatewayCheckScreen.vue'
@@ -140,7 +139,7 @@ const screenMap: Record<string, any> = {
   MarketplaceScreen, PresetSelectScreen, SubjectSelectScreen, SubmitConfirmScreen,
   SwitchUserScreen, ApprovalScreen, VerifyScreen, DataScopeScreen,
   ApprovalChainScreen, TraceScreen, PEPResolverScreen, AuditLogScreen,
-  ObsCacheScreen, ObsMetricsScreen, ObsOfgaScreen, ObsOwnersScreen,
+  ObsCacheScreen, ObsMetricsScreen, ObsOwnersScreen,
   GatewayCheckScreen, ArchSummaryScreen,
   PermWorkbenchScreen, PermDimensionsScreen, PermOrgDetailScreen,
   PermCalcScreen, PermAuditTrailScreen, PermSummaryScreen,
@@ -211,9 +210,8 @@ const allScenarios: Record<string, { title: string; steps: Step[] }> = {
       { component: 'AuditLogScreen', title: '决策日志', role: 'admin', roleLabel: '系统管理员', narration: '决策日志含 TraceID，与链路追踪联动，全链路溯源', animation: 'slide-left' },
       { component: 'ObsCacheScreen', title: '决策缓存', role: 'admin', roleLabel: '系统管理员', narration: '决策缓存工作台：authz:dec:* 键 + 命中率 + 一键失效，策略变更不生效时首要排查', animation: 'slide-left' },
       { component: 'ObsMetricsScreen', title: '指标面板', role: 'admin', roleLabel: '系统管理员', narration: '鉴权指标面板：决策量 / 允许拒绝 / 延迟百分位 / 24h 趋势 / Top 权限点', animation: 'slide-left' },
-      { component: 'ObsOfgaScreen', title: '数据面图谱', role: 'admin', roleLabel: '系统管理员', narration: 'OpenFGA 数据面图谱：授权模型 type 定义 + 实例级关系元组全貌', animation: 'slide-left' },
       { component: 'ObsOwnersScreen', title: 'Owner 巡检', role: 'admin', roleLabel: '系统管理员', narration: 'Owner 巡检：失联 owner 提醒 → 达阈值自动停用 → 新 owner 认领恢复', animation: 'slide-left' },
-      { component: 'CompleteScreen', title: '完成', role: '—', roleLabel: '完成', narration: '✅ 可观测：TraceID 贯穿 + 决策缓存 / 指标面板 / 数据面图谱 / Owner 巡检，黑盒显性化', animation: 'celebrate' },
+      { component: 'CompleteScreen', title: '完成', role: '—', roleLabel: ' 完成', narration: '✅ 可观测：TraceID 贯穿 + 决策缓存 / 指标面板 / Owner 巡检，黑盒显性化', animation: 'celebrate' },
     ],
   },
   e2e: {

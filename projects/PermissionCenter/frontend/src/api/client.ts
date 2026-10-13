@@ -200,7 +200,6 @@ export const api = {
   debugCache: () => request('/api/v1/debug/cache'),
   debugCacheClear: () => request('/api/v1/debug/cache/clear', 'POST'),
   debugMetrics: () => request('/api/v1/debug/metrics'),
-  debugOfga: () => request('/api/v1/debug/ofga'),
   debugOwners: () => request('/api/v1/debug/owners'),
   ownerCheck: () => request('/api/v1/owner-check', 'POST'),
   agents: () => request('/api/v1/agents'),
