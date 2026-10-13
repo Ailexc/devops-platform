@@ -8,7 +8,7 @@ import (
 	"github.com/xcy/permission-center/internal/model"
 )
 
-// buildConditionCEL 将 v12 范围字段类型操作符转换为可落 OpenFGA 的 CEL 条件（D2：真解析）
+// buildConditionCEL 将 v12 范围字段类型操作符转换为可落库的 CEL 条件（D2：真解析；1.5 判定=CheckRow 对权威行求值）
 // demo 文案（field contains "v" / field !in [...]）→ 真实 CEL（field.contains("v") / !(field in [...])）
 func buildConditionCEL(field, op, value string, values []string) (string, error) {
 	quoted := func(vs []string) (string, error) {
@@ -56,7 +56,7 @@ func buildConditionCEL(field, op, value string, values []string) (string, error)
 }
 
 // validateCEL 用 cel-go 真解析校验 CEL 表达式语法（P0 即真解析，D2 定案）
-// 字段标识符未声明时仅做语法解析（类型检查由 OpenFGA 侧模型声明约束）
+// 字段标识符未声明时仅做语法解析（类型检查由落库侧声明约束）
 func validateCEL(expr string) error {
 	if strings.TrimSpace(expr) == "" {
 		return nil
