@@ -322,7 +322,7 @@ func (d *Deps) approveRevokeRequest(c *gin.Context) {
 	c.JSON(200, gin.H{"status": "revoked"})
 }
 
-// executeRevoke 执行回收：停用策略 + 撤销 OpenFGA 关系 + 缓存/bundle 失效
+// executeRevoke 执行回收：停用策略 + 缓存/bundle 失效（1.5：集合式=点查行比对，无关系需撤）
 func (d *Deps) executeRevoke(rr *model.RevokeRequest, approver uint64, comment string) error {
 	p, err := d.Pol.ByID(rr.PolicyID)
 	if err != nil {
