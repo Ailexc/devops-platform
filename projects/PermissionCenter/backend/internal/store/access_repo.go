@@ -41,6 +41,10 @@ func (r *AccessRepo) UpsertAction(a *model.Action) error {
 	if a.RespExample != "" {
 		existing.RespExample = a.RespExample
 	}
+	// v1.5 T5：query 参数候选（非空才覆盖）
+	if len(a.QueryParams) > 0 {
+		existing.QueryParams = a.QueryParams
+	}
 	// v1.5：回填既有行（含 ID）——调用方（如待确认落表）需要真实主键，否则拿到 ID=0
 	*a = existing
 	return r.db.Save(a).Error

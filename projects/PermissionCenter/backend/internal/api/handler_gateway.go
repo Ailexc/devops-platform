@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -79,6 +80,36 @@ func (d *Deps) handleGatewayCheck(c *gin.Context) {
 	if err != nil || !dec.Allow {
 		c.AbortWithStatusJSON(403, gin.H{"error": "denied", "code": "NO_PERMISSION"})
 		return
+	}
+
+	// ---- T5 列表判定两步（§5.2 元组集合语义）：契约登记的 list 动作 → 缺参拒 / 子集校验 ----
+	// 中心自 X-Forwarded-Uri 的 query 按契约参数位置取值（不依赖前端诚实；授权集=本次回调实时按策略计算）
+	if trace.Action.ScopeParam != nil {
+		if pname, _ := trace.Action.ScopeParam["param"].(string); pname != "" {
+			rawQuery := ""
+			if i := strings.IndexByte(uri, '?'); i >= 0 {
+				rawQuery = uri[i+1:]
+			}
+			q, _ := url.ParseQuery(rawQuery)
+			reqVals := authz.ParseScopeParamList(q.Get(pname))
+			required, _ := trace.Action.ScopeParam["required"].(bool)
+			if len(reqVals) == 0 && required {
+				d.logDecision(traceID, user, app, trace.Action.Code, method+" "+path, false, "missing_scope_param（列表缺契约范围参数）", pepInfo)
+				c.AbortWithStatusJSON(403, gin.H{"error": "denied", "code": "MISSING_SCOPE_PARAM"})
+				return
+			}
+			if len(reqVals) > 0 {
+				full, vals := authz.AuthorizedScopeValues(matchedPids, d.Pol, trace.Action.Resource, pname)
+				if bad, ok := authz.SubsetCheck(reqVals, full, vals); !ok {
+					pepInfo["list_scope"] = map[string]any{"param": pname, "requested": reqVals}
+					d.logDecision(traceID, user, app, trace.Action.Code, method+" "+path, false,
+						"list scope not matched（请求值 "+bad+" 超授权集合）", pepInfo)
+					c.AbortWithStatusJSON(403, gin.H{"error": "denied", "code": "NO_PERMISSION"})
+					return
+				}
+				pepInfo["list_scope"] = map[string]any{"param": pname, "requested": reqVals, "full_access": full}
+			}
+		}
 	}
 
 	// ---- T2 数据级：点查取材（§3.5 网关链路即判）----

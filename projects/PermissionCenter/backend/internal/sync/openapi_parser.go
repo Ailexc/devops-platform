@@ -128,9 +128,21 @@ type ParsedAction struct {
 	// 接口契约（v12）：请求示例 / 响应示例（从 OpenAPI parameters/requestBody/responses 生成）
 	ReqExample  string `json:"req_example,omitempty"`
 	RespExample string `json:"resp_example,omitempty"`
+	// v1.5 T5：query 参数名候选（供五格登记勾 required 下拉；非权威，仅提示）
+	QueryParams []string `json:"query_params,omitempty"`
 }
 
-// genericQueryKeywords 统一查询入口关键字（经 X-Resource-Type 解析资源类型）
+// queryParams 提取 operation 的 query 参数名候选（契约三步链 step1：scope_param.required UI 下拉源）
+func queryParams(op *Operation) []string {
+	var out []string
+	for _, p := range op.Parameters {
+		if strings.EqualFold(p.In, "query") {
+			out = append(out, p.Name)
+		}
+	}
+	return out
+}
+
 var genericQueryKeywords = map[string]bool{
 	"entities": true, "resources": true, "search": true, "query": true,
 }
@@ -219,6 +231,7 @@ func ParseOpenAPI(raw []byte, appCode string) ([]ParsedAction, error) {
 				ResourceSlot: slot,
 				ReqExample:   doc.buildReqExample(method, path, op),
 				RespExample:  doc.buildRespExample(op),
+				QueryParams:  queryParams(&op),
 			})
 		}
 	}

@@ -58,6 +58,8 @@ func (s *OpenAPISyncer) Sync(ctx context.Context, app *model.App) (map[string]an
 			// 接口契约（v12）：请求/响应示例
 			ReqExample:  a.ReqExample,
 			RespExample: a.RespExample,
+			// v1.5 T5：query 参数候选（契约三步链 step1）
+			QueryParams: a.QueryParams,
 		}
 		if err := s.acc.UpsertAction(act); err != nil {
 			s.syncs.FinishJob(job.ID, 0, map[string]any{"error": err.Error()})

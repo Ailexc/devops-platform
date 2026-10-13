@@ -224,6 +224,29 @@ echo "  ✓ 硬断言6b：恢复复通（无缓存放行——点查即实时）
 
 #（原场景21『深对账』已随投影机制退役下线：判定不再依赖投影库，无对账对象）
 
+say "21. 列表判定两步（1.5）：契约登记 → 缺参拒 / 超授权拒 / 业务真过滤（契约测试）"
+# ① 五格登记：cmdb:host:list 挂范围参数 env@query（required）——契约两件之一
+ACTION_LIST=$(curl -s "$IAM/api/v1/apps/1/actions" -H "$AUTH" | python3 -c 'import json,sys;print([a["id"] for a in json.load(sys.stdin)["items"] if a["code"]=="cmdb:host:list"][0])')
+curl -s -X PATCH "$IAM/api/v1/apps/1/routes/$ACTION_LIST" -H "$AUTH" -d '{"scope_param":{"param":"env","location":"query","required":true}}' -o /dev/null -w "  范围参数登记 http=%{http_code}\n"
+# ② 条件授权（两级审批）：frank host:list × env=prod
+curl -s -o /tmp/iam-frank.json -X POST "$IAM/api/v1/auth/login" -H "$CT" -d '{"username":"frank","password":"pass123"}'
+FRANK_T21=$(python3 -c 'import json;print(json.load(open("/tmp/iam-frank.json"))["access_token"])')
+REQ21=$(curl -s -o /tmp/iam-req21.json -X POST "$IAM/api/v1/policies" -H "$CT" -H "$AUTH" -d "{\"name\":\"demo:frank:host-list-prod\",\"effect\":1,\"subject_type\":1,\"subject_id\":5,\"app_id\":1,\"action_ids\":[$ACTION_LIST],\"resource_scope\":{\"model\":\"host\",\"condition\":{\"op\":\"eq\",\"field\":\"env\",\"value\":\"prod\"}},\"conditions\":{},\"reason\":\"只看生产主机列表（demo）\"}" && python3 -c 'import json;print(json.load(open("/tmp/iam-req21.json"))["id"])')
+curl -s -X POST "$IAM/api/v1/requests/$REQ21/approve" -H "$CT" -H "Authorization: Bearer $FRANK_T21" -d '{"action":1,"comment":"我知道并同意"}' -o /dev/null
+curl -s -X POST "$IAM/api/v1/requests/$REQ21/approve" -H "$CT" -H "Authorization: Bearer $ALICE_T4" -d '{"action":1,"comment":"同意（demo 列表契约）"}' -o /dev/null
+echo "> 三态判定：?env=prod 应 200 / ?env=dev 应 403 NO_PERMISSION / 无参应 403 MISSING_SCOPE_PARAM"
+S21A=$(curl -s -o /dev/null -w "%{http_code}" "$GW/api/v1/hosts?env=prod" -H "X-User: frank")
+S21B=$(curl -s "$GW/api/v1/hosts?env=dev" -H "X-User: frank")
+S21C=$(curl -s "$GW/api/v1/hosts" -H "X-User: frank")
+echo "  env=prod:$S21A / env=dev:$(echo "$S21B" | head -c 60) / 无参:$(echo "$S21C" | head -c 60)"
+if [ "$S21A" != "200" ] || ! echo "$S21B" | grep -q NO_PERMISSION || ! echo "$S21C" | grep -q MISSING_SCOPE_PARAM; then
+  echo "  ✗ FAIL：判定两步三态（硬断言8）" >&2; exit 1
+fi
+echo "  ✓ 硬断言8：判定两步三态（缺参拒/超授权拒/授权值过）"
+echo "> 一次性契约测试（中心出脚本：业务真按字段过滤 = 判定字段落库字段）："
+bash scripts/contract-test.sh frank /api/v1/hosts env prod dev || { echo "  ✗ FAIL：契约测试（硬断言9）" >&2; exit 1; }
+echo "  ✓ 硬断言9：契约测试通过（判定两步 + 业务过滤闭环）"
+
 say "22. 定制需求卡（A8 非目录请求：包覆盖不到 → 定制单 → owner 直授带 TTL → 判定排除+回收）"
 echo "> 0) 授权前：bob 用 cmdb:host:delete（能力目录里有但无人授权 → 应 deny）"
 curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"bob","app":"cmdb","action":"cmdb:host:delete"}'; echo

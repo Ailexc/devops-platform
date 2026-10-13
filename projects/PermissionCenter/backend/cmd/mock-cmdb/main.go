@@ -397,11 +397,22 @@ func main() {
 			g.JSON(404, gin.H{"error": "resource not found"})
 			return
 		}
+		q := g.Request.URL.Query()
 		c.mu.RLock()
 		defer c.mu.RUnlock()
 		var out []*Instance
 		for _, inst := range m.Instances {
-			out = append(out, inst)
+			// T5 契约测试需要业务真按字段过滤（判定字段=落库字段）：query 键命中属性则等值过滤
+			match := true
+			for k, vs := range q {
+				if v, ok := inst.Attributes[k]; ok && fmt.Sprintf("%v", v) != vs[0] {
+					match = false
+					break
+				}
+			}
+			if match {
+				out = append(out, inst)
+			}
 		}
 		g.JSON(200, gin.H{"items": out})
 	})
