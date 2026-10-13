@@ -10,24 +10,23 @@
 控制面（低 QPS，管理）       数据面（高 QPS，鉴权执行）
   PAP 管理控制台 (Vue3)  ──▶  iam-server (PDP)
   Sync Connector         ──▶    Casbin（动作级 RBAC/ABAC）
-  iam-sync (同步独立进程) ─▶    OpenFGA（实例级 ReBAC：Check/ListObjects）
-   三循环: 事件worker/巡检patrol/TTL回收    Redis（策略/决策缓存 + 事件流）
-   单活锁 + 消费组 + 逐轮 recover           PostgreSQL（主存储）
+  iam-sync (仅 TTL 回收) ─▶    CheckRow（数据级：范围谓词×点查权威行）
+   单活锁 + 逐轮 recover            Redis（策略/决策缓存）/ PostgreSQL（主存储）
 下游接入 PEP：Traefik（forwardAuth → PDP） / mock-cmdb / mock-identity
 ```
 
 关键设计：
 
 - **PEP/PDP/PAP/PIP 外部化授权**，控制面/数据面分离，PDP 无状态可水平扩展
-- **数据源解耦**：CMDB 事件同步 + 本地资源索引投影，CMDB 宕机仍可鉴权（stale-but-available）
-- **双引擎授权**：动作级 Casbin + 实例级 OpenFGA（CNCF/Zanzibar），自研层收缩为翻译/适配
-- **策略即数据**：策略版本化（policy_versions）+ 回滚 + 审计；数据策略 → OpenFGA 关系
+- **数据源解耦（1.5）**：判定材料=点查权威行（通用点查约定，行用完即丢）；CMDB 挂=数据级 fail-closed，动作级不受影响
+- **授权引擎**：动作级 Casbin（RBAC/ABAC）+ 数据级自研 CheckRow（范围谓词×权威行，无投影无关系引擎）
+- **策略即数据**：策略版本化（policy_versions）+ 回滚 + 审计；数据策略=范围谓词（条件/集合/全量）
 - **策略分发**（借鉴 OPA bundle）：bundle 快照 + checksum + agent 本地动作级决策 + 状态上报
 - **程序授权（M2M）**：OAuth2 Client Credentials，主体 service 与用户共用 PDP
 - **开放自服务/弱管理员**：应用自注册 + owner 模型 + 权限市场 + 申请-审批-开通-回收（IGA）
 - **身份同步**：mock-identity（SCIM 风格）+ Identity Connector + JML
-- **数据契约与新鲜度（2026-09-22）**：数据级发布必填契约（指纹字段/算法档位/SLA）+ 三通道对账（事件 / 指纹巡检增量 / 深对账）+ 确认制时钟三态（Fresh / 降级续判 / 超龄拒绝——**仅拒该数据域数据级，接口级不受影响**），观测端点 `/api/v1/sync/contracts`、`/sync/patrol-logs`
-- **同步组件进程隔离（2026-09-23，清单 S1-S10）**：三后台循环（事件 worker / 巡检 patrol / TTL 回收）拆**独立进程 `iam-sync`**——同镜像双 workload，判定与同步 panic/重启/资源互不牵连、双双可独立多副本；防重三层 = 消费组分摊（`iam-sync-workers`，死信流兜底）+ 分布式锁单活（三把锁四执行点）+ 幂等兜底（upsert 三道门 / 水位与确认制时钟 CAS）；健康探活容器内 `/healthz`；本地开发 `make run-sync`；天级深对账开标准 API `POST /api/v1/sync/reconcile` 供任务平台经网关编排（快慢分治）
+- **数据契约与点查（1.5）**：数据级发布必填契约（判定字段清单=点查模型白名单）+ 门禁试算自检（按取材声明真取一次行）；观测端点 `/api/v1/sync/contracts`
+- **进程隔离**：`iam-sync` 仅存 TTL 到期回收循环（单活锁+逐轮 recover+status 守卫）；判定进程 iam-server 无后台循环、可独立多副本；健康探活容器内 `/healthz`；本地开发 `make run-sync`
 
 ## 快速开始（OrbStack 全栈部署，统一管理）
 
@@ -88,24 +87,23 @@ bash scripts/demo.sh
 IAM_DEMO=http://localhost:18080 GW_DEMO=http://localhost:19080 bash scripts/demo.sh
 ```
 
-覆盖（15 场景）：动作级鉴权 → 无权限拦截 → 数据级 check-instance/filter → 程序身份(M2M) →
-网关 PEP 链路（Traefik forwardAuth，allow/deny）→ CMDB 宕机降级 → 策略发布即时生效
-（决策缓存失效）→ 本地 agent 决策 → **数据契约与集合指纹 → 实例删除级联清理（PG+OpenFGA）→
-新鲜度三态（降级续判→超龄拒绝→恢复自愈）→ 深对账手动触发**。
+覆盖（22 场景）：动作级鉴权 → 无权限拦截 → 数据级点查（条件授权+谓词拒+带体信封两连判）→ 程序身份(M2M) →
+网关 PEP 链路（Traefik forwardAuth，allow/deny）→ 动作级不依赖上游 → 策略发布即时生效
+（决策缓存失效）→ 本地 agent 决策 → **点查链路三件套（回查配置/契约白名单/取材声明）→
+行删除 DATA_MISSING → 点查源不可用 fail-closed+恢复复通** → 定制需求卡 TTL 回收。
 
-### 数据契约与巡检配置（2026-09-22，实施清单 A2/A4/A5b）
+### 数据契约配置（1.5：登记面）
 
-| 配置 | 默认值 | 说明 |
-|------|--------|------|
-| `PATROL_INTERVAL` | compose demo=5s（代码默认 5m） | 指纹巡检周期——**必须显著小于契约 SLA**，否则 Fresh 态不可达、stale 常驻 |
-| `RECONCILE_INTERVAL` | 24h | 深对账周期；可手动触发 `POST /api/v1/sync/reconcile`（管理 JWT） |
-| 契约 SLA / 上限 | 种子 host=15s/30s | `data_contracts.staleness_sla_sec` / `degrade_max_age_sec`（0 = SLA×6） |
+| 配置 | 说明 |
+|------|------|
+| `data_contracts.fields` | 判定字段清单 = 点查模型白名单（seed 自动登记 host/database/disk/public_resource） |
+| 应用回查配置 | `PUT /api/v1/apps/:id/perm-query`（回查地址=系统内部地址 + M2M 凭证；demo 场景 4 自动配置） |
 
-> 三态判定（确认制状态机）与发布门禁的完整语义见 `docs/architecture.md` §5.13 与 §7.6。
+> 点查取材/fail-closed 三态与发布门禁的完整语义见 `docs/architecture.md` §5.4 与 §7.6。
 
 ### 数据管理与备份恢复（Seed / Backup / Restore）
 
-**数据位置**：业务数据在 Docker 命名卷 `permission-center_pgdata`（PostgreSQL，含 IAM + OpenFGA）、
+**数据位置**：业务数据在 Docker 命名卷 `permission-center_pgdata`（PostgreSQL，含 IAM）、
 `permission-center_redisdata`（Redis），**不在容器内**。⚠️ 严禁 `docker compose down -v`
 （`-v` 会删除命名卷导致数据直接丢失）。
 
@@ -114,7 +112,7 @@ IAM_DEMO=http://localhost:18080 GW_DEMO=http://localhost:19080 bash scripts/demo
 1. **Seed 初始化脚本（主）**：演示基准数据（应用 / 权限点 / 数据模型 / 能力包 / 授权）由
    `backend/cmd/iam-server/seed.go` 定义，版本化、幂等、可一键重建，随代码演进。
 2. **数据库备份（补充）**：保留 seed 不覆盖的运行时痕迹——审批单（审批人/评论/流转）、
-   审计日志、决策日志、OpenFGA 元组、token 等；适合还原某个演示现场或历史操作状态。
+   审计日志、决策日志、token 等；适合还原某个演示现场或历史操作状态。
 
 ```bash
 # —— Seed 系列（演示基准数据，日常首选）——
@@ -156,12 +154,7 @@ npm run dev     # http://localhost:5173（vite 代理 /api /v1 → :8080）
 
 ### 环境说明
 
-- **OpenFGA**：⚠️ `openfga/openfga:v1.8.7` 为 **distroless** 镜像（仅 `/openfga` 二进制，无 `sh`/`curl`/`wget`）：
-  不可配 `sh -c` entrypoint，也不可用 curl/wget healthcheck（否则容器起不来）。正确流程（各执行一次、幂等）：
-  1. **建库**：postgres 空数据目录首次启动时，`/docker-entrypoint-initdb.d/init-openfga.sh` 自动 `CREATE DATABASE openfga;`
-     （若库缺失可手动 `docker exec iam-postgres psql -U iam -c "CREATE DATABASE openfga;"`）；
-  2. **迁移**：`docker compose -f deploy/docker-compose.yml run --rm openfga migrate`（手动，幂等，直接跑二进制）；
-  3. **启动**：openfga 服务用默认 entrypoint 直接 `run`；iam-server 启动时自动 EnsureSchema（幂等）。
+- **OpenFGA（已退役，1.5）**：数据级判定不再依赖关系引擎——compose 中 openfga 服务、`OPENFGA_ADDR` 等环境变量已移除；`devops_openfga` 库留存无引用（可手工清理）。
 - **seed 与 PEP 映射**：`make seed` 末尾会自动对 cmdb 应用做 OpenAPI 同步（幂等），
   生成权限点 `method/path` + 板块模板，供网关 PEP（Traefik forwardAuth）做"请求→action"映射；
   数据卷重建后无需再手动同步，直接 `make seed` 即可。注意：**授权（策略）非 seed 全量覆盖**，
@@ -178,13 +171,14 @@ npm run dev     # http://localhost:5173（vite 代理 /api /v1 → :8080）
 
 ```
 backend/            Go 后端
-  cmd/iam-server    中心 PDP + 管理 API + Sync（含 seed 子命令）
+  cmd/iam-server    中心 PDP + 管理 API（含 seed 子命令）
+  cmd/iam-sync      同步独立进程（仅 TTL 到期回收 + healthz）
   cmd/iam-agent     本地 PDP agent（sidecar，内嵌 Casbin）
   cmd/mock-cmdb     模拟 CMDB 数据源（OpenAPI + 模型/实例 + 事件）
   cmd/mock-identity 模拟身份源（SCIM 风格）
   internal/api      HTTP 层（含网关回调 /v1/gateway/check）
   internal/authz    授权核心（Casbin + 策略模型层 + 数据面）
-  internal/openfga  OpenFGA 客户端适配
+  internal/material 通用点查取材（点查客户端/信封与路径提取/回源绑定）
   internal/bundle   策略分发
   internal/sync     同步连接器（OpenAPI/CMDB/Identity）
   internal/model    领域模型（GORM AutoMigrate 建表）
