@@ -1253,13 +1253,13 @@ func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map
 		}
 	}
 	if len(tuples) > 0 {
-		b.WriteString("\n// OpenFGA 直接授权 tuple（instance 类型）\n")
+		b.WriteString("\n// 集合式范围谓词（勾选实例，instance 类型——判定：点查行 id ∈ 集合）\n")
 		for _, t := range tuples {
 			b.WriteString(t + "\n")
 		}
 	}
 	if len(conds) > 0 {
-		b.WriteString("\n// OpenFGA 数据级条件（CEL 落库格式；variable 运行时按 grantee 解析）\n")
+		b.WriteString("\n// 数据级范围条件（CEL 落库格式；variable 运行时按 grantee 解析——判定由 CheckRow 对权威行求值）\n")
 		for _, c := range conds {
 			if err := validateCEL(c); err != nil {
 				return "", "", err
@@ -1272,7 +1272,7 @@ func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map
 	}
 	engine := "Casbin"
 	if len(tuples) > 0 || len(conds) > 0 {
-		engine = "OpenFGA"
+		engine = "CheckRow"
 	}
 	return engine, b.String(), nil
 }

@@ -62,7 +62,7 @@ func (d *Deps) logDecision(traceID, user string, app *model.App, action, resourc
 	}()
 }
 
-// subjectOFGAKey 用户/服务 → OpenFGA 主体 key
+// subjectOFGAKey 用户/服务 → 判定主体 key（保留通道合同参数名；1.5：关系引擎已退役）
 func subjectOFGAKey(user string) string {
 	if strings.HasPrefix(user, "client:") {
 		return "service:" + strings.TrimPrefix(user, "client:")
