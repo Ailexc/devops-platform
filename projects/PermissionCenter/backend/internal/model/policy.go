@@ -5,7 +5,7 @@ import "time"
 // Policy 统一策略表（API + 数据）
 // effect: 1=allow 2=deny；subject_type: 1=user 2=group 3=service（原 role 已删除，组即角色）
 // action_ids: 权限点 ID 数组（[]=全部）；resource_scope: 数据策略范围；conditions: ABAC 条件
-// force_remote: 风险分级——强制回源中心（不进入本地 bundle）
+// （1.5 T3）force_remote 强一致档已随投影退役（点查即实时，无前置同步对象）
 type Policy struct {
 	Base
 	Name          string         `gorm:"size:128;not null" json:"name"`
@@ -17,7 +17,6 @@ type Policy struct {
 	ActionIDs     JSONArray      `gorm:"type:jsonb;not null" json:"action_ids"`
 	ResourceScope JSONMap        `gorm:"type:jsonb" json:"resource_scope"`
 	Conditions    JSONMap        `gorm:"type:jsonb;default:'{}'" json:"conditions"`
-	ForceRemote   bool           `gorm:"default:false" json:"force_remote"`
 	Status        int16          `gorm:"not null;default:1" json:"status"`
 	CreatedBy     uint64         `json:"created_by"`
 	Source        int16          `gorm:"not null;default:1" json:"source"` // 来源：1=owner_grant 2=via_request 3=app_request

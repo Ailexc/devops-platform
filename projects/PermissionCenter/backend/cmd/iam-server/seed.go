@@ -36,10 +36,7 @@ func seed(reset bool) error {
 	deps := api.NewDeps(cfg, db, cache)
 	ctx := context.Background()
 
-	// 初始化 OpenFGA
-	if err := deps.DataPlane.EnsureSchema(ctx); err != nil {
-		log.Printf("[seed] openfga init warn: %v", err)
-	}
+	// （1.5 T3）数据级=点查权威行（material/CheckRow），无需 OpenFGA schema 初始化
 
 	// 1. admin 用户
 	adminHash, _ := auth.HashPassword("admin123")
@@ -276,8 +273,7 @@ func seed(reset bool) error {
 	grantViaRequest(deps, ctx, userID(deps, "alice"), app.ID, "user:alice:cmdb-read",
 		model.ReqSubjectUser, userID(deps, "alice"), readActionIDs, nil,
 		"alice 为 cmdb 联合负责人，需要只读权限", "", false)
-	// 6.1 强一致档种子（A6）：给 alice 追加一条 force-remote 只读策略（幂等由调用方环境保证：seed --reset 重建）
-	seedForceRemotePolicy(deps, app.ID, userID(deps, "alice"), readActionIDs)
+// （1.5 T3）强一致档（force-remote）已随投影退役——点查即实时，无前置同步对象
 
 	// 7. 程序身份（M2M）
 	secret := "cloud-mgmt-secret"
@@ -529,19 +525,7 @@ func seedContractRows(deps *api.Deps, appID uint64) {
 	log.Printf("[seed] data contracts ready (host: sla=15s/max=30s — 分钟级新鲜度三态演示；巡检 5s < SLA)")
 }
 
-// seedForceRemotePolicy 强一致档种子（清单 A6 验收：决策日志 reason=force_remote 可查）：
-// alice 只读授权额外打一条 force-remote 标记——与 §5.7 策略分发同一标记合流，
-// 数据级挂接=判定前指纹快查+前置同步（判定主体仍是权限中心）
-func seedForceRemotePolicy(deps *api.Deps, appID uint64, aliceID uint64, actionIDs []uint64) {
-	deps.DB.Create(&model.Policy{
-		AppID: appID, Name: "user:alice:cmdb-read-strong",
-		SubjectType: model.SubjectUser, SubjectID: aliceID,
-		ActionIDs: actionIDs, Effect: model.EffectAllow,
-		Status: model.PolicyActive, Source: model.SourceOwnerGrant,
-		ForceRemote: true,
-	})
-	log.Printf("[seed] force-remote policy for alice (强一致档 reason=force_remote 可查)")
-}
+
 
 func findOrCreateOrg(deps *api.Deps, name string, parentID *uint64) *model.Group {
 	// 幂等：先按 (name, parent_id) 精确查找，避免重复创建
@@ -833,7 +817,7 @@ func refreshAllOrgPaths(deps *api.Deps) {
 // ==================== 富 Demo 数据（v12：应用市场 / 能力市场内容） ====================
 
 // resetDemoData 清空全部 demo 域表并重置自增序列（seed --reset 一键重建）
-// OpenFGA 授权模型/元组独立于这些表，seed 内 EnsureSchema 幂等重建，无需处理
+// （1.5 T3）OpenFGA 已退役——重置仅涉及下列关系表
 func resetDemoData(db *gorm.DB) error {
 	tables := "scope_options, capability_actions, capability_manifests, capability_publish_tasks, " +
 		"revoke_requests, access_requests, approval_tasks, policies, policy_versions, clients, app_owners, apps, actions, " +
@@ -1374,22 +1358,8 @@ func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID,
 		log.Printf("[seed] capability policy warn: %v", err)
 		return
 	}
-	// 数据级限制真实生效：写 OpenFGA instance tuples
-	if len(resScope) > 0 {
-		if err := deps.DataPlane.PublishPolicy(ctx, p); err != nil {
-			log.Printf("[seed] capability policy openfga warn: %v", err)
-		}
-		// 组级授权：OpenFGA 需物化组成员关系（group:X#member → user:xx）才能对成员生效
-		if granteeType == model.GranteeGroup {
-			if members, err := deps.Groups.Members(granteeID); err == nil {
-				for _, m := range members {
-					if err := deps.OFGA.WriteTuple(ctx, "user:"+m.Username, "member", fmt.Sprintf("group:%d", granteeID)); err != nil {
-						log.Printf("[seed] group member tuple warn: %v", err)
-					}
-				}
-			}
-		}
-	}
+	// （1.5 T3）集合式判定=点查行比对（CheckRow）——不再物化 OpenFGA 元组；
+	// 组级授权的成员关系也不再需要物化（主体闭包由 Casbin/策略快照处理）
 }
 
 func toAnyStrings(ss []string) []any {

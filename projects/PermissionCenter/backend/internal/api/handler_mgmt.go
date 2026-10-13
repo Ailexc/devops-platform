@@ -285,10 +285,6 @@ func (d *Deps) mgScope(c *gin.Context) {
 		return
 
 	// --- 同步 ---
-	case path == "/api/v1/sync/cmdb":
-		c.Next() // CMDB 同步：任何登录用户可触发
-		return
-
 	case path == "/api/v1/sync/identity":
 		c.Next() // 身份源同步：任何登录用户可触发
 		return
@@ -351,7 +347,7 @@ func (d *Deps) mgScope(c *gin.Context) {
 	// --- 系统观测：任何登录用户只读（鉴权链路/PEP解析/PIP身份/Agent/分发/同步/缓存/指标/图谱/owner）---
 	case path == "/api/v1/debug/resolve" || path == "/api/v1/debug/pip/:user" ||
 		path == "/api/v1/debug/cache" || path == "/api/v1/debug/cache/clear" ||
-		path == "/api/v1/debug/metrics" || path == "/api/v1/debug/ofga" ||
+		path == "/api/v1/debug/metrics" ||
 		path == "/api/v1/debug/owners" ||
 		path == "/api/v1/agents" || path == "/api/v1/apps/:id/bundles" ||
 		path == "/api/v1/sync-jobs":

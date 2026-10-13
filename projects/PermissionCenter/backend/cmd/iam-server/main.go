@@ -1,8 +1,7 @@
-// iam-server：中心 PDP + 管理 API（判定与控制面 HTTP——后台同步三循环已迁独立进程 cmd/iam-sync，清单 S1）
+// iam-server：中心 PDP + 管理 API（判定与控制面 HTTP——1.5 起后台仅 iam-sync 的 TTL 回收）
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 
@@ -41,17 +40,8 @@ func main() {
 
 	deps := api.NewDeps(cfg, db, cache)
 
-	// 初始化 OpenFGA：store + 授权模型（幂等）
-	// 启动初期 OpenFGA 可能未就绪（容器编排时序），重试直至成功，避免 storeID 为空导致数据级鉴权失效
-	ctx := context.Background()
-	if err := deps.EnsureOpenFGA(ctx); err != nil {
-		log.Printf("[iam-server] openfga init warn: %v（数据级鉴权将降级 fail-closed）", err)
-	} else {
-		log.Println("[iam-server] openfga schema ready")
-	}
-
-	// （S1 迁移）后台同步三循环（worker/patrol/ttl）已迁至独立进程 cmd/iam-sync——
-	// 判定可用性不再被后台任务绑架，本进程此后可独立多副本
+	// （1.5 T3）OpenFGA 数据面与后台同步循环均已退役：数据级=点查权威行（material/CheckRow），
+	// 后台仅存 iam-sync 的 TTL 回收；本进程纯判定/API，可独立多副本
 
 	gin.SetMode(gin.ReleaseMode)
 	r := api.NewRouter(deps)

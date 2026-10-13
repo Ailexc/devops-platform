@@ -341,9 +341,7 @@ func (d *Deps) executeRevoke(rr *model.RevokeRequest, approver uint64, comment s
 	if err := d.Pol.Update(p); err != nil {
 		return err
 	}
-	if p.ResourceScope != nil {
-		d.DataPlane.RevokePolicy(context.Background(), p)
-	}
+	// （1.5 T3）集合式判定=点查行比对（CheckRow），不再物化/撤销 OpenFGA 元组
 	d.bumpAllCaches(nil)
 	d.BundleMgr.Publish(context.Background(), p.AppID)
 	rr.Status = model.RevokeApproved

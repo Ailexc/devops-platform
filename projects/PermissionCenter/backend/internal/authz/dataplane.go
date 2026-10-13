@@ -1,187 +1,37 @@
 package authz
 
 import (
-	"context"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
 	"github.com/xcy/permission-center/internal/model"
-	"github.com/xcy/permission-center/internal/openfga"
 	"github.com/xcy/permission-center/internal/store"
 )
 
-// DataPlane 数据级授权：策略 scope → OpenFGA 关系（Write）+ check/filter
-// 自研翻译/适配层：数据策略（集合式/关系式/属性式）→ OpenFGA 关系与本地求值
+// DataPlane 1.5 数据级判定：范围谓词 × 权威行（点查取材，T2/T3）。
+//
+// 投影机制退役（1.5 T3，方案 §2/§9 #1）：OpenFGA 关系检查、投影存在性前置、
+// 新鲜度门槛（确认制状态机）、force-remote 强一致档均已移除——取材一律点查（material 包），
+// 行实时、不过新鲜度门（无新鲜度税）；上游不可达=点查失败 fail-closed（材料层，非本层）。
 type DataPlane struct {
-	ofga  *openfga.Client
-	res   *store.ResourceRepo
-	users *store.UserRepo
-	grps  *store.GroupRepo
-	clis  *store.AppRepo
-	pol   *store.PolicyRepo
+	pol *store.PolicyRepo
 }
 
-func NewDataPlane(ofga *openfga.Client, res *store.ResourceRepo, users *store.UserRepo, grps *store.GroupRepo, clis *store.AppRepo, pol *store.PolicyRepo) *DataPlane {
-	return &DataPlane{ofga: ofga, res: res, users: users, grps: grps, clis: clis, pol: pol}
-}
+func NewDataPlane(pol *store.PolicyRepo) *DataPlane { return &DataPlane{pol: pol} }
 
-// EnsureSchema 幂等初始化：store + 授权模型
-func (d *DataPlane) EnsureSchema(ctx context.Context) error {
-	if err := d.ofga.EnsureStore(ctx, "iam"); err != nil {
-		return fmt.Errorf("ensure openfga store: %w", err)
-	}
-	return d.ofga.EnsureModel(ctx, openfga.ModelDefs())
-}
-
-// PublishPolicy 数据策略发布：集合式 scope → 写 OpenFGA 关系
-// 关系式/属性式无需物化（动态 Check / Go 求值）
-func (d *DataPlane) PublishPolicy(ctx context.Context, p *model.Policy) error {
-	ids, ok := scopeInstanceIDs(p)
-	if !ok {
-		return nil
-	}
-	subj, err := d.subjectKey(ctx, p)
-	if err != nil {
-		return err
-	}
-	rel := openfga.OpToRelation(scopeOperation(p))
-	insts, err := d.res.InstancesByIDs(ids)
-	if err != nil {
-		return err
-	}
-	model, err := d.res.ModelByCode(scopeModelCode(p))
-	if err != nil {
-		return err
-	}
-	for _, inst := range insts {
-		obj := fmt.Sprintf("%s:%s", model.Code, inst.ExternalID)
-		if err := d.ofga.WriteTuple(ctx, subj, rel, obj); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// RevokePolicy 撤销数据策略：删除对应关系（防关系图膨胀）
-func (d *DataPlane) RevokePolicy(ctx context.Context, p *model.Policy) error {
-	ids, ok := scopeInstanceIDs(p)
-	if !ok {
-		return nil
-	}
-	subj, err := d.subjectKey(ctx, p)
-	if err != nil {
-		return err
-	}
-	rel := openfga.OpToRelation(scopeOperation(p))
-	insts, err := d.res.InstancesByIDs(ids)
-	if err != nil {
-		return err
-	}
-	model, err := d.res.ModelByCode(scopeModelCode(p))
-	if err != nil {
-		return err
-	}
-	for _, inst := range insts {
-		// S6①：错误必须上抛——原实现丢弃返回值，OFGA 瞬断时调用方无从感知失败、
-		// 照样置 status=0 → 过期授权元组永久残留且永不再扫（幽灵授权面）
-		if err := d.ofga.DeleteTuple(ctx, subj, rel, fmt.Sprintf("%s:%s", model.Code, inst.ExternalID)); err != nil {
-			return fmt.Errorf("delete tuple %s#%s@%s: %w", model.Code, inst.ExternalID, subj, err)
-		}
-	}
-	return nil
-}
-
-// PurgeInstanceTuples 实例删除级联清理（清单 A5a）：按对象列出全部关系元组并逐条删除——
-// 已删实例的关系式授权必须同步失效，否则 check-instance 对已删资源仍放行 = 幽灵授权 = 判多红线。
-// （原实现只删 PG 投影行、不碰 OpenFGA——architecture.md §5.4 为设计宣称，本方法补齐实现）
-func (d *DataPlane) PurgeInstanceTuples(ctx context.Context, modelCode, externalID string) error {
-	obj := fmt.Sprintf("%s:%s", modelCode, externalID)
-	tuples, err := d.ofga.ReadTuplesByObject(ctx, obj)
-	if err != nil {
-		return fmt.Errorf("read tuples for %s: %w", obj, err)
-	}
-	for _, t := range tuples {
-		if err := d.ofga.DeleteTuple(ctx, t.User, t.Relation, t.Object); err != nil {
-			return fmt.Errorf("delete tuple %s#%s@%s: %w", t.Object, t.Relation, t.User, err)
-		}
-	}
-	if len(tuples) > 0 {
-		log.Printf("[authz] purge %d tuples for deleted instance %s", len(tuples), obj)
-	}
-	return nil
-}
-
-// CheckInstance 点操作 = Casbin(动作) + OpenFGA Check(实例) / 属性求值
-// 短路：无动作权限不查 OpenFGA。
-// 返回 reason 三态（清单 A6 默认档）："" = 正常判定；"data_missing" = 投影无该记录 →
-// fail-closed 拒单条（记录缺失 ≠ 引擎错误：原实现 condition 分支吞错静默 deny、reason 混在
-// "openfga check" 里，无法区分——本版显式区分供决策日志与验收检索）
-func (d *DataPlane) CheckInstance(ctx context.Context, userKey, actionCode, modelCode, externalID, operation string, matchedPids []string) (bool, string, error) {
-	// 数据存在性前置（fail-closed 三态之"数据缺失"）
-	m, merr := d.res.ModelByCode(modelCode)
-	if merr != nil {
-		return false, "data_missing", nil
-	}
-	inst, ierr := d.res.InstanceByExternal(m.ID, externalID)
-	if ierr != nil {
-		return false, "data_missing", nil
-	}
-	rel := openfga.OpToRelation(operation)
-	obj := fmt.Sprintf("%s:%s", modelCode, externalID)
-	allow := false
-	for _, pid := range matchedPids {
-		if strings.HasPrefix(pid, "role:") || strings.HasPrefix(pid, "gp:") {
-			continue // 角色/组权限定义行无数据 scope
-		}
-		id, err := strconv.ParseUint(pid, 10, 64)
-		if err != nil {
-			continue
-		}
-		p, err := d.pol.ByID(id)
-		if err != nil {
-			continue
-		}
-		if p.ResourceScope == nil {
-			return true, "", nil // 无数据范围 → 动作级放行（全量）
-		}
-		if sc := scopeModelCode(p); sc != "" && sc != modelCode {
-			continue
-		}
-		switch {
-		case p.ResourceScope["instance_ids"] != nil || p.ResourceScope["relation"] != nil:
-			relToUse := rel
-			if p.ResourceScope["relation"] != nil {
-				relToUse, _ = p.ResourceScope["relation"].(string)
-			}
-			ok, err := d.ofga.Check(ctx, userKey, relToUse, obj)
-			if err != nil {
-				return false, "", err
-			}
-			if ok {
-				allow = true
-			}
-		case p.ResourceScope["condition"] != nil:
-			// 属性式：对实例 attributes 求值（判定数据=投影属性；"记录在、属性旧"的判多面
-			// 由 A6 新鲜度门槛 + 巡检收敛 + 强一致档收窄——见清单 2.3.1/附录话术 6）
-			if cond, ok := p.ResourceScope["condition"].(map[string]any); ok {
-				if evalAttrCond(cond, inst.Attributes) {
-					allow = true
-				}
-			}
-		}
-	}
-	return allow, "", nil
-}
-
-// CheckRow v1.5 T2 点查取材判定（方案 §3.2）：行来自通用点查的【权威行】——
-// 不读投影库、不过新鲜度门（点查即实时行，无新鲜度税）。
-// 判定 = 命中 allow 策略的范围谓词（全量 nil / 属性式 condition 对权威行求值 /
-// 集合式 instance_ids·relation 走既有 OpenFGA——投影元组在 T3 前仍有效）。
-// row==nil → data_missing（fail-closed 拒单条）。
-// 返回语义与 CheckInstance 一致：(allow, reason, err)。
+// CheckRow 范围谓词求值（T2 引入，T3 收口为唯一数据级判定路径）：
+//   - ResourceScope=nil → 全量（动作级已放行即放行）
+//   - condition（属性式）→ 对权威行/信封伪行求值（evalAttrCond）
+//   - instance_ids（集合式/勾选实例）→ 点查行 id 与集合比对（1.5 语义：
+//     外部 id 字符串直接比、历史数字项比外部 id 尾号；关系元组引擎已退役，
+//     demo 存量集合为空、无迁移面）
+//   - relation（关系式）→ 预留无入口（方案 §4.5），出现即不匹配
+//
+// userKey 保留为通道合同参数（主体资格由动作级 Casbin 判定，本层不再消费）。
+// row==nil → data_missing（fail-closed 拒单条）。返回语义与旧 CheckInstance 一致。
 func (d *DataPlane) CheckRow(userKey, modelCode, externalID string, row map[string]any, matchedPids []string) (bool, string, error) {
+	_ = userKey
 	if row == nil {
 		return false, "data_missing", nil
 	}
@@ -205,24 +55,14 @@ func (d *DataPlane) CheckRow(userKey, modelCode, externalID string, row map[stri
 			continue
 		}
 		switch {
-		case p.ResourceScope["instance_ids"] != nil || p.ResourceScope["relation"] != nil:
-			// 集合式/关系式：沿用 OpenFGA（元组由既有同步写入，T3 投影下线时一并裁决）
-			relToUse := "view"
-			if p.ResourceScope["relation"] != nil {
-				relToUse, _ = p.ResourceScope["relation"].(string)
-			}
+		case p.ResourceScope["instance_ids"] != nil:
 			if externalID == "" {
 				continue // 创建类无实例，集合式不匹配
 			}
-			ok, err := d.ofga.Check(context.Background(), userKey, relToUse, fmt.Sprintf("%s:%s", modelCode, externalID))
-			if err != nil {
-				return false, "", err
-			}
-			if ok {
+			if instanceSetContains(p.ResourceScope["instance_ids"], externalID) {
 				allow = true
 			}
 		case p.ResourceScope["condition"] != nil:
-			// 属性式：对权威行求值（1.5 点查通道——行实时、字段来自应用方）
 			if cond, ok := p.ResourceScope["condition"].(map[string]any); ok {
 				if evalAttrCond(cond, row) {
 					allow = true
@@ -232,177 +72,54 @@ func (d *DataPlane) CheckRow(userKey, modelCode, externalID string, row map[stri
 	}
 	return allow, "", nil
 }
-// FilterResult filter 结果（含实例集 + 维度级范围条件）
-type FilterResult struct {
-	InstanceIDs    []string       `json:"instance_ids"`
-	ScopeCondition map[string]any `json:"scope_condition,omitempty"` // 维度级范围条件供下游拼接
-}
 
-// Filter 列表 = OpenFGA ListObjects → 允许实例集 + 维度级范围条件
-func (d *DataPlane) Filter(ctx context.Context, userKey, actionCode, modelCode, operation string, matchedPids []string) (*FilterResult, error) {
-	rel := openfga.OpToRelation(operation)
-	set := map[string]bool{}
-	fullAccess := false
-	var dimensionConditions []map[string]any
-
-	for _, pid := range matchedPids {
-		if strings.HasPrefix(pid, "role:") || strings.HasPrefix(pid, "gp:") {
-			continue
+// instanceSetContains 集合成员比对：外部 id 字符串直接比；历史数字项比外部 id 尾号
+// （兼容早期 instance_ids 存投影数字 id 的写法——"host-4" 尾号 4）
+func instanceSetContains(raw any, externalID string) bool {
+	suffix := externalID
+	if i := strings.LastIndex(externalID, "-"); i >= 0 {
+		suffix = externalID[i+1:]
+	}
+	cmp := func(x any) bool {
+		switch t := x.(type) {
+		case string:
+			return t == externalID || t == suffix
+		case float64: // JSONB 数字
+			return fmt.Sprintf("%v", t) == suffix
+		case int:
+			return strconv.Itoa(t) == suffix
+		case uint64:
+			return strconv.FormatUint(t, 10) == suffix
 		}
-		id, err := strconv.ParseUint(pid, 10, 64)
-		if err != nil {
-			continue
-		}
-		p, err := d.pol.ByID(id)
-		if err != nil {
-			continue
-		}
-		if p.ResourceScope == nil {
-			fullAccess = true
-			continue
-		}
-		if m := scopeModelCode(p); m != "" && m != modelCode {
-			continue
-		}
-
-		switch {
-		// 维度/属性级范围（新增维度级 scope）
-		case p.ResourceScope["dimension"] != nil:
-			dim, _ := p.ResourceScope["dimension"].(string)
-			vals, _ := p.ResourceScope["values"].([]any)
-			if dim != "" && len(vals) > 0 {
-				dimensionConditions = append(dimensionConditions, map[string]any{
-					"field":  dim,
-					"op":     "in",
-					"values": vals,
-				})
+		return false
+	}
+	switch v := raw.(type) {
+	case []any:
+		for _, x := range v {
+			if cmp(x) {
+				return true
 			}
-
-		// 集合式/关系式：OpenFGA ListObjects
-		case p.ResourceScope["instance_ids"] != nil || p.ResourceScope["relation"] != nil:
-			relToUse := rel
-			if p.ResourceScope["relation"] != nil {
-				relToUse, _ = p.ResourceScope["relation"].(string)
+		}
+	case []string:
+		for _, x := range v {
+			if x == externalID || x == suffix {
+				return true
 			}
-			objs, err := d.ofga.ListObjects(ctx, userKey, relToUse, modelCode)
-			if err != nil {
-				return nil, err
-			}
-			for _, o := range objs {
-				set[o] = true
+		}
+	case []uint64:
+		for _, x := range v {
+			if strconv.FormatUint(x, 10) == suffix {
+				return true
 			}
 		}
 	}
-
-	if fullAccess {
-		insts, err := d.allInstances(modelCode)
-		if err != nil {
-			return nil, err
-		}
-		for _, o := range insts {
-			set[o] = true
-		}
-	}
-
-	out := make([]string, 0, len(set))
-	for o := range set {
-		out = append(out, o)
-	}
-
-	result := &FilterResult{InstanceIDs: out}
-	// 合并维度级条件为 AND 逻辑
-	if len(dimensionConditions) > 0 {
-		result.ScopeCondition = map[string]any{
-			"logic": "and",
-			"rules": dimensionConditions,
-		}
-	}
-	return result, nil
+	return false
 }
 
-// 主体 key（OpenFGA）：user:username / group:{id}#member / service:{client_id}
-func (d *DataPlane) subjectKey(ctx context.Context, p *model.Policy) (string, error) {
-	switch p.SubjectType {
-	case model.SubjectUser:
-		u, err := d.users.ByID(p.SubjectID)
-		if err != nil {
-			return "", err
-		}
-		return "user:" + u.Username, nil
-	case model.SubjectGroup:
-		return fmt.Sprintf("group:%d#member", p.SubjectID), nil
-	case model.SubjectService:
-		c, err := d.clis.ClientByRowID(p.SubjectID)
-		if err != nil {
-			return "", err
-		}
-		return "service:" + c.ClientID, nil
-	default:
-		return "", fmt.Errorf("unsupported subject type")
-	}
-}
-
-func (d *DataPlane) allInstances(modelCode string) ([]string, error) {
-	m, err := d.res.ModelByCode(modelCode)
-	if err != nil {
-		return nil, err
-	}
-	insts, _, err := d.res.Instances(m.ID, 0, 10000)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]string, 0, len(insts))
-	for _, i := range insts {
-		out = append(out, fmt.Sprintf("%s:%s", modelCode, i.ExternalID))
-	}
-	return out, nil
-}
-
+// scopeModelCode 策略数据范围绑定的模型域（scope["model"]，空=不限域）
 func scopeModelCode(p *model.Policy) string {
 	if v, ok := p.ResourceScope["model"].(string); ok {
 		return v
 	}
 	return ""
-}
-
-// scopeInstanceIDs 兼容 []uint64（Go 构造）与 []any（JSON 反序列化）
-func scopeInstanceIDs(p *model.Policy) ([]uint64, bool) {
-	raw, ok := p.ResourceScope["instance_ids"]
-	if !ok {
-		return nil, false
-	}
-	var ids []uint64
-	switch v := raw.(type) {
-	case []uint64:
-		ids = v
-	case []any:
-		for _, x := range v {
-			if n, err := toUint(x); err == nil {
-				ids = append(ids, n)
-			}
-		}
-	default:
-		return nil, false
-	}
-	return ids, len(ids) > 0
-}
-
-func scopeOperation(p *model.Policy) string {
-	if v, ok := p.ResourceScope["operation"].(string); ok {
-		return v
-	}
-	return "read"
-}
-
-func toUint(v any) (uint64, error) {
-	switch n := v.(type) {
-	case float64:
-		return uint64(n), nil
-	case int:
-		return uint64(n), nil
-	case string:
-		return strconv.ParseUint(n, 10, 64)
-	default:
-		return 0, fmt.Errorf("cannot convert %T", v)
-	}
 }

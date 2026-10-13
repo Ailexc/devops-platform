@@ -31,22 +31,7 @@ func (d *Deps) listResourceInstances(c *gin.Context) {
 	c.JSON(200, gin.H{"items": is, "total": total})
 }
 
-func (d *Deps) syncCMDB(c *gin.Context) {
-	// 资源归属应用：demo 中资源模型由 cmdb 提供（"我接入了谁"按此展示对方数据模型）
-	if a, err := d.Apps.ByCode("cmdb"); err == nil {
-		d.CMDBConnector.SetAppID(a.ID)
-	}
-	if err := d.CMDBConnector.SyncModels(c.Request.Context()); err != nil {
-		c.JSON(502, gin.H{"error": err.Error()})
-		return
-	}
-	if err := d.CMDBConnector.SyncInstances(c.Request.Context()); err != nil {
-		c.JSON(502, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(200, gin.H{"ok": true})
-}
-
+// （1.5 T3）syncCMDB 运行期同步已下线——资源目录=seed 时快照（CMDBConnector 仅供 seed 期目录取数）
 func (d *Deps) syncIdentity(c *gin.Context) {
 	if err := d.IdentityConn.Sync(c.Request.Context()); err != nil {
 		c.JSON(502, gin.H{"error": err.Error()})

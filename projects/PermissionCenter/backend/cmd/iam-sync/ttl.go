@@ -13,7 +13,7 @@ import (
 // 既无判定过滤也无回收，"直授必须带 TTL"是空话；本循环补"回收语义"半段）：
 //
 //   - 判定侧过滤由 ActiveByApp 查询承担（expires_at IS NULL OR > now → builder/enforcer/matchedPids/bundle 全链源头排除）
-//   - 本循环：置状态失效（status=0，权限列表不再展示）+ 清 OpenFGA 关系元组（复用 RevokePolicy，幂等）
+//   - 本循环：置状态失效（status=0，权限列表不再展示）——（1.5 T3）集合式判定=点查行比对，无元组需清
 //   - agent bundle 重发布（旧快照含过期策略 → Publish 重建）
 //   - 周期 60s；配合 builder 缓存（PolicyCacheTTL=30s）→ 过期后判定最长 ~90s 内完全消失
 func ttlSweepLoop(ctx context.Context, deps *api.Deps) {
@@ -34,12 +34,7 @@ func ttlSweepLoop(ctx context.Context, deps *api.Deps) {
 				}
 				for i := range expired {
 					p := &expired[i]
-					if err := deps.DataPlane.RevokePolicy(ctx, p); err != nil {
-						// S6②：出错不置 status=0——否则 OFGA 瞬断窗口下元组残留 + status 已死
-						// → 查询条件 status=active 永远捞不到它 = 永不再扫；保持 active 下轮重扫
-						log.Printf("[ttl] revoke %s: %v（OFGA 失败——保持 active 下轮重扫）", p.Name, err)
-						continue
-					}
+				// （1.5 T3）集合式判定=点查行比对、无元组需撤销——回收仅置 status=0（幂等）
 					// S6③：status 守卫（防并发双副本重复回收）——已回收的影响行数=0 直接跳过
 					res := deps.DB.Model(&model.Policy{}).
 						Where("id = ? AND status = ?", p.ID, model.PolicyActive).

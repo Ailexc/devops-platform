@@ -111,8 +111,7 @@ func NewRouter(d *Deps) *gin.Engine {
 		// 资源索引
 		mg.GET("/resource-models", d.listResourceModels)
 		mg.GET("/resource-models/:id/instances", d.listResourceInstances)
-		// 同步
-		mg.POST("/sync/cmdb", d.syncCMDB)
+		// 同步（1.5：CMDB 运行期同步已下线——资源目录=seed 时快照；身份同步保留）
 		mg.POST("/sync/identity", d.syncIdentity)
 		// 申请/审批
 		mg.POST("/requests", d.submitRequest)
@@ -130,7 +129,6 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.GET("/debug/cache", d.debugCache)
 		mg.POST("/debug/cache/clear", d.debugCacheClear)
 		mg.GET("/debug/metrics", d.debugMetrics)
-		mg.GET("/debug/ofga", d.debugOfga)
 		mg.GET("/debug/owners", d.debugOwners)
 		mg.GET("/agents", d.listAgents)
 		mg.GET("/apps/:id/bundles", d.listBundles)
@@ -144,10 +142,8 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.GET("/audit/my-requests", d.auditMyRequests)
 		mg.GET("/audit/my-approvals", d.auditMyApprovals)
 		mg.GET("/audit/my-publishes", d.auditMyPublishes)
-		// 数据契约与新鲜度观测（清单 A2/A4/A5b：契约时钟 / 巡检失败历史 / 手动触发深对账）
+		// 数据契约登记（1.5：契约 fields=判定字段清单；巡检/深对账已随投影退役下线）
 		mg.GET("/sync/contracts", d.listDataContracts)
-		mg.GET("/sync/patrol-logs", d.listPatrolLogs)
-		mg.POST("/sync/reconcile", d.reconcileNow)
 		// 程序化兜底
 		mg.POST("/apps/:id/claim", d.ClaimApp)
 		mg.POST("/owner-check", d.CheckOwnerResponsive)
@@ -159,8 +155,6 @@ func NewRouter(d *Deps) *gin.Engine {
 	az := r.Group("/v1/authz", pepMiddleware(d))
 	{
 		az.POST("/check", d.handleCheck)
-		az.POST("/check-instance", d.handleCheckInstance)
-		az.POST("/filter", d.handleFilter)
 		// T2 带体调用：创建 / 存量 body-id / fetch_source 的供材通道（业务持有请求体，材料随请求带到判定点）
 		az.POST("/check-material", d.handleCheckMaterial)
 	}

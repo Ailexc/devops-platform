@@ -1,6 +1,6 @@
 // iam-agent：本地 PDP agent（sidecar，内嵌 Casbin）
 // 借鉴 OPA bundle 思想：轮询拉取策略包 → 校验 checksum → 原子激活 → 本地动作级决策
-// 数据级请求回源中心 OpenFGA；force_remote 高风险动作回源中心强一致
+// （1.5 T3）数据级/强一致档已随投影退役——本地仅动作级判定，失配/无 bundle 回源中心
 package main
 
 import (
@@ -27,7 +27,6 @@ type BundleContent struct {
 	Groupings   [][]string        `json:"groupings"`
 	CasbinModel string            `json:"casbin_model"`
 	Users       map[string]string `json:"users"`
-	ForceRemote []string          `json:"force_remote"`
 }
 
 type PolicyEntry struct {
@@ -183,7 +182,7 @@ func (a *agent) report(ctx context.Context) {
 	}
 }
 
-// handleLocalCheck 本地动作级决策；force_remote 回源中心；数据级回源中心
+// handleLocalCheck 本地动作级决策；无 bundle/失配回源中心
 func (a *agent) handleLocalCheck(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		User   string `json:"user"`
@@ -203,15 +202,6 @@ func (a *agent) handleLocalCheck(w http.ResponseWriter, r *http.Request) {
 		// fail-closed：无 bundle → 回源中心
 		a.relayRemote(w, req)
 		return
-	}
-
-	// force_remote：高风险动作强制回源
-	for _, fr := range content.ForceRemote {
-		if fr == req.Action {
-			a.remoteCnt++
-			a.relayRemote(w, req)
-			return
-		}
 	}
 
 	sub, ok := content.Users[req.User]
@@ -234,7 +224,7 @@ func (a *agent) handleLocalCheck(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `{"decision":"deny","code":"NO_PERMISSION","channel":"local"}`)
 }
 
-// relayRemote 回源中心 PDP（agent 无 bundle / force_remote）
+// relayRemote 回源中心 PDP（agent 无 bundle 或本地失配时）
 func (a *agent) relayRemote(w http.ResponseWriter, req struct {
 	User   string `json:"user"`
 	App    string `json:"app"`

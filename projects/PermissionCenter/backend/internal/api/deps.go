@@ -7,7 +7,6 @@ import (
 	"github.com/xcy/permission-center/internal/bundle"
 	"github.com/xcy/permission-center/internal/config"
 	"github.com/xcy/permission-center/internal/material"
-	"github.com/xcy/permission-center/internal/openfga"
 	"github.com/xcy/permission-center/internal/store"
 	"github.com/xcy/permission-center/internal/sync"
 	"gorm.io/gorm"
@@ -36,7 +35,6 @@ type Deps struct {
 	Checker   *authz.Checker
 	DataPlane *authz.DataPlane
 	Builder   *authz.Builder
-	OFGA      *openfga.Client
 
 	// Mat 通用点查取材客户端（T2 §3.1：中心回调应用取权威行，行用完即丢）
 	Mat *material.Client
@@ -45,8 +43,6 @@ type Deps struct {
 	CMDBConnector *sync.CMDBConnector
 	IdentityConn  *sync.IdentityConnector
 	BundleMgr     *bundle.Manager
-	// Patrol 巡检 + 深对账服务（清单 A4/A5b；API 手动触发 /sync/reconcile 与后台定时循环共用单实例）
-	Patrol *sync.PatrolService
 }
 
 // NewDeps 组装全部依赖
@@ -64,18 +60,15 @@ func NewDeps(cfg *config.Config, db *gorm.DB, cache *store.Cache) *Deps {
 
 	jwt := auth.NewManager(cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
 
-	ofga := openfga.NewClient(cfg.OpenFGAServerURL)
 	builder := authz.NewBuilder(cache, apps, users, groups, access, pol, apps)
 	enforcer, _ := authz.NewEnforcer()
 	checker := authz.NewChecker(cfg, cache, builder, enforcer, users, apps, pol, syncs)
-	dataPlane := authz.NewDataPlane(ofga, res, users, groups, apps, pol)
+	dataPlane := authz.NewDataPlane(pol)
 
 	bundleMgr := bundle.NewManager(syncs, pol, access, apps, users, groups, cache)
 
+	// CMDBConnector：仅 seed 期目录取数（1.5——资源目录=接入时快照；运行期同步管道已下线）
 	cmdbConn := sync.NewCMDBConnector(cfg.CMDBBaseURL, res, syncs)
-	// 巡检周期 10% 作增量水位重叠窗口（回拨兜两侧时钟偏差，清单 A4）
-	overlap := cfg.PatrolInterval / 10
-	patrol := sync.NewPatrolService(contracts, res, cmdbConn, syncs, overlap, dataPlane.PurgeInstanceTuples)
 
 	return &Deps{
 		Cfg:           cfg,
@@ -95,12 +88,10 @@ func NewDeps(cfg *config.Config, db *gorm.DB, cache *store.Cache) *Deps {
 		Checker:       checker,
 		DataPlane:     dataPlane,
 		Builder:       builder,
-		OFGA:          ofga,
 		Mat:           material.NewClient(),
 		OpenAPISyncer: sync.NewOpenAPISyncer(access, syncs),
 		CMDBConnector: cmdbConn,
 		IdentityConn:  sync.NewIdentityConnector(cfg.IdentityBaseURL, users, groups, syncs),
 		BundleMgr:     bundleMgr,
-		Patrol:        patrol,
 	}
 }

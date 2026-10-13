@@ -18,7 +18,6 @@ type policyReq struct {
 	ActionIDs     []uint64       `json:"action_ids"`
 	ResourceScope map[string]any `json:"resource_scope"`
 	Conditions    map[string]any `json:"conditions"`
-	ForceRemote   bool           `json:"force_remote"`
 }
 
 func (d *Deps) listPolicies(c *gin.Context) {
@@ -51,7 +50,6 @@ func (d *Deps) createPolicy(c *gin.Context) {
 		ActionIDs     []uint64       `json:"action_ids"`
 		ResourceScope map[string]any `json:"resource_scope"`
 		Conditions    map[string]any `json:"conditions"`
-		ForceRemote   bool           `json:"force_remote"`
 		Reason        string         `json:"reason"` // 授权理由（必填，"为什么给我授权"）
 		ExpiresAt     *time.Time     `json:"expires_at"`
 	}
@@ -88,7 +86,7 @@ func (d *Deps) createPolicy(c *gin.Context) {
 
 	// 风险：写操作/数据范围/高权限 → 中或高；默认中（授权需双方确认，不给低风险自动）
 	risk := int16(model.RiskMedium)
-	if req.ForceRemote || req.ResourceScope != nil {
+	if req.ResourceScope != nil {
 		risk = model.RiskHigh
 	}
 
@@ -101,7 +99,7 @@ func (d *Deps) createPolicy(c *gin.Context) {
 		Content: map[string]any{
 			"name": req.Name, "effect": req.Effect, "action_ids": req.ActionIDs,
 			"resource_scope": req.ResourceScope, "conditions": req.Conditions,
-			"force_remote": req.ForceRemote, "subject_type": req.SubjectType, "subject_id": req.SubjectID,
+			"subject_type": req.SubjectType, "subject_id": req.SubjectID,
 		},
 		Reason:    req.Reason,
 		RiskLevel: risk,
@@ -184,16 +182,8 @@ func (d *Deps) publishPolicy(c *gin.Context) {
 		return
 	}
 
-	// 3. 数据策略 → OpenFGA 关系（Write）
-	if p.ResourceScope != nil {
-		if p.Status == model.PolicyActive {
-			d.DataPlane.PublishPolicy(c.Request.Context(), p)
-		} else {
-			d.DataPlane.RevokePolicy(c.Request.Context(), p)
-		}
-	}
-
 	// 4. 缓存失效 + bundle 生成（动作级）
+	// （1.5 T3）集合式判定=点查行比对（CheckRow），不再物化/撤销 OpenFGA 元组
 	d.bumpAllCaches(c)
 	if _, err := d.BundleMgr.Publish(c.Request.Context(), p.AppID); err != nil {
 		c.JSON(500, gin.H{"error": "bundle publish: " + err.Error()})

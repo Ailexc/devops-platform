@@ -39,8 +39,6 @@ type BundleContent struct {
 	CasbinModel  string        `json:"casbin_model"`
 	// Users username → 主体 key（agent 本地解析：alice → u:2）
 	Users map[string]string `json:"users"`
-	// ForceRemote 高风险动作：agent 本地命中但标记为强制回源中心
-	ForceRemote []string `json:"force_remote"`
 }
 
 type PolicyEntry struct {
@@ -131,8 +129,7 @@ func (m *Manager) build(ctx context.Context, app *model.App) (*BundleContent, er
 	}
 	userName := map[uint64]string{}
 	clientID := map[uint64]string{}
-	users := map[string]string{} // username → u:{id}（agent 本地解析）
-	var forceRemote []string
+	users := map[string]string{} // username → u:{id}（agent 解析）
 
 	// 组关系
 	var groupings [][]string
@@ -158,13 +155,6 @@ func (m *Manager) build(ctx context.Context, app *model.App) (*BundleContent, er
 	for _, p := range policies {
 		if p.SubjectType == model.SubjectUser {
 			userIDs[p.SubjectID] = true
-		}
-		if p.ForceRemote {
-			for _, aid := range p.ActionIDs {
-				if code, ok := actionCode[aid]; ok {
-					forceRemote = append(forceRemote, code)
-				}
-			}
 		}
 	}
 	for id := range userIDs {
@@ -233,7 +223,6 @@ func (m *Manager) build(ctx context.Context, app *model.App) (*BundleContent, er
 		Groupings:   groupings,
 		CasbinModel: authz.CasbinModel,
 		Users:       users,
-		ForceRemote: forceRemote,
 	}, nil
 }
 

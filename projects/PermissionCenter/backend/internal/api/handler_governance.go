@@ -459,9 +459,7 @@ func (d *Deps) fulfillCustomRequest(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	if scope != nil {
-		d.DataPlane.PublishPolicy(c.Request.Context(), p)
-	}
+	// （1.5 T3）集合式判定=点查行比对（CheckRow），不再物化 OpenFGA 元组
 	if err := d.DB.Save(&r).Error; err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
@@ -897,9 +895,7 @@ func (d *Deps) grantFromRequest(c *gin.Context, r *model.AccessRequest, approver
 	if tplID, ok := r.Items["template_id"].(float64); ok && tplID > 0 {
 		d.Tpls.IncApply(uint64(tplID))
 	}
-	if scope != nil {
-		d.DataPlane.PublishPolicy(c.Request.Context(), p)
-	}
+	// （1.5 T3）集合式判定=点查行比对（CheckRow），不再物化 OpenFGA 元组
 	d.bumpAllCaches(c)
 	d.BundleMgr.Publish(c.Request.Context(), r.AppID)
 	return nil

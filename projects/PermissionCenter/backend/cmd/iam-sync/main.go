@@ -1,10 +1,8 @@
-// iam-sync：同步组件独立进程（清单 S1——与判定进程进程级隔离）
-//
-// 承接原 iam-server 进程内三后台循环：CMDB 事件消费（worker）+ 数据契约巡检/深对账（patrol）
-// + 策略 TTL 到期回收（ttl）。设计要点（清单 v1.1）：
+// iam-sync：同步组件独立进程（1.5 T3 后仅存 TTL 回收——CMDB 事件 worker 与巡检/深对账已随
+// 投影机制退役下线；策略 TTL 到期回收继续在此自治运行）。设计要点（清单 v1.1）：
 //   - 逐轮 recover：panic 不杀进程、循环不静默死亡（外层）+ 单活锁 defer 释放（内层）
 //   - signal.NotifyContext 优雅退出（原全仓无 signal、ctx 永不取消）
-//   - 单活锁（S4）：三把锁覆盖四执行点（启动轮/patrol tick/recon tick/ttl tick）
+//   - 单活锁：ttl tick 抢锁执行（多副本仅一活）
 //   - healthz 仅容器内网（S7：compose 禁发布宿主口——宿主 8090 已被 devops-gateway 占用、scale 前提）
 package main
 
@@ -40,19 +38,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// 写路径必须 schema（删除级联/关系写入）——与判定进程共用同一装配步骤（抽至 internal/api）
-	if err := deps.EnsureOpenFGA(ctx); err != nil {
-		log.Printf("[iam-sync] openfga init warn: %v（删除级联将如实上报失败、TTL 回收保持 active 重扫——S6 语义）", err)
-	} else {
-		log.Println("[iam-sync] openfga schema ready")
-	}
-
+	// （1.5 T3）OpenFGA 数据面已退役——本进程仅存 TTL 回收循环（投影同步管道已下线）
 	loops := []struct {
 		name string
 		run  func(context.Context, *api.Deps)
 	}{
-		{"worker", consumeCMDBEvents},
-		{"patrol", patrolLoop},
 		{"ttl", ttlSweepLoop},
 	}
 	var wg sync.WaitGroup
@@ -67,11 +57,10 @@ func main() {
 	// healthz：仅容器内网监听（S7）
 	go runHealthz(cfg.SyncHealthAddr)
 
-	log.Printf("[iam-sync] started（loops=worker/patrol/ttl patrol=%v reconcile=%v healthz=%s）",
-		cfg.PatrolInterval, cfg.ReconcileInterval, cfg.SyncHealthAddr)
+	log.Printf("[iam-sync] started（loops=ttl healthz=%s）", cfg.SyncHealthAddr)
 
 	<-ctx.Done()
-	log.Println("[iam-sync] ctx canceled——等待循环退出（worker block ≤2s、锁内执行等本轮返回）")
+		log.Println("[iam-sync] ctx canceled——等待 TTL 循环退出（锁内执行等本轮返回）")
 	done := make(chan struct{})
 	go func() { wg.Wait(); close(done) }()
 	select {
