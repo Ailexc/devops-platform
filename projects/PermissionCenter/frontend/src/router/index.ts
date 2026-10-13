@@ -18,6 +18,7 @@ const routes = [
       { path: 'apps', name: 'apps', component: () => import('../views/Apps.vue'), meta: { title: '应用管理' } },
       { path: 'apps/register', name: 'app-register', component: () => import('../views/AppRegister.vue'), meta: { title: '注册应用', crumb: [{ title: '应用管理', path: '/apps' }, { title: '注册应用' }] } },
       { path: 'apps/:id', name: 'app-detail', component: () => import('../views/AppDetail.vue'), meta: { title: '应用详情', crumb: [{ title: '应用管理', path: '/apps' }, { title: '应用详情' }] } },
+      { path: 'apps/:id/routes', name: 'route-table', component: () => import('../views/RouteTable.vue'), meta: { title: '路由表', crumb: [{ title: '应用管理', path: '/apps' }, { title: '路由表' }] } },
       { path: 'apps/:id/capabilities/:cid', name: 'capability-editor', component: () => import('../views/CapabilityEditor.vue'), meta: { title: '能力详情', crumb: [{ title: '能力管理', path: '/capabilities' }, { title: '能力详情' }] } },
       { path: 'apps/:id/capabilities/:cid/authz', name: 'capability-authz', component: () => import('../views/CapabilityAuthz.vue'), meta: { title: '授权管理', crumb: [{ title: '能力管理', path: '/capabilities' }, { title: '授权管理' }] } },
       { path: 'capabilities', name: 'capabilities', component: () => import('../views/Capabilities.vue'), meta: { title: '能力管理' } },

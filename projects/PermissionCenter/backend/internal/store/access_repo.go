@@ -41,7 +41,9 @@ func (r *AccessRepo) UpsertAction(a *model.Action) error {
 	if a.RespExample != "" {
 		existing.RespExample = a.RespExample
 	}
-	return r.db.Save(&existing).Error
+	// v1.5：回填既有行（含 ID）——调用方（如待确认落表）需要真实主键，否则拿到 ID=0
+	*a = existing
+	return r.db.Save(a).Error
 }
 
 // Actions 应用的权限点清单（排除通用接口路由：PEP 提示，非可授予权限点；排除归档=可查不可用）

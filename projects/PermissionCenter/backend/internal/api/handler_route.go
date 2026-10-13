@@ -257,6 +257,21 @@ func (d *Deps) confirmPending(c *gin.Context) {
 	if a.RW != "read" && a.RW != "write" {
 		a.RW = sync.OperationRW(parts[2])
 	}
+	// 与导入同款撞车拦截：同路由挂多码 / 同码挂多路由（防重复落表产生歧义路由）
+	acts, _ := d.Access.AllActions(appID)
+	for _, prev := range acts {
+		sameRoute := strings.EqualFold(prev.Method, a.Method) && prev.Path == a.Path
+		if sameRoute && prev.Code != code {
+			c.JSON(409, gin.H{"error": "route_code_conflict",
+				"hint": "该路由已挂动作码 " + prev.Code + "——归档旧码或改走迁移"})
+			return
+		}
+		if prev.Code == code && !sameRoute {
+			c.JSON(409, gin.H{"error": "code_route_conflict",
+				"hint": "动作码已挂载 " + prev.Method + " " + prev.Path})
+			return
+		}
+	}
 	if err := d.Access.UpsertAction(a); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return

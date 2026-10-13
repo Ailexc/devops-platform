@@ -3,6 +3,7 @@
     <PageHeader :title="`${appIcon} ${app.name}`" :desc="`${app.code} · ${app.type === 1 ? 'API' : '数据'} · 负责人 ${primaryOwner?.display_name || primaryOwner?.username || '—'} · v${appDetail?.app?.version || '—'}`">
       <template #actions>
         <button class="btn btn-ghost" @click="sync" :disabled="syncing">同步权限点</button>
+        <router-link :to="`/apps/${$route.params.id}/routes`" class="btn btn-ghost">🧭 路由表（动作码登记）→</router-link>
         <router-link :to="`/capabilities?app=${app.code}`" class="btn btn-ghost">查看该应用的能力 →</router-link>
       </template>
     </PageHeader>
