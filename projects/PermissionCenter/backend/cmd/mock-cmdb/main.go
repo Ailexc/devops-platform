@@ -123,6 +123,65 @@ func main() {
 
 	r := gin.Default()
 	r.GET("/healthz", func(g *gin.Context) { g.JSON(200, gin.H{"status": "ok"}) })
+
+	// v1.5 T2 通用点查回查端点（§3.1 "一系统一约定"）：按 (model, id) 返回权威行。
+	// 凭证=presence 轻校验（mock 演示通道存在性；真实应用=M2M 严格比对）。行=内存实时数据，无投影无落库。
+	r.POST("/__perm/query", func(g *gin.Context) {
+		if g.GetHeader("X-Perm-Query-Token") == "" {
+			g.JSON(401, gin.H{"error": "X-Perm-Query-Token required"})
+			return
+		}
+		var req struct {
+			Model string `json:"model"`
+			ID    string `json:"id"`
+		}
+		if err := g.ShouldBindJSON(&req); err != nil {
+			g.JSON(400, gin.H{"error": "bad body"})
+			return
+		}
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+		m, ok := c.models[req.Model]
+		if !ok {
+			g.JSON(404, gin.H{"error": "model not found"})
+			return
+		}
+		// id 形态兼容："<model>-<n>"（external_id 同构）/ 纯数字 / 实例名
+		var inst *Instance
+		if strings.HasPrefix(req.ID, req.Model+"-") {
+			if n, err := strconv.ParseUint(strings.TrimPrefix(req.ID, req.Model+"-"), 10, 64); err == nil {
+				inst = m.Instances[n]
+			}
+		}
+		if inst == nil {
+			if n, err := strconv.ParseUint(req.ID, 10, 64); err == nil {
+				inst = m.Instances[n]
+			}
+		}
+		if inst == nil {
+			for _, it := range m.Instances {
+				if it.Name == req.ID {
+					inst = it
+					break
+				}
+			}
+		}
+		if inst == nil {
+			g.JSON(404, gin.H{"error": "row not found"})
+			return
+		}
+		row := map[string]any{}
+		for k, v := range inst.Attributes {
+			row[k] = v
+		}
+		row["id"] = fmt.Sprintf("%s-%d", req.Model, inst.ID)
+		row["name"] = inst.Name
+		row["model"] = req.Model
+		if inst.OwnerID != nil {
+			row["owner_id"] = *inst.OwnerID
+		}
+		g.JSON(200, gin.H{"row": row})
+	})
 	r.GET("/openapi.json", func(g *gin.Context) { g.Data(200, "application/json", openapiJSON()) })
 
 	// A3 集合指纹端点（数据契约算法菜单 L2 的发布方侧实现，实施清单 A3）

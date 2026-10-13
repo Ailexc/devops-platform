@@ -537,3 +537,32 @@ func (d *Deps) setRouteArchived(c *gin.Context, status string) {
 	v, _ := d.Access.BumpRouteVersion(appID, status, note, d.currentUserID(c))
 	c.JSON(200, gin.H{"ok": true, "status": status, "version": v})
 }
+
+// setPermQuery 通用点查配置（T2 §3.1 应用注册）：回查地址（系统内部地址不过网关=零豁免）+ M2M 只读凭证
+func (d *Deps) setPermQuery(c *gin.Context) {
+	appID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	if _, err := d.Apps.ByID(appID); err != nil {
+		c.JSON(404, gin.H{"error": "app not found"})
+		return
+	}
+	var body struct {
+		URL   string `json:"url"`
+		Token string `json:"token"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(400, gin.H{"error": "bad body"})
+		return
+	}
+	if body.URL != "" && !strings.HasPrefix(body.URL, "http://") && !strings.HasPrefix(body.URL, "https://") {
+		c.JSON(400, gin.H{"error": "回查地址须为 http(s) 系统内部地址"})
+		return
+	}
+	if err := d.DB.Model(&model.App{}).Where("id = ?", appID).Updates(map[string]any{
+		"perm_query_url": body.URL, "perm_query_token": body.Token,
+	}).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	app, _ := d.Apps.ByID(appID)
+	c.JSON(200, gin.H{"app": app})
+}

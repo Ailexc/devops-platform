@@ -58,6 +58,8 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.POST("/apps/:id/routes/:rid/restore", d.restoreRoute)
 		mg.POST("/apps/:id/pending-routes/:pid/confirm", d.confirmPending)
 		mg.POST("/apps/:id/pending-routes/:pid/discard", d.discardPending)
+		// T2 通用点查配置（§3.1 应用注册：回查地址+M2M 凭证，owner）
+		mg.PUT("/apps/:id/perm-query", d.setPermQuery)
 		// 能力声明（L1，仅 owner）
 		mg.GET("/apps/:id/capabilities", d.listCapabilities)
 		mg.POST("/apps/:id/capabilities", d.createCapability)
@@ -159,6 +161,8 @@ func NewRouter(d *Deps) *gin.Engine {
 		az.POST("/check", d.handleCheck)
 		az.POST("/check-instance", d.handleCheckInstance)
 		az.POST("/filter", d.handleFilter)
+		// T2 带体调用：创建 / 存量 body-id / fetch_source 的供材通道（业务持有请求体，材料随请求带到判定点）
+		az.POST("/check-material", d.handleCheckMaterial)
 	}
 
 	// ---- 网关回调（Traefik forwardAuth → PEP→PDP，请求→action 映射）----

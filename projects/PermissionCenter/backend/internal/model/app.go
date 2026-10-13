@@ -22,6 +22,10 @@ type App struct {
 	// v12：应用元数据板块 —— 网络信息（Q5）与鉴权方式（D4，展示声明）
 	NetInfo JSONMap `gorm:"type:jsonb" json:"net_info"` // 云/账号/区域/VPC/子网/安全组/容器/健康检查接口
 	Auth    JSONAny `gorm:"type:jsonb" json:"auth"`     // 鉴权方式列表 [{icon,name,type,strength,desc,meta}]
+	// v1.5 T2 通用点查约定（§3.1 应用注册一系统一约定，标配必配）：
+	// 回查地址走【系统内部地址】不过网关（中心→业务回调不经网关=零豁免需求）；凭证=M2M 只读
+	PermQueryURL   string `gorm:"size:512" json:"perm_query_url"`
+	PermQueryToken string `gorm:"size:128" json:"perm_query_token,omitempty"`
 }
 
 // Client 程序身份（M2M）：client_id + secret（bcrypt 哈希）

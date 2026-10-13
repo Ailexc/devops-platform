@@ -175,6 +175,63 @@ func (d *DataPlane) CheckInstance(ctx context.Context, userKey, actionCode, mode
 	return allow, "", nil
 }
 
+// CheckRow v1.5 T2 点查取材判定（方案 §3.2）：行来自通用点查的【权威行】——
+// 不读投影库、不过新鲜度门（点查即实时行，无新鲜度税）。
+// 判定 = 命中 allow 策略的范围谓词（全量 nil / 属性式 condition 对权威行求值 /
+// 集合式 instance_ids·relation 走既有 OpenFGA——投影元组在 T3 前仍有效）。
+// row==nil → data_missing（fail-closed 拒单条）。
+// 返回语义与 CheckInstance 一致：(allow, reason, err)。
+func (d *DataPlane) CheckRow(userKey, modelCode, externalID string, row map[string]any, matchedPids []string) (bool, string, error) {
+	if row == nil {
+		return false, "data_missing", nil
+	}
+	allow := false
+	for _, pid := range matchedPids {
+		if strings.HasPrefix(pid, "role:") || strings.HasPrefix(pid, "gp:") {
+			continue // 角色/组权限定义行无数据 scope
+		}
+		id, err := strconv.ParseUint(pid, 10, 64)
+		if err != nil {
+			continue
+		}
+		p, err := d.pol.ByID(id)
+		if err != nil {
+			continue
+		}
+		if p.ResourceScope == nil {
+			return true, "", nil // 无数据范围 → 动作级放行（全量）
+		}
+		if sc := scopeModelCode(p); sc != "" && sc != modelCode {
+			continue
+		}
+		switch {
+		case p.ResourceScope["instance_ids"] != nil || p.ResourceScope["relation"] != nil:
+			// 集合式/关系式：沿用 OpenFGA（元组由既有同步写入，T3 投影下线时一并裁决）
+			relToUse := "view"
+			if p.ResourceScope["relation"] != nil {
+				relToUse, _ = p.ResourceScope["relation"].(string)
+			}
+			if externalID == "" {
+				continue // 创建类无实例，集合式不匹配
+			}
+			ok, err := d.ofga.Check(context.Background(), userKey, relToUse, fmt.Sprintf("%s:%s", modelCode, externalID))
+			if err != nil {
+				return false, "", err
+			}
+			if ok {
+				allow = true
+			}
+		case p.ResourceScope["condition"] != nil:
+			// 属性式：对权威行求值（1.5 点查通道——行实时、字段来自应用方）
+			if cond, ok := p.ResourceScope["condition"].(map[string]any); ok {
+				if evalAttrCond(cond, row) {
+					allow = true
+				}
+			}
+		}
+	}
+	return allow, "", nil
+}
 // FilterResult filter 结果（含实例集 + 维度级范围条件）
 type FilterResult struct {
 	InstanceIDs    []string       `json:"instance_ids"`

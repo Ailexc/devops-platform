@@ -6,6 +6,7 @@ import (
 	"github.com/xcy/permission-center/internal/authz"
 	"github.com/xcy/permission-center/internal/bundle"
 	"github.com/xcy/permission-center/internal/config"
+	"github.com/xcy/permission-center/internal/material"
 	"github.com/xcy/permission-center/internal/openfga"
 	"github.com/xcy/permission-center/internal/store"
 	"github.com/xcy/permission-center/internal/sync"
@@ -36,6 +37,9 @@ type Deps struct {
 	DataPlane *authz.DataPlane
 	Builder   *authz.Builder
 	OFGA      *openfga.Client
+
+	// Mat 通用点查取材客户端（T2 §3.1：中心回调应用取权威行，行用完即丢）
+	Mat *material.Client
 
 	OpenAPISyncer *sync.OpenAPISyncer
 	CMDBConnector *sync.CMDBConnector
@@ -92,6 +96,7 @@ func NewDeps(cfg *config.Config, db *gorm.DB, cache *store.Cache) *Deps {
 		DataPlane:     dataPlane,
 		Builder:       builder,
 		OFGA:          ofga,
+		Mat:           material.NewClient(),
 		OpenAPISyncer: sync.NewOpenAPISyncer(access, syncs),
 		CMDBConnector: cmdbConn,
 		IdentityConn:  sync.NewIdentityConnector(cfg.IdentityBaseURL, users, groups, syncs),
