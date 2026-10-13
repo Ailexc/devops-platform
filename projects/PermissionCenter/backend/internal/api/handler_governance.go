@@ -1120,8 +1120,9 @@ func riskLabel(risk int16) string {
 	return "?"
 }
 
-// buildScopeExpression 数据范围 + 参数 → 条件表达式（Casbin / OpenFGA 模板）
+// buildScopeExpression 数据范围 + 参数 → 判定表达式（Casbin 动作级 + 数据级范围谓词模板）
 // 前端 Step 4/5 实时展示；提交时后端同样生成并落申请单留痕
+// （1.5：数据级=范围谓词 × 点查权威行，CheckRow；表达式仅示意，判定由策略行消费）
 func buildScopeExpression(scope string, params map[string]any, modelCode *string, actions []string, subjName string) (string, string) {
 	modelName := "resource"
 	if modelCode != nil && *modelCode != "" {
@@ -1137,18 +1138,15 @@ func buildScopeExpression(scope string, params map[string]any, modelCode *string
 	}
 	switch scope {
 	case model.ScopeAll:
-		return "Casbin", fmt.Sprintf("p, %s, {app}, %s, *, allow\n// 无数据层限制", subj, actionStr)
+		return "Casbin", fmt.Sprintf("p, %s, {app}, %s, *, allow\n// 无数据层限制（全量）", subj, actionStr)
 	case model.ScopeOwner:
-		return "OpenFGA", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// OpenFGA 关系\n(%s:xxx, owner, user:%s)\n→ Check(user:%s, reader, %s:xxx) if owner_id == %s",
-			subj, actionStr, modelName, subj, subj, modelName, subj)
+		return "CheckRow", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// 数据级范围谓词（属性式 × 点查权威行）\nresource_scope: {\"model\": %q, \"condition\": {\"op\": \"eq\", \"field\": \"owner_id\", \"value\": \"%s\"}}\n→ 行.owner_id == %s 才放行", subj, actionStr, modelName, subj, subj)
 	case model.ScopeDimension:
 		dim := stringParam(params, "dimension", "value")
-		return "OpenFGA", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// OpenFGA 组织维度\n(group:%s, member, user:%s)\n(%s:xxx, org, group:%s)\n→ ListObjects(user:%s, reader, %s)\n  仅返回 org=%s 的实例",
-			subj, actionStr, dim, subj, modelName, dim, subj, modelName, dim)
+		return "CheckRow", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// 数据级范围谓词（维度式）\nresource_scope: {\"model\": %q, \"condition\": {\"op\": \"eq\", \"field\": %q, \"value\": \"%s\"}}\n→ 列表判定两步：请求 %s 参数 ⊆ 授权集合", subj, actionStr, modelName, dim, subj, dim)
 	case "account":
 		acc := stringParam(params, "account", "value")
-		return "OpenFGA", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// OpenFGA 账号维度\n(cloud_account:%s, member, user:%s)\n(%s:xxx, account, cloud_account:%s)\n→ Check(user:%s, reader, %s:xxx)\n  仅返回账号 %s 的资源",
-			subj, actionStr, acc, subj, modelName, acc, subj, modelName, acc)
+		return "CheckRow", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// 数据级范围谓词（账号维度）\nresource_scope: {\"model\": %q, \"condition\": {\"op\": \"eq\", \"field\": \"account\", \"value\": \"%s\"}}\n→ 行.account == %s 才放行", subj, actionStr, modelName, acc, acc)
 	case "tag":
 		expr := stringParam(params, "expression", "value")
 		return "Casbin ABAC", fmt.Sprintf("// ABAC 条件策略\np, %s, {app}, %s,\n  { %s },\n  allow", subj, actionStr, expr)
@@ -1162,18 +1160,20 @@ func buildScopeExpression(scope string, params map[string]any, modelCode *string
 			}
 		}
 		if len(names) == 0 {
-			return "OpenFGA", "// 未选择实例"
+			return "CheckRow", "// 未选择实例"
+		}
+		quoted := make([]string, 0, len(names))
+		for _, n := range names {
+			quoted = append(quoted, fmt.Sprintf("%q", n))
 		}
 		var b strings.Builder
-		b.WriteString("// 直接授权 tuple\n")
+		b.WriteString("// 集合式范围谓词（勾选实例，存外部 id）\n")
+		fmt.Fprintf(&b, "resource_scope: {\"model\": %q, \"instance_ids\": [%s]}\n\n", modelName, strings.Join(quoted, ", "))
+		b.WriteString("// 判定：点查行 id ∈ 集合 才放行\n")
 		for _, n := range names {
-			fmt.Fprintf(&b, "(%s:%s, reader, user:%s)\n", modelName, n, subj)
+			fmt.Fprintf(&b, "row.id ∈ %s:%s → Check(user:%s)\n", modelName, n, subj)
 		}
-		b.WriteString("\n// Check\n")
-		for _, n := range names {
-			fmt.Fprintf(&b, "Check(user:%s, reader, %s:%s) → true\n", subj, modelName, n)
-		}
-		return "OpenFGA", b.String()
+		return "CheckRow", b.String()
 	}
 	return "-", ""
 }
