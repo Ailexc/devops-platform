@@ -20,7 +20,7 @@ import (
 //
 // 扩展（能力打包申请）：capability_id + preset_id + scope + scope_params
 //
-//	→ 后端解析预设 action_codes → action_ids、风险组合升级、条件表达式生成（Casbin/OpenFGA）
+//	→ 后端解析预设 action_codes → action_ids、风险组合升级、条件表达式生成（Casbin）
 //
 // 审批规则（审批即策略）：
 //   - 低风险：可自动审批（应用 owner 在线时自动路由）
@@ -371,7 +371,7 @@ func (d *Deps) createCustomRequest(c *gin.Context) {
 // fulfillCustomRequest owner 处置定制需求单（A8）：
 //
 //	mode=grant  → 直授落策略（Source=owner_grant，**TTL 必填 1-365 天**，到期判定排除 + sweep 回收——
-//	              防 AWS inline policy 式游离授权碎片）+ 数据范围物化 OpenFGA 关系 + 刷缓存/bundle
+//	              防 AWS inline policy 式游离授权碎片）+ 数据范围落策略行（1.5：点查行比对） + 刷缓存/bundle
 //	mode=package → 标记"已转为能力包"（owner 线下补包上架，申请人走正常申请——包从使用数据里长出来）
 //
 // 校验：类型/状态 + 处置人必须在审批链内（=目标应用 owners，复用 inChain）
