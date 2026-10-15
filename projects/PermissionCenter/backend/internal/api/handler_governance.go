@@ -47,6 +47,8 @@ func (d *Deps) submitRequest(c *gin.Context) {
 		GranteeName     string           `json:"grantee_name"` // client:xxx / 用户名 / 组织路径
 		GranteeID       uint64           `json:"grantee_id"`
 		ScopeSelections []map[string]any `json:"scope_selections"` // v12：[{model,type,selectedValue,selectedValues[]}]
+		// T6（§4.2 升级一）：场景参数——联动模式只选一次，各域 "$key" 引用同值（结构防错位）
+		ScenarioParams map[string]any `json:"scenario_params"`
 		// 接入申请（Phase 6.5，D4 定案）：request_type=3
 		RequestType   int16  `json:"request_type"`    // 1=自助申请 2=owner授权 3=接入申请
 		ConsumerAppID uint64 `json:"consumer_app_id"` // 申请方（下游应用）
@@ -176,7 +178,7 @@ func (d *Deps) submitRequest(c *gin.Context) {
 		var engine, code string
 		if len(req.ScopeSelections) > 0 {
 			// v12：范围字段类型系统——按模型结构化选择，后端生成 CEL（§4.5）
-			engine, code, err = d.buildV12ScopeExpression(cap, preset, req.ScopeSelections, actionCodes, subjName)
+			engine, code, err = d.buildV12ScopeExpression(cap, preset, req.ScopeSelections, req.ScenarioParams, actionCodes, subjName)
 			if err != nil {
 				c.JSON(400, gin.H{"error": err.Error()})
 				return
@@ -187,13 +189,17 @@ func (d *Deps) submitRequest(c *gin.Context) {
 					"type": "selections", "selections": req.ScopeSelections,
 				},
 			}}}
-			req.Content = map[string]any{
+			content := map[string]any{
 				"capability_id":     req.CapabilityID,
 				"preset_id":         req.PresetID,
 				"scope_selections":  req.ScopeSelections,
 				"scope_expression":  code,
 				"expression_engine": engine,
 			}
+			if len(req.ScenarioParams) > 0 {
+				content["scenario_params"] = req.ScenarioParams // T6：审批视图可见"只选一次"的场景参数
+			}
+			req.Content = content
 			// 数据级控制 → 至少中风险（demo applyRisk 一致）
 			if dc, _ := preset["data_control"].(bool); dc && req.RiskLevel < model.RiskMedium {
 				req.RiskLevel = model.RiskMedium
@@ -918,6 +924,7 @@ func (d *Deps) previewRequest(c *gin.Context) {
 		GranteeName     string           `json:"grantee_name"`
 		GranteeID       uint64           `json:"grantee_id"`
 		ScopeSelections []map[string]any `json:"scope_selections"`
+		ScenarioParams  map[string]any   `json:"scenario_params"` // T6 场景参数（联动）
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.AppID == 0 {
 		c.JSON(400, gin.H{"error": "app_id required"})
@@ -999,7 +1006,7 @@ func (d *Deps) previewRequest(c *gin.Context) {
 	subjName := d.subjectNameForExpression(subjectType, subjectID, req.AppID)
 	var engine, exprCode string
 	if len(req.ScopeSelections) > 0 && cap != nil && preset != nil {
-		engine, exprCode, err = d.buildV12ScopeExpression(cap, preset, req.ScopeSelections, actionCodes, subjName)
+		engine, exprCode, err = d.buildV12ScopeExpression(cap, preset, req.ScopeSelections, req.ScenarioParams, actionCodes, subjName)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
@@ -1181,7 +1188,10 @@ func buildScopeExpression(scope string, params map[string]any, modelCode *string
 // buildV12ScopeExpression v12 范围字段类型系统：按模型结构化选择 → CEL（§4.5 规则）
 // 字段/操作符/变量取自 owner 配置的 ScopeOption（独立表），applicant 只提供值；
 // variable 类型保存变量名，运行时按 grantee（权限作用主体）解析
-func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map[string]any, selections []map[string]any, actions []string, subjName string) (string, string, error) {
+// T6（§4.2 升级一）：scenarioParams=场景参数（申请时只选一次）；selections 值位置可写
+// "$key" 引用 → 统一解析（同一参数全域同值=结构防错位）。shared 联动模式服务端钉子：
+// 条件 field 与场景参数 key 同名的域禁填字面值——只认 $key 引用。
+func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map[string]any, selections []map[string]any, scenarioParams map[string]any, actions []string, subjName string) (string, string, error) {
 	actionStr := strings.Join(actions, ", ")
 	if actionStr == "" {
 		actionStr = "{actions}"
@@ -1196,7 +1206,7 @@ func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map
 	fmt.Fprintf(&b, "p, %s, {app}, %s, *, allow\n", subj, actionStr)
 	var conds []string
 	var tuples []string
-	for _, sel := range selections {
+	for _, sel := range selections { // 注：$key 解析值回写 sel——调用方 content/审批视图直接可见解析后值
 		modelCode, _ := sel["model"].(string)
 		typ, _ := sel["type"].(string)
 		if typ == "" {
@@ -1210,14 +1220,23 @@ func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map
 			return "", "", err
 		}
 		var opt *model.ScopeOption
+		// field 精确匹配（同类型多选项防歧义）：selections[i]["field"] 非空按 type+field，否则首个（兼容旧）
+		wantField, _ := sel["field"].(string)
 		for i := range opts {
-			if opts[i].Type == typ {
+			if opts[i].Type != typ {
+				continue
+			}
+			if wantField == "" || opts[i].Field == wantField {
 				opt = &opts[i]
 				break
 			}
 		}
 		if opt == nil {
 			return "", "", fmt.Errorf("scope option type %q not configured for model %q", typ, modelCode)
+		}
+		// T6 场景参数联动（§4.2 升级一）：$key 引用解析 + shared 防错位（纯函数，单测覆盖）
+		if err := applyScenarioParam(preset, sel, opt.Field, modelCode, scenarioParams); err != nil {
+			return "", "", err
 		}
 		switch typ {
 		case model.ScopeOptInstance:

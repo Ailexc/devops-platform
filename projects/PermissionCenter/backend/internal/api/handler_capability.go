@@ -871,9 +871,87 @@ func validatePresets(m *model.CapabilityManifest) error {
 					return err
 				}
 			}
+			// T6 升级①+②（§4.2）：场景参数联动 + 层级编排（可选字段，缺省=独立+平面——向后兼容）
+			if err := validatePresetLinkage(i, p); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+// validatePresetLinkage T6（§4.2）：场景参数声明 / 联动模式 / data_models 层级树 的结构校验。
+// 层级是编排不是存储——data_models 平面数组仍是参与域权威，树只声明"谁随谁走"。
+func validatePresetLinkage(i int, p map[string]any) error {
+	dms, _ := p["data_models"].([]any)
+	dmSet := map[string]bool{}
+	for _, d := range dms {
+		if s, ok := d.(string); ok {
+			dmSet[s] = true
+		}
+	}
+	// param_linkage 枚举（缺省 independent=现状）
+	if lm, ok := p["param_linkage"].(string); ok && lm != "" && lm != "shared" && lm != "independent" {
+		return fmt.Errorf("preset[%d] param_linkage must be shared|independent", i)
+	}
+	// scenario_params 形状：[{key,label,type(select|input),choices?,required?}]
+	paramKeys := map[string]bool{}
+	if sps, ok := p["scenario_params"].([]any); ok {
+		for j, raw := range sps {
+			sp, ok := raw.(map[string]any)
+			if !ok {
+				return fmt.Errorf("preset[%d] scenario_params[%d] must be an object", i, j)
+			}
+			key, _ := sp["key"].(string)
+			if key == "" {
+				return fmt.Errorf("preset[%d] scenario_params[%d] requires key", i, j)
+			}
+			if paramKeys[key] {
+				return fmt.Errorf("preset[%d] scenario_params key %q duplicated", i, key)
+			}
+			paramKeys[key] = true
+			if t, _ := sp["type"].(string); t != "" && t != "select" && t != "input" {
+				return fmt.Errorf("preset[%d] scenario_params[%d] type must be select|input", i, j)
+			}
+		}
+	}
+	// data_model_tree：引用域 ⊆ data_models、每域至多一父、无环
+	raw, has := p["data_model_tree"]
+	if !has {
+		return nil
+	}
+	tree, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("preset[%d] data_model_tree must be an array", i)
+	}
+	parentOf := map[string]string{}
+	var walk func(nodes []any, parent string) error
+	walk = func(nodes []any, parent string) error {
+		for _, n := range nodes {
+			node, ok := n.(map[string]any)
+			if !ok {
+				return fmt.Errorf("preset[%d] data_model_tree node must be an object", i)
+			}
+			mc, _ := node["model"].(string)
+			if mc == "" {
+				return fmt.Errorf("preset[%d] data_model_tree node requires model", i)
+			}
+			if !dmSet[mc] {
+				return fmt.Errorf("preset[%d] data_model_tree model %q not in data_models", i, mc)
+			}
+			if _, seen := parentOf[mc]; seen {
+				return fmt.Errorf("preset[%d] data_model_tree model %q duplicated", i, mc)
+			}
+			parentOf[mc] = parent
+			if kids, ok := node["children"].([]any); ok {
+				if err := walk(kids, mc); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return walk(tree, "")
 }
 
 // presetList presets JSONAny → []map[string]any

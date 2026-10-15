@@ -149,8 +149,53 @@ say "14. 能力包 v12：预设级上架/下架（审批→工单留痕）"
 curl -s -X POST "$IAM/api/v1/apps/1/capabilities/$CAP_ID/publish" -H "$CT" -H "$AUTH" -d '{"action":"publish","preset_ids":["operator"]}'; echo
 curl -s -X POST "$IAM/api/v1/apps/1/capabilities/$CAP_ID/publish" -H "$CT" -H "$AUTH" -d '{"action":"offline","preset_ids":["operator"]}'; echo
 
-say "15. 能力包 v12：市场申请（预设过滤 + 双主体 + 范围选择 → 自动生成 CEL）"
-curl -s -X POST "$IAM/api/v1/requests/preview" -H "$CT" -H "$AUTH" -d "{\"app_id\":1,\"capability_id\":$CAP_ID,\"preset_id\":\"readonly\",\"subject_type\":1,\"subject_id\":$BOB_ID,\"scope_selections\":[{\"model\":\"host\",\"type\":\"select\",\"selectedValue\":\"prod\"}]}" | python3 -c 'import json,sys;d=json.load(sys.stdin);print("  expr:", d["expression"]["engine"]);print("  code:", d["expression"]["code"])'
+say "15. 能力包 v12：市场申请升级版（T6 场景参数联动 + 层级编排 + 防错位）"
+echo "> ① 联动申请：account 只选一次 → host+disk 两域同值带出（结构上不可能错位）："
+cat > /tmp/iam-15a.json <<JSONEOF
+{"app_id":1,"capability_id":$CAP_ID,"preset_id":"readonly","subject_type":1,"subject_id":$BOB_ID,
+ "scenario_params":{"account":"acc-ops-001"},
+ "scope_selections":[{"model":"host","type":"select","field":"account","selectedValue":"\$account"},
+                     {"model":"disk","type":"select","field":"account","selectedValue":"\$account"}]}
+JSONEOF
+curl -s -X POST "$IAM/api/v1/requests/preview" -H "$CT" -H "$AUTH" -d @/tmp/iam-15a.json | python3 -c '
+import json,sys
+d=json.load(sys.stdin); code=d["expression"]["code"]
+print("  engine:", d["expression"]["engine"])
+for l in code.splitlines():
+    if l.startswith("# "): print("   ", l)
+if code.count("account == \"acc-ops-001\"") < 2:
+    print("  ✗ FAIL：host+disk 两域应同值 account==acc-ops-001（硬断言10 联动带出）", file=sys.stderr); sys.exit(1)
+print("  ✓ 硬断言10：场景参数联动——host+disk 同值（一次选定全域带出）")'
+echo "> ② 错位防护：绕过前端给 disk 填字面值（host 仍引用）→ 服务端钉子拒："
+cat > /tmp/iam-15b.json <<JSONEOF
+{"app_id":1,"capability_id":$CAP_ID,"preset_id":"readonly","subject_type":1,"subject_id":$BOB_ID,
+ "scenario_params":{"account":"acc-ops-001"},
+ "scope_selections":[{"model":"host","type":"select","field":"account","selectedValue":"\$account"},
+                     {"model":"disk","type":"select","field":"account","selectedValue":"acc-rd-002"}]}
+JSONEOF
+R15B=$(curl -s -o /tmp/iam-15b.out -w "%{http_code}" -X POST "$IAM/api/v1/requests/preview" -H "$CT" -H "$AUTH" -d @/tmp/iam-15b.json)
+if [ "$R15B" != "400" ]; then
+  echo "  ✗ FAIL：联动域字面值应 400 拒（硬断言11 防错位）——实得 $R15B $(cat /tmp/iam-15b.out)" >&2; exit 1
+fi
+echo "  ✓ 硬断言11：防错位——联动域禁字面值，只认 \$account 引用（服务端钉子）"
+echo "> ③ 跨层单独申请：database 域独立预设（dbview）照旧独立选值（层级不外溢）："
+CAP_DB=$(curl -s -X GET "$IAM/api/v1/apps/1/capabilities" -H "$AUTH" | python3 -c 'import json,sys;d=json.load(sys.stdin);print([c["id"] for c in d["items"] if c["name"]=="数据库管理"][0])')
+cat > /tmp/iam-15c.json <<JSONEOF
+{"app_id":1,"capability_id":$CAP_DB,"preset_id":"dbview","subject_type":1,"subject_id":$BOB_ID,
+ "scope_selections":[{"model":"database","type":"select","selectedValue":"db-cmdb"}]}
+JSONEOF
+curl -s -X POST "$IAM/api/v1/requests/preview" -H "$CT" -H "$AUTH" -d @/tmp/iam-15c.json | python3 -c '
+import json,sys
+d=json.load(sys.stdin); code=d["expression"]["code"]
+if "db_name == \"db-cmdb\"" not in code:
+    print("  ✗ FAIL：独立预设跨层申请应正常生成（硬断言12）", file=sys.stderr); sys.exit(1)
+print("  ✓ 硬断言12：跨层申请走独立路径（独立模式预设不受联动约束）")'
+echo "> （readonly 单域 env 选项仍合法：field 不在场景参数 key——真独立的域允许独立选）"
+cat > /tmp/iam-15d.json <<JSONEOF
+{"app_id":1,"capability_id":$CAP_ID,"preset_id":"readonly","subject_type":1,"subject_id":$BOB_ID,
+ "scope_selections":[{"model":"host","type":"select","field":"env","selectedValue":"prod"}]}
+JSONEOF
+curl -s -X POST "$IAM/api/v1/requests/preview" -H "$CT" -H "$AUTH" -d @/tmp/iam-15d.json | python3 -c 'import json,sys;d=json.load(sys.stdin);print("  expr:", d["expression"]["engine"]);print("  code:", d["expression"]["code"])'
 
 say "16. 能力包 v12：接入申请（前置鉴权 + 网络开通，凭证一次签发）"
 curl -s -X POST "$IAM/api/v1/auth/login" -H "$CT" -d '{"username":"erin","password":"pass123"}' > "$TMP/erin.json"

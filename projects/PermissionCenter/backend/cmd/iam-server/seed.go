@@ -273,7 +273,7 @@ func seed(reset bool) error {
 	grantViaRequest(deps, ctx, userID(deps, "alice"), app.ID, "user:alice:cmdb-read",
 		model.ReqSubjectUser, userID(deps, "alice"), readActionIDs, nil,
 		"alice 为 cmdb 联合负责人，需要只读权限", "", false)
-// （1.5 T3）强一致档（force-remote）已随投影退役——点查即实时，无前置同步对象
+	// （1.5 T3）强一致档（force-remote）已随投影退役——点查即实时，无前置同步对象
 
 	// 7. 程序身份（M2M）
 	secret := "cloud-mgmt-secret"
@@ -524,8 +524,6 @@ func seedContractRows(deps *api.Deps, appID uint64) {
 	}
 	log.Printf("[seed] data contracts ready (host: sla=15s/max=30s — 分钟级新鲜度三态演示；巡检 5s < SLA)")
 }
-
-
 
 func findOrCreateOrg(deps *api.Deps, name string, parentID *uint64) *model.Group {
 	// 幂等：先按 (name, parent_id) 精确查找，避免重复创建
@@ -969,10 +967,24 @@ func seedRichDemoData(deps *api.Deps) {
 		},
 		model.JSONAny{
 			map[string]any{
+				// T6 升级版（§4.2）：host→disk 层级编排 + 场景参数联动（只选一次防域间错位）
 				"id": "readonly", "name": "只读查看", "status": "published",
-				"action_codes":  []any{"cmdb:host:list", "cmdb:host:read"},
+				"action_codes":  []any{"cmdb:host:list", "cmdb:host:read", "cmdb:disk:list", "cmdb:disk:read"},
 				"grantee_types": []any{"user", "org", "group", "app"},
-				"data_control":  true, "data_models": []any{"host"},
+				"data_control":  true, "data_models": []any{"host", "disk"},
+				"param_linkage": "shared",
+				"scenario_params": []any{
+					map[string]any{"key": "account", "label": "云账号", "type": "select", "required": true,
+						"choices": []any{
+							map[string]any{"label": "运维账号", "value": "acc-ops-001"},
+							map[string]any{"label": "研发账号", "value": "acc-rd-002"},
+						}},
+				},
+				"data_model_tree": []any{
+					map[string]any{"model": "host", "children": []any{
+						map[string]any{"model": "disk"},
+					}},
+				},
 			},
 			map[string]any{
 				"id": "operator", "name": "运维操作", "status": "published",
@@ -998,6 +1010,13 @@ func seedRichDemoData(deps *api.Deps) {
 	)
 	seedScopeOptions(deps, hostCap.ID, "readonly", "host", []*model.ScopeOption{
 		{Type: model.ScopeOptAll, Label: "所有数据", Desc: "无需填写"},
+		// T6 联动绑定域（§4.2 升级一）：field=account 与场景参数 key 同名——
+		// shared 模式下值只认 "$account" 引用（申请时只选一次，服务端钉子防域间错位）
+		{Type: model.ScopeOptSelect, Label: "按云账号（联动）", Desc: "场景参数联动——全域同值，防错位", Field: "account", Op: "==",
+			Choices: model.JSONAny{
+				map[string]any{"label": "运维账号", "value": "acc-ops-001"},
+				map[string]any{"label": "研发账号", "value": "acc-rd-002"},
+			}},
 		{Type: model.ScopeOptInstance, Label: "具体实例", Desc: "勾选要访问的主机实例", API: "/api/v1/hosts"},
 		{Type: model.ScopeOptSelect, Label: "选择环境", Desc: "选择目标环境（单选）", Field: "env", Op: "==",
 			Choices: model.JSONAny{
@@ -1013,6 +1032,17 @@ func seedRichDemoData(deps *api.Deps) {
 			}},
 		{Type: model.ScopeOptVariable, Label: "仅自己的资源", Desc: "自动匹配你的身份，只能看到自己创建的资源", Field: "owner_id", Op: "==", Variable: model.VarCurrentUser, VarLabel: "当前用户"},
 		{Type: model.ScopeOptInput, Label: "按标签过滤", Desc: "输入标签名进行模糊匹配", Field: "tags", Op: "contains", Placeholder: "如 web、prod"},
+	})
+	// T6 层级从属域（§4.2 升级二）：disk 随 host——落底层各域仍是独立策略（层级是编排不是存储）
+	seedScopeOptions(deps, hostCap.ID, "readonly", "disk", []*model.ScopeOption{
+		{Type: model.ScopeOptAll, Label: "所有数据", Desc: "无需填写"},
+		// 与 host 域同 key 联动：shared 模式下同一次 account 选定带出全域（结构上不可能错位）
+		{Type: model.ScopeOptSelect, Label: "按云账号（联动）", Desc: "随 host 域场景参数——全域同值", Field: "account", Op: "==",
+			Choices: model.JSONAny{
+				map[string]any{"label": "运维账号", "value": "acc-ops-001"},
+				map[string]any{"label": "研发账号", "value": "acc-rd-002"},
+			}},
+		{Type: model.ScopeOptInstance, Label: "具体实例", Desc: "勾选要访问的磁盘实例", API: "/api/v1/disks"},
 	})
 
 	// ===== cmdb · 数据库管理（published）=====
