@@ -185,6 +185,8 @@ func (d *Deps) mgScope(c *gin.Context) {
 	// v1.5 T1 动作码路由表 + T2 通用点查配置：仅 owner（admin 已在前面放行）——deny-by-default，不登记必 403
 	case path == "/api/v1/apps/:id/routes" ||
 		path == "/api/v1/apps/:id/perm-query" ||
+		path == "/api/v1/apps/:id/onboard-report" ||
+		path == "/api/v1/apps/:id/exempt-paths" ||
 		strings.HasPrefix(path, "/api/v1/apps/:id/routes/") ||
 		strings.HasPrefix(path, "/api/v1/apps/:id/pending-routes/"):
 		appID, _ := strconv.ParseUint(c.Param("id"), 10, 64)

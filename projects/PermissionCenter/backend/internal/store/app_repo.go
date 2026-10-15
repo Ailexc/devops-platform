@@ -42,6 +42,12 @@ func (r *AppRepo) List(offset, limit int) ([]model.App, int64, error) {
 func (r *AppRepo) CreateClient(c *model.Client) error { return r.db.Create(c).Error }
 func (r *AppRepo) UpdateClient(c *model.Client) error { return r.db.Save(c).Error }
 
+// SetExemptPaths 更新凭证豁免表（T4 §3.1：map[path]client_id，配置期已拦裸豁免）
+func (r *AppRepo) SetExemptPaths(appID uint64, m model.JSONMap) error {
+	return r.db.Model(&model.App{}).Where("id = ?", appID).
+		Update("exempt_paths", m).Error
+}
+
 func (r *AppRepo) ClientByID(clientID string) (*model.Client, error) {
 	var c model.Client
 	if err := r.db.Where("client_id = ?", clientID).First(&c).Error; err != nil {

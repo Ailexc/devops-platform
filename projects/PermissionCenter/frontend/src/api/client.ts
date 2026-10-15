@@ -84,6 +84,9 @@ export const api = {
 
   // ---- v1.5 T1 动作码路由表（§3.7 五格登记 / §3.8 导入 / §3.9 生命周期）----
   routes: (id: number) => request(`/api/v1/apps/${id}/routes`),
+  onboardReport: (id: number) => request(`/api/v1/apps/${id}/onboard-report`),
+  setExemptPaths: (id: number, body: any) =>
+    request(`/api/v1/apps/${id}/exempt-paths`, 'PUT', body),
   importRoutes: (id: number, body: any) => request(`/api/v1/apps/${id}/routes`, 'POST', body),
   updateRoute: (id: number, rid: number, body: any) =>
     request(`/api/v1/apps/${id}/routes/${rid}`, 'PATCH', body),

@@ -60,6 +60,9 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.POST("/apps/:id/pending-routes/:pid/discard", d.discardPending)
 		// T2 通用点查配置（§3.1 应用注册：回查地址+M2M 凭证，owner）
 		mg.PUT("/apps/:id/perm-query", d.setPermQuery)
+		// T4 接入体检（§3.9 五类硬校验，报告回执——注册/导入时也自动跑）
+		mg.GET("/apps/:id/onboard-report", d.onboardReport)
+		mg.PUT("/apps/:id/exempt-paths", d.setExemptPaths)
 		// 能力声明（L1，仅 owner）
 		mg.GET("/apps/:id/capabilities", d.listCapabilities)
 		mg.POST("/apps/:id/capabilities", d.createCapability)

@@ -19,6 +19,19 @@ func (r *ContractRepo) ListEnabled() ([]model.DataContract, error) {
 	return cs, err
 }
 
+// ByApp 应用全部启用契约（model_code → 契约；接入体检 pick/schema 校验用，T4）
+func (r *ContractRepo) ByApp(appID uint64) (map[string]model.DataContract, error) {
+	var cs []model.DataContract
+	if err := r.db.Where("app_id = ? AND enabled = ?", appID, true).Find(&cs).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[string]model.DataContract, len(cs))
+	for _, c := range cs {
+		out[c.ModelCode] = c
+	}
+	return out, nil
+}
+
 // ByModelCode 数据域 → 最近更新的启用契约（判定侧新鲜度门槛读参，清单 A6）
 func (r *ContractRepo) ByModelCode(code string) (*model.DataContract, error) {
 	var c model.DataContract

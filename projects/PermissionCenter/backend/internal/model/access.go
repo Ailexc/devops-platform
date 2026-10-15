@@ -24,6 +24,9 @@ type Action struct {
 	ScopeParam JSONMap `gorm:"type:jsonb" json:"scope_param"`  // list 动作范围参数 {param,location}
 	// v1.5 T5 契约三步链 step1：OpenAPI query 参数名候选（required 的 UI 下拉源，非权威仅提示）
 	QueryParams StringArray `gorm:"type:jsonb" json:"query_params,omitempty"`
+	// v1.5 T4 别名路由（§3.9 L5 口径）：同码多路由的显式登记例外——
+	// 元素="METHOD /path"（如 "GET /api/v2/hosts"）；显式登记才合法，未登记同码多路由=体检阻断
+	AliasRoutes StringArray `gorm:"type:jsonb" json:"alias_routes,omitempty"`
 	Status      string      `gorm:"size:16;default:active" json:"status"` // active|archived——归档=可查不可用
 }
 

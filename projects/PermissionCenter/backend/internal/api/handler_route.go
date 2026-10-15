@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/xcy/permission-center/internal/model"
+	"github.com/xcy/permission-center/internal/onboard"
 	"github.com/xcy/permission-center/internal/sync"
 )
 
@@ -78,7 +79,9 @@ func (d *Deps) importRoutes(c *gin.Context) {
 		}
 		v, _ := d.Access.BumpRouteVersion(appID, "openapi", fmt.Sprintf("OpenAPI 导入 %d 条", imported), uid)
 		pend, _ := d.Access.Pendings(appID, "")
-		c.JSON(200, gin.H{"version": v, "imported": imported, "blocked": []any{}, "pending": pend})
+		// T4：导入即体检（§3.9 触发点之一），报告随回执返回
+		rep, _ := d.buildOnboardReport(appID)
+		c.JSON(200, gin.H{"version": v, "imported": imported, "blocked": []any{}, "pending": pend, "onboard": rep})
 		return
 
 	case "dict":
@@ -209,6 +212,8 @@ func (d *Deps) importRoutes(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"version": version, "imported": imported,
 			"pending_count": pendingN, "pending": pendOut, "blocked": blocked,
+			// T4：导入即体检（§3.9 触发点之一），报告随回执返回
+			"onboard": func() onboard.Report { r, _ := d.buildOnboardReport(appID); return r }(),
 		})
 		return
 

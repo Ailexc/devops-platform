@@ -4,24 +4,21 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log"
 	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xcy/permission-center/internal/auth"
 	"github.com/xcy/permission-center/internal/authz"
 	"github.com/xcy/permission-center/internal/material"
+	"github.com/xcy/permission-center/internal/model"
 )
 
 // Traefik 把原始请求整体转发到本端点，原始 method/path 经 X-Forwarded-Method / X-Forwarded-Uri 传递；
 // 在此完成"请求 → action 映射"（PEP 职责，对应 APISIX ext-authz 行为），再调中心 PDP。
 // 200 = 放行；403 = 拦截（deny-by-default）。
 func (d *Deps) handleGatewayCheck(c *gin.Context) {
-	// 主体：网关透传业务侧身份头
-	user := c.GetHeader("X-User")
-	if user == "" {
-		c.AbortWithStatusJSON(403, gin.H{"error": "X-User header required"})
-		return
-	}
 	appCode := c.GetHeader("X-App")
 	if appCode == "" {
 		appCode = "cmdb"
@@ -46,11 +43,41 @@ func (d *Deps) handleGatewayCheck(c *gin.Context) {
 		c.AbortWithStatusJSON(403, gin.H{"error": "app not found: " + appCode})
 		return
 	}
+
+	// ---- T4 凭证豁免（§3.1）：豁免主语=中心 M2M 凭证，不是路由 ----
+	// 路径命中豁免表 + 携带绑定凭证验证通过 → 跳过判定（点查/回源防递归同款规则，审计留痕）；
+	// 凭证缺失/不匹配 → 普通请求照常判（普通用户同接口照常判）；裸豁免（未绑凭证）运行时 fail-closed + 体检阻断。
+	if raw, hit := app.ExemptPaths[path]; hit {
+		want, _ := raw.(string)
+		clientID := c.GetHeader("X-Client-ID")
+		if want != "" && clientID == want {
+			if cli, cerr := d.Apps.ClientByID(clientID); cerr == nil &&
+				cli.AppID == app.ID && cli.Status == model.StatusEnabled &&
+				auth.CheckPassword(cli.ClientSecretHash, c.GetHeader("X-Client-Secret")) {
+				log.Printf("[gw][exempt] app=%s path=%s client=%s 豁免放行（M2M 凭证匹配，免判定）",
+					app.Code, path, clientID)
+				c.JSON(200, gin.H{"ok": true, "exempt": true})
+				return
+			}
+		}
+		// 命中豁免表但凭证不匹配 → 落回正常判定链（未注册动作则 deny-by-default）
+	}
+
+	// 主体：网关透传业务侧身份头（豁免放行在前——M2M 回调无业务用户头）
+	user := c.GetHeader("X-User")
+	if user == "" {
+		c.AbortWithStatusJSON(403, gin.H{"error": "X-User header required"})
+		return
+	}
+
 	// X-Resource-Type：统一查询入口（/api/v1/entities）经此头解析真实资源类型（网关可信边界注入）
 	resourceType := c.GetHeader("X-Resource-Type")
 	trace := d.Access.ResolveActionSteps(app.ID, method, path, resourceType)
 	if trace.Action == nil {
 		// deny-by-default：未注册路径 / 通用接口无法落具体资源类型（防权限漂移）
+		// T4 告警打点（§3.9 M6 失配闭环）：失配=配置问题（URL 改版没重新导入），必须可被告警发现
+		log.Printf("[ALERT][gw403] 失配未命中 app=%s user=%s %s %s——路由表无此动作（发版重新导入?）",
+			appCode, user, method, path)
 		c.AbortWithStatusJSON(403, gin.H{"error": "no action resolved for " + method + " " + path})
 		return
 	}

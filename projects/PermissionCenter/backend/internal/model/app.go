@@ -26,6 +26,10 @@ type App struct {
 	// 回查地址走【系统内部地址】不过网关（中心→业务回调不经网关=零豁免需求）；凭证=M2M 只读
 	PermQueryURL   string `gorm:"size:512" json:"perm_query_url"`
 	PermQueryToken string `gorm:"size:128" json:"perm_query_token,omitempty"`
+	// v1.5 T4 凭证豁免（§3.1/§3.9）：豁免主语=【中心 M2M 凭证】不是路由——
+	// map[path]client_id；路径命中且请求携带该 M2M 凭证才跳过判定，普通用户同接口照常判。
+	// 裸豁免（只配路径不绑凭证）=接入体检阻断（BARE_EXEMPT）。
+	ExemptPaths JSONMap `gorm:"type:jsonb" json:"exempt_paths"`
 }
 
 // Client 程序身份（M2M）：client_id + secret（bcrypt 哈希）
@@ -36,8 +40,8 @@ type Client struct {
 	ClientSecretHash string `gorm:"size:255;not null" json:"-"`
 	Status           int16  `gorm:"not null;default:1" json:"status"`
 	// v12 接入申请（Phase 6.5）：凭证绑定的鉴权方式与目标提供方
-	AuthMethod     string `gorm:"size:32" json:"auth_method"`     // oauth2_client_credentials / static_token / api_key / ...
-	ProviderAppID  uint64 `gorm:"index" json:"provider_app_id"`   // 接入的目标应用（提供方）
+	AuthMethod    string `gorm:"size:32" json:"auth_method"`   // oauth2_client_credentials / static_token / api_key / ...
+	ProviderAppID uint64 `gorm:"index" json:"provider_app_id"` // 接入的目标应用（提供方）
 }
 
 // AppOwner 应用负责人（≥2 个，失联时组织树向上兜底）

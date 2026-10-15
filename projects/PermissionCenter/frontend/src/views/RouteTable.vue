@@ -8,9 +8,35 @@
         <span class="tag tag-blue">路由表 v{{ version }}</span>
         <span class="tag tag-gray">{{ items.length }} 条路由</span>
         <button class="btn btn-ghost" @click="load">⟳ 刷新</button>
+        <button class="btn" @click="runOnboard">🩺 接入体检</button>
         <button class="btn btn-primary" @click="showImport = true">📥 导入路由</button>
       </template>
     </PageHeader>
+
+    <!-- 接入体检报告（§3.9 五类硬校验回执）：阻断=不修完不能接入；待确认=停在未完成态 -->
+    <div v-if="onboard" class="section-title">
+      🩺 接入体检报告
+      <span class="tag" :class="statusTag(onboard.status)">{{ statusText(onboard.status) }}</span>
+      <span class="section-hint">{{ onboard.actions }} 条路由 · 动作码已登记 {{ onboard.registered }} 条</span>
+      <span class="section-hint">导入/注册时自动跑，此为最新回执</span>
+    </div>
+    <div v-if="onboard" class="panel ob-panel">
+      <div v-if="!onboard.blocked.length && !onboard.warnings.length" class="ob-ok">
+        ✅ 五类硬校验全绿（缺动作/格式/重复/配置自洽/导入一致性）
+      </div>
+      <div v-for="(b, i) in onboard.blocked" :key="'ob' + i" class="ob-block">
+        <span class="tag tag-red">{{ b.code }}</span>
+        <span class="mono">{{ b.method }} {{ b.path }}</span>
+        <span v-if="b.action" class="mono ob-action">{{ b.action }}</span>
+        <span class="ob-reason">{{ b.reason }}</span>
+      </div>
+      <div v-for="(w, i) in onboard.warnings" :key="'ow' + i" class="ob-warn">
+        <span class="tag tag-amber">{{ w.code }}</span>
+        <span class="mono">{{ w.method }} {{ w.path }}</span>
+        <span class="mono ob-action">{{ w.action }}</span>
+        <span class="ob-reason">{{ w.reason }}</span>
+      </div>
+    </div>
 
     <!-- 待确认队列：推断预填永不直接生效，人工确认后落表 -->
     <div class="section-title">
@@ -233,6 +259,7 @@ const route = useRoute()
 const appId = computed(() => Number(route.params.id))
 
 const app = ref<any>(null)
+const onboard = ref<any>(null)
 const items = ref<any[]>([])
 const pending = ref<any[]>([])
 const version = ref(0)
@@ -259,11 +286,25 @@ const migErr = ref('')
 const mig = reactive({ rid: 0, code: '', newCode: '', confirmed: false, affected: null as any })
 
 async function load() {
-  const [d, ad] = await Promise.all([api.routes(appId.value), api.appDetail(appId.value)])
+  const [d, ad, ob] = await Promise.all([
+    api.routes(appId.value),
+    api.appDetail(appId.value),
+    api.onboardReport(appId.value).catch(() => null),
+  ])
   app.value = ad?.app || ad
   items.value = d.items || []
   pending.value = (d.pending || []).map((p: any) => ({ ...p, _edit: false, _code: p.inferred_code }))
   version.value = d.version || 0
+  onboard.value = ob
+}
+async function runOnboard() {
+  onboard.value = await api.onboardReport(appId.value).catch((e: any) => { alert('体检失败：' + e.message); return null })
+}
+function statusTag(st: string): string {
+  return st === 'ready' ? 'tag-ok' : st === 'incomplete' ? 'tag-amber' : 'tag-red'
+}
+function statusText(st: string): string {
+  return st === 'ready' ? '可接入' : st === 'incomplete' ? '未完成（有待确认）' : '阻断'
 }
 onMounted(load)
 
@@ -489,6 +530,13 @@ function scopeBrief(a: any): string {
 .report { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .report-line { display: flex; gap: 8px; }
 .report-block { font-size: 12px; color: var(--danger); }
+.ob-panel { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.ob-ok { font-size: 12px; color: var(--success); }
+.ob-block, .ob-warn { display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
+.ob-block .mono { color: var(--danger); }
+.ob-warn .mono { color: var(--warning); }
+.ob-action { color: var(--brand-strong); }
+.ob-reason { color: var(--text-secondary); }
 .affected { border: 1px solid rgba(217,119,6,.4); background: var(--warning-bg); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .affected-title { font-size: 12px; font-weight: 700; color: var(--warning); }
 .affected-item { font-size: 12px; color: var(--text-secondary); }
