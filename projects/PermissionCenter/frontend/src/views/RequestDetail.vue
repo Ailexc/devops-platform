@@ -13,7 +13,29 @@
       <div class="kv"><span class="k">申请理由</span><span class="v">{{ data.request.reason || '—' }}</span></div>
     </div>
 
-    <div class="section-title">数据范围选择（v12 结构化）</div>
+    <!-- T7 多包审批视图：合并展示各包范围与表达式（一单一审批 → 批量开通） -->
+    <template v-if="data.request.content?.multi">
+      <div class="section-title">📦 多包申请（{{ data.request.content.packages?.length }} 包——单一审批视图，落底各包独立策略）</div>
+      <div v-for="p in data.request.content.packages || []" :key="p.capability_id" class="panel multi-pkg-detail">
+        <div class="multi-pkg-title">
+          <b>{{ p.capability_name }}</b><span class="tag">/ {{ p.preset_name }}</span>
+          <span class="tag" :class="(p.risk_label || '').includes('高') ? 'tag-red' : 'tag-amber'">{{ p.risk_label }}</span>
+        </div>
+        <table class="data-table data-table-sm">
+          <thead><tr><th>模型</th><th>类型</th><th>选择值</th></tr></thead>
+          <tbody>
+            <tr v-for="(s, si) in p.scope_selections || []" :key="si">
+              <td class="mono">{{ s.model }}</td>
+              <td>{{ SCOPE_LABEL[s.type] || s.type }}</td>
+              <td class="mono">{{ s.selectedValue || (s.selectedValues || []).join(', ') || '全部' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <pre class="codeblock">{{ p.scope_expression }}</pre>
+      </div>
+    </template>
+
+    <div class="section-title" v-else>数据范围选择（v12 结构化）</div>
     <div class="panel">
       <div v-if="!scopeSelections.length" class="empty-state">接口级申请（无数据范围）或接入申请</div>
       <table v-else class="data-table data-table-sm">
@@ -28,8 +50,8 @@
       </table>
     </div>
 
-    <div class="section-title">权限表达式（Casbin + OpenFGA）</div>
-    <div class="panel"><pre class="codeblock">{{ data.request.content?.scope_expression || '—' }}</pre></div>
+    <div class="section-title" v-if="!data.request.content?.multi">权限表达式（Casbin + OpenFGA）</div>
+    <div class="panel" v-if="!data.request.content?.multi"><pre class="codeblock">{{ data.request.content?.scope_expression || '—' }}</pre></div>
 
     <div v-if="data.request.content?.onboard" class="section-title">🔑 接入申请 · 凭证</div>
     <div v-if="data.request.content?.onboard" class="panel">
@@ -110,4 +132,7 @@ onMounted(async () => {
 .empty-state { padding: 24px; text-align: center; color: var(--text-tertiary); font-size: 13px; }
 .tag { font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; background: var(--bg-tertiary); }
 .mono { font-family: var(--font-mono); font-size: 12px; }
+/* T7 多包审批视图 */
+.multi-pkg-detail { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+.multi-pkg-title { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 </style>

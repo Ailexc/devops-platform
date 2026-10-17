@@ -152,6 +152,8 @@ export const api = {
   capabilityPrereqs: (cid: number) => request(`/api/v1/marketplace/capabilities/${cid}/prereqs`),
   // 应用市场公开目录（申请接入用：网络/鉴权公开，不含管理信息）
   marketplaceApps: () => request('/api/v1/marketplace/apps'),
+  // T7 关联推荐（共现信号，非依赖）：capability_id → top3 常一起申请
+  marketplaceRecommend: (capabilityId: number) => request(`/api/v1/marketplace/recommend?capability_id=${capabilityId}`),
   marketplaceAppDetail: (id: number) => request(`/api/v1/marketplace/apps/${id}`),
 
   // 能力打包申请（能力包向导）：范围选项（预设×模型粒度，v12）+ 申请单预览

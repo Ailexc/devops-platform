@@ -26,6 +26,17 @@ import (
 //   - 低风险：可自动审批（应用 owner 在线时自动路由）
 //   - 中风险：需应用 owner 审批（组织上级可参与）
 //   - 高风险：需应用 owner + 安全复核
+//
+// capRequestItem T7 多包一次性申请（#4）：一包一 preset 一范围选择——逐包生成表达式、
+// 落独立策略（可指认哪个包），审批合并为一单（单一审批视图=同应用 owner 链）
+type capRequestItem struct {
+	CapabilityID    uint64           `json:"capability_id"`
+	PresetID        string           `json:"preset_id"`
+	Scope           string           `json:"scope"`
+	ScopeSelections []map[string]any `json:"scope_selections"`
+	ScenarioParams  map[string]any   `json:"scenario_params"`
+}
+
 func (d *Deps) submitRequest(c *gin.Context) {
 	var req struct {
 		AppID         uint64         `json:"app_id"`
@@ -47,6 +58,9 @@ func (d *Deps) submitRequest(c *gin.Context) {
 		GranteeName     string           `json:"grantee_name"` // client:xxx / 用户名 / 组织路径
 		GranteeID       uint64           `json:"grantee_id"`
 		ScopeSelections []map[string]any `json:"scope_selections"` // v12：[{model,type,selectedValue,selectedValues[]}]
+		// T7 多包一次性申请（#4）：≥2 包一单一审批批量开通——与单包字段互斥；
+		// 同应用多包（单一审批视图=一个 app 的 owner 链），跨应用请分别申请
+		CapabilityRequests []capRequestItem `json:"capability_requests"`
 		// T6（§4.2 升级一）：场景参数——联动模式只选一次，各域 "$key" 引用同值（结构防错位）
 		ScenarioParams map[string]any `json:"scenario_params"`
 		// 接入申请（Phase 6.5，D4 定案）：request_type=3
@@ -241,6 +255,91 @@ func (d *Deps) submitRequest(c *gin.Context) {
 		// 风险组合升级（§5.4）
 		if len(req.ScopeSelections) == 0 {
 			req.RiskLevel = comboRiskFromOps(subjectType, req.Scope, ops)
+		}
+	}
+
+	// T7 多包一次性申请（#4）：≥2 包一单一审批 → 逐包生成表达式、items 逐包一条（落底独立策略）；
+	// 同应用多包（单一审批视图=一个 app 的 owner 链），跨应用请分别申请；与单包字段互斥
+	if len(req.CapabilityRequests) >= 2 {
+		if req.CapabilityID > 0 {
+			c.JSON(400, gin.H{"error": "capability_requests 与单包字段互斥"})
+			return
+		}
+		packages := make([]any, 0, len(req.CapabilityRequests))
+		items := make([]any, 0, len(req.CapabilityRequests))
+		seenCaps := map[uint64]bool{}
+		pkgRiskMax := int16(model.RiskLow)
+		for _, cr := range req.CapabilityRequests {
+			cap, err := d.Caps.ByID(cr.CapabilityID)
+			if err != nil {
+				c.JSON(404, gin.H{"error": fmt.Sprintf("capability %d not found", cr.CapabilityID)})
+				return
+			}
+			if cap.AppID != req.AppID {
+				c.JSON(400, gin.H{"error": "多包申请须同一应用（单一审批视图=一个 app 的 owner 链）——跨应用请分别申请"})
+				return
+			}
+			if seenCaps[cap.ID] {
+				continue // 去重
+			}
+			seenCaps[cap.ID] = true
+			preset := d.findPreset(cap.Presets, cr.PresetID)
+			if preset == nil {
+				c.JSON(400, gin.H{"error": fmt.Sprintf("preset %q not found in capability %d", cr.PresetID, cr.CapabilityID)})
+				return
+			}
+			resolved := d.enrichOnePreset(cap.AppID, preset)
+			aids, _ := resolved["action_ids"].([]uint64)
+			ops, _ := resolved["ops"].([]map[string]any)
+			if len(aids) == 0 {
+				c.JSON(400, gin.H{"error": fmt.Sprintf("preset %q resolves to no actions", cr.PresetID)})
+				return
+			}
+			actionCodes := make([]string, 0, len(ops))
+			for _, op := range ops {
+				if code, ok := op["action"].(string); ok {
+					actionCodes = append(actionCodes, code)
+				}
+			}
+			subjName := d.subjectNameForExpression(subjectType, subjectID, req.AppID)
+			engine, code := "Casbin", "// 无数据层限制（all 类型）\n"
+			dataScope := map[string]any{"type": "all"}
+			pkgRisk := comboRiskFromOps(subjectType, cr.Scope, ops)
+			if len(cr.ScopeSelections) > 0 {
+				engine, code, err = d.buildV12ScopeExpression(cap, preset, cr.ScopeSelections, cr.ScenarioParams, actionCodes, subjName)
+				if err != nil {
+					c.JSON(400, gin.H{"error": err.Error()})
+					return
+				}
+				dataScope = map[string]any{"type": "selections", "selections": cr.ScopeSelections}
+				if dc, _ := preset["data_control"].(bool); dc && pkgRisk < model.RiskMedium {
+					pkgRisk = model.RiskMedium
+				}
+			}
+			if pkgRisk > pkgRiskMax {
+				pkgRiskMax = pkgRisk
+			}
+			presetName, _ := preset["name"].(string)
+			items = append(items, map[string]any{
+				"capability_id": cap.ID, "preset_id": cr.PresetID,
+				"action_ids": aids, "data_scope": dataScope,
+			})
+			packages = append(packages, map[string]any{
+				"capability_id": cap.ID, "capability_name": cap.Name,
+				"preset_id": cr.PresetID, "preset_name": presetName,
+				"scope_selections": cr.ScopeSelections,
+				"scope_expression": code, "expression_engine": engine,
+				"risk": pkgRisk, "risk_label": riskLabel(pkgRisk),
+			})
+		}
+		if len(items) < 2 {
+			c.JSON(400, gin.H{"error": "多包申请须 ≥2 个不同能力包（单包请走单包通道）"})
+			return
+		}
+		req.Items = map[string]any{"items": items}
+		req.Content = map[string]any{"multi": true, "packages": packages}
+		if pkgRiskMax > req.RiskLevel {
+			req.RiskLevel = pkgRiskMax
 		}
 	}
 
@@ -877,6 +976,68 @@ func (d *Deps) grantFromRequest(c *gin.Context, r *model.AccessRequest, approver
 	if r.RequestType == model.RequestGrant {
 		source = model.SourceOwnerGrant
 	}
+
+	// T7 多包开通（#4）：content.multi → 一 item 一策略（capability_id 可指认哪个包）；
+	// 一单一审批批量开通，各包落底仍是独立策略（与单包 items=1 路径等价，行为不变）
+	if multi, _ := content["multi"].(bool); multi {
+		if rawItems, ok := r.Items["items"].([]any); ok && len(rawItems) > 0 {
+			created := 0
+			for _, it := range rawItems {
+				item, _ := it.(map[string]any)
+				var cid uint64
+				switch v := item["capability_id"].(type) {
+				case float64:
+					cid = uint64(v)
+				case uint64:
+					cid = v
+				}
+				aids := parseActionIDs(item["action_ids"])
+				if len(aids) == 0 {
+					continue
+				}
+				var itemScope map[string]any
+				dst := ""
+				if ds, ok := item["data_scope"].(map[string]any); ok {
+					itemScope = ds
+					dst, _ = ds["type"].(string)
+				}
+				var cidPtr *uint64
+				if cid > 0 {
+					cidPtr = &cid
+				}
+				pp := &model.Policy{
+					Name:          fmt.Sprintf("grant:req:%d:cap%d", r.ID, cid),
+					Effect:        model.EffectAllow,
+					SubjectType:   subjectType,
+					SubjectID:     subjectID,
+					AppID:         r.AppID,
+					ActionIDs:     aids,
+					ResourceScope: itemScope,
+					Conditions:    map[string]any{},
+					Status:        model.PolicyActive,
+					CreatedBy:     approver,
+					Source:        source,
+					RequestID:     &r.ID,
+					CapabilityID:  cidPtr,
+					DataScopeType: dst,
+					ExpiresAt:     r.ExpiresAt,
+				}
+				if err := d.Pol.Create(pp); err != nil {
+					return fmt.Errorf("多包开通 cap%d 失败: %w", cid, err)
+				}
+				created++
+			}
+			if created == 0 {
+				return fmt.Errorf("multi request has no items with action_ids")
+			}
+			d.bumpAllCaches(c)
+			d.BundleMgr.Publish(c.Request.Context(), r.AppID)
+			d.audit(c, "request.multi_grant", "request", strconv.FormatUint(r.ID, 10),
+				gin.H{"policies": created})
+			return nil
+		}
+	}
+
 	p := &model.Policy{
 		Name:          "grant:req:" + strconv.FormatUint(r.ID, 10),
 		Effect:        model.EffectAllow,
@@ -913,18 +1074,19 @@ func (d *Deps) grantFromRequest(c *gin.Context, r *model.AccessRequest, approver
 // 能力包向导 Step 5 确认页调用，实时展示最终风险等级与审批链
 func (d *Deps) previewRequest(c *gin.Context) {
 	var req struct {
-		AppID           uint64           `json:"app_id"`
-		SubjectType     int16            `json:"subject_type"`
-		SubjectID       uint64           `json:"subject_id"`
-		CapabilityID    uint64           `json:"capability_id"`
-		PresetID        string           `json:"preset_id"`
-		Scope           string           `json:"scope"`
-		ScopeParams     map[string]any   `json:"scope_params"`
-		GranteeType     string           `json:"grantee_type"`
-		GranteeName     string           `json:"grantee_name"`
-		GranteeID       uint64           `json:"grantee_id"`
-		ScopeSelections []map[string]any `json:"scope_selections"`
-		ScenarioParams  map[string]any   `json:"scenario_params"` // T6 场景参数（联动）
+		AppID              uint64           `json:"app_id"`
+		SubjectType        int16            `json:"subject_type"`
+		SubjectID          uint64           `json:"subject_id"`
+		CapabilityID       uint64           `json:"capability_id"`
+		PresetID           string           `json:"preset_id"`
+		Scope              string           `json:"scope"`
+		ScopeParams        map[string]any   `json:"scope_params"`
+		GranteeType        string           `json:"grantee_type"`
+		GranteeName        string           `json:"grantee_name"`
+		GranteeID          uint64           `json:"grantee_id"`
+		ScopeSelections    []map[string]any `json:"scope_selections"`
+		ScenarioParams     map[string]any   `json:"scenario_params"`     // T6 场景参数（联动）
+		CapabilityRequests []capRequestItem `json:"capability_requests"` // T7 多包预览
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.AppID == 0 {
 		c.JSON(400, gin.H{"error": "app_id required"})
@@ -981,6 +1143,91 @@ func (d *Deps) previewRequest(c *gin.Context) {
 				}
 			}
 		}
+	}
+
+	// T7 多包预览（#4）：≥2 包逐包表达式 + 最高风险 + 合并审批链（不落库）
+	if len(req.CapabilityRequests) >= 2 {
+		pkgs := make([]map[string]any, 0, len(req.CapabilityRequests))
+		pkgRiskMax := int16(model.RiskLow)
+		seen := map[uint64]bool{}
+		for _, cr := range req.CapabilityRequests {
+			pcap, err := d.Caps.ByID(cr.CapabilityID)
+			if err != nil {
+				c.JSON(404, gin.H{"error": fmt.Sprintf("capability %d not found", cr.CapabilityID)})
+				return
+			}
+			if pcap.AppID != req.AppID {
+				c.JSON(400, gin.H{"error": "多包申请须同一应用——跨应用请分别申请"})
+				return
+			}
+			if seen[pcap.ID] {
+				continue
+			}
+			seen[pcap.ID] = true
+			ppreset := d.findPreset(pcap.Presets, cr.PresetID)
+			if ppreset == nil {
+				c.JSON(400, gin.H{"error": fmt.Sprintf("preset %q not found in capability %d", cr.PresetID, cr.CapabilityID)})
+				return
+			}
+			resolved := d.enrichOnePreset(pcap.AppID, ppreset)
+			pops, _ := resolved["ops"].([]map[string]any)
+			pcodes := make([]string, 0, len(pops))
+			for _, op := range pops {
+				if code, ok := op["action"].(string); ok {
+					pcodes = append(pcodes, code)
+				}
+			}
+			subjName := d.subjectNameForExpression(subjectType, subjectID, req.AppID)
+			pengine, pcode := "Casbin", "// 无数据层限制（all 类型）"
+			pRisk := comboRiskFromOps(subjectType, cr.Scope, pops)
+			if len(cr.ScopeSelections) > 0 {
+				var perr error
+				pengine, pcode, perr = d.buildV12ScopeExpression(pcap, ppreset, cr.ScopeSelections, cr.ScenarioParams, pcodes, subjName)
+				if perr != nil {
+					c.JSON(400, gin.H{"error": perr.Error()})
+					return
+				}
+				if dc, _ := ppreset["data_control"].(bool); dc && pRisk < model.RiskMedium {
+					pRisk = model.RiskMedium
+				}
+			}
+			if pRisk > pkgRiskMax {
+				pkgRiskMax = pRisk
+			}
+			pname, _ := ppreset["name"].(string)
+			pkgs = append(pkgs, map[string]any{
+				"capability_id": pcap.ID, "capability_name": pcap.Name,
+				"preset_id": cr.PresetID, "preset_name": pname,
+				"scope_selections": cr.ScopeSelections,
+				"scope_expression": pcode, "expression_engine": pengine,
+				"risk": pRisk, "risk_label": riskLabel(pRisk),
+			})
+		}
+		if len(pkgs) < 2 {
+			c.JSON(400, gin.H{"error": "多包申请须 ≥2 个不同能力包"})
+			return
+		}
+		risk := pkgRiskMax
+		if subjectType == model.ReqSubjectApp && risk < model.RiskMedium {
+			risk = model.RiskMedium
+		}
+		rm := &model.AccessRequest{
+			ApplicantID: applicantID, RequestType: model.RequestApply,
+			ApplicantSubjectType: subjectType, ApplicantSubjectID: subjectID,
+			AppID: req.AppID, RiskLevel: risk, Status: model.ReqPending,
+		}
+		chain := d.decorateApprovalChain(d.buildApprovalChain(rm, app, applicantID), app)
+		gt, gn, gid := req.GranteeType, req.GranteeName, req.GranteeID
+		if gt == "" {
+			gt, gn, gid = d.granteeFields(subjectType, subjectID)
+		}
+		c.JSON(200, gin.H{
+			"multi": true, "packages": pkgs,
+			"risk_level": risk, "risk_label": riskLabel(risk),
+			"approval_chain": chain,
+			"grantee":        gin.H{"type": gt, "name": gn, "id": gid},
+		})
+		return
 	}
 
 	risk := comboRiskFromOps(subjectType, req.Scope, ops)

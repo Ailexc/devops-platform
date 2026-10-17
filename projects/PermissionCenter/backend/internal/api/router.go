@@ -92,6 +92,7 @@ func NewRouter(d *Deps) *gin.Engine {
 		// 应用市场公开目录（申请接入用：网络/鉴权公开，不含管理信息）
 		mg.GET("/marketplace/apps", d.marketplaceApps)
 		mg.GET("/marketplace/apps/:id", d.marketplaceAppDetail)
+		mg.GET("/marketplace/recommend", d.marketplaceRecommend) // T7 共现推荐（非依赖）
 		// 能力打包申请（能力包向导）：范围选项（预设×模型粒度）+ 元数据 + 校验 + 申请单预览
 		mg.GET("/capabilities/:cid/presets/:pid/models/:mc/options", d.presetScopeOptions)
 		mg.GET("/capabilities/:cid/presets/:pid/scope-meta", d.presetScopeMeta)

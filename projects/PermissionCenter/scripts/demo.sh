@@ -197,6 +197,44 @@ cat > /tmp/iam-15d.json <<JSONEOF
 JSONEOF
 curl -s -X POST "$IAM/api/v1/requests/preview" -H "$CT" -H "$AUTH" -d @/tmp/iam-15d.json | python3 -c 'import json,sys;d=json.load(sys.stdin);print("  expr:", d["expression"]["engine"]);print("  code:", d["expression"]["code"])'
 
+say "15.5 T7 多包一次性申请：主机管理+数据库管理 一单一审批 → 批量开通（策略可指认）+ 关联推荐"
+cat > /tmp/iam-15m.json <<JSONEOF
+{"app_id":1,"subject_type":1,"subject_id":$BOB_ID,
+ "capability_requests":[
+   {"capability_id":$CAP_ID,"preset_id":"readonly",
+    "scope_selections":[{"model":"host","type":"select","field":"account","selectedValue":"\$account"}],
+    "scenario_params":{"account":"acc-ops-001"}},
+   {"capability_id":$CAP_DB,"preset_id":"dbview",
+    "scope_selections":[{"model":"database","type":"select","selectedValue":"db-cmdb"}]}]}
+JSONEOF
+R15M=$(curl -s -X POST "$IAM/api/v1/requests/preview" -H "$CT" -H "$AUTH" -d @/tmp/iam-15m.json)
+echo "$R15M" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+if not d.get("multi") or len(d.get("packages",[])) != 2:
+    print("  ✗ FAIL：多包预览应返回 multi+2 包（硬断言13a）", file=sys.stderr); sys.exit(1)
+for p in d["packages"]: print("   ", p["capability_name"], "/", p["preset_name"], "→", p["expression_engine"])
+print("  risk:", d["risk_label"], "| 审批链:", " → ".join(x.get("role","?") for x in d.get("approval_chain",[])))
+print("  ✓ 硬断言13a：多包预览——2 包各自表达式 + 合并审批链")'
+RID15M=$(echo "$R15M" > /dev/null; curl -s -X POST "$IAM/api/v1/requests" -H "$CT" -H "$AUTH" -d @/tmp/iam-15m.json | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+echo "  多包申请单 #$RID15M 已提交（bob 本人确认 → alice 复核——两级审批）"
+curl -s -X POST "$IAM/api/v1/requests/$RID15M/approve" -H "$CT" -H "Authorization: Bearer $BOB_T4" -d '{"action":1,"comment":"我知道并同意"}' -o /dev/null
+curl -s -X POST "$IAM/api/v1/requests/$RID15M/approve" -H "$CT" -H "Authorization: Bearer $ALICE_T4" -d '{"action":1,"comment":"同意（多包一单）"}' | python3 -c 'import json,sys;d=json.load(sys.stdin);print("  审批结果:", d.get("status") or d)'
+docker exec devops-postgres psql -U devops -d devops_iam -t -A -c "SELECT count(*), count(DISTINCT capability_id) FROM policies WHERE request_id=$RID15M;" | python3 -c '
+import sys
+n, caps = sys.stdin.read().strip().split("|")
+if int(n) < 2 or int(caps) < 2:
+    print("  ✗ FAIL：应落 ≥2 条策略且 capability_id 可指认（硬断言13b）——实得 n=%s caps=%s" % (n, caps), file=sys.stderr); sys.exit(1)
+print("  ✓ 硬断言13b：批量开通——%s 条策略、%s 个 capability 可指认（一 item 一策略）" % (n, caps))'
+echo "> 关联推荐（共现信号：两包曾同单出现 → 互推）："
+curl -s "$IAM/api/v1/marketplace/recommend?capability_id=$CAP_ID" -H "$AUTH" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+names=[i["name"] for i in d.get("items",[])]
+if "数据库管理" not in names:
+    print("  ✗ FAIL：主机管理应推荐共现的数据库管理（硬断言14）——实得", names, file=sys.stderr); sys.exit(1)
+print("  ✓ 硬断言14：关联推荐——主机管理 →", "、".join(names), "（基于共现，非依赖）")'
+
 say "16. 能力包 v12：接入申请（前置鉴权 + 网络开通，凭证一次签发）"
 curl -s -X POST "$IAM/api/v1/auth/login" -H "$CT" -d '{"username":"erin","password":"pass123"}' > "$TMP/erin.json"
 ERIN_TOKEN=$(python3 -c 'import json;print(json.load(open("'$TMP'/erin.json"))["access_token"])')
