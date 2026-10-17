@@ -25,8 +25,10 @@
 - **程序授权（M2M）**：OAuth2 Client Credentials，主体 service 与用户共用 PDP
 - **开放自服务/弱管理员**：应用自注册 + owner 模型 + 权限市场 + 申请-审批-开通-回收（IGA）
 - **身份同步**：mock-identity（SCIM 风格）+ Identity Connector + JML
-- **数据契约与点查（1.5）**：数据级发布必填契约（判定字段清单=点查模型白名单）+ 门禁试算自检（按取材声明真取一次行）；观测端点 `/api/v1/sync/contracts`
-- **进程隔离**：`iam-sync` 仅存 TTL 到期回收循环（单活锁+逐轮 recover+status 守卫）；判定进程 iam-server 无后台循环、可独立多副本；健康探活容器内 `/healthz`；本地开发 `make run-sync`
+- **数据契约与点查（1.5）**：数据级发布必填契约（判定字段清单=点查模型白名单）+ 门禁试算自检（按取材声明真取一次行）；观测端点 `/api/v1/sync/contracts`- **接入体检与凭证豁免（1.5 T4）**：应用注册/导入即体检（五类硬校验：缺动作/格式错/重复/配置自洽含裸豁免/导入一致性，报告回执 `GET /apps/:id/onboard-report`）；豁免主语=M2M 凭证非路由（`App.ExemptPaths`，网关凭证匹配才跳过，失配打 `[ALERT][gw403]` 告警）；动作码别名路由显式登记例外
+- **预设参数联动+层级编排（1.5 T6）**：场景参数一次选定全域同值（`$key` 引用，shared 模式服务端钉子禁字面值=防域间错位）；`data_model_tree` 层级树（编排不是存储，落底各域独立策略）
+- **多包一次性申请（1.5 T7）**：`capability_requests[]` ≥2 包一单一审批（同应用）→ 逐包表达式合并审批视图 → 批量开通一 item 一策略（capability_id 可指认）；共现推荐（`/marketplace/recommend`）
+- **deny 治理（1.5 T8）**：deny-overrides（`allow && !deny` 一票否决）+ 治理三钉子（显式 action_ids 禁通配/reason 必填同链留痕/单应用配额 20）；deny≠删除授权——回收解除后 allow 自然恢复（冻结语义）；见 `docs/deny治理规范.md` 与 `docs/兜底接入规范.md`- **进程隔离**：`iam-sync` 仅存 TTL 到期回收循环（单活锁+逐轮 recover+status 守卫）；判定进程 iam-server 无后台循环、可独立多副本；健康探活容器内 `/healthz`；本地开发 `make run-sync`
 
 ## 快速开始（OrbStack 全栈部署，统一管理）
 

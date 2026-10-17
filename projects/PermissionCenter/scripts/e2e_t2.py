@@ -81,8 +81,9 @@ ok, d = grant("t2:disk:create-ssd", [DISK_CREATE], {"condition": {"op": "eq", "f
 check("disk create 条件策略生效", ok, d)
 
 # ---- 3. 网关链路点查（path.*，§3.5 零配合）----
-s, g = gw("alice", "cmdb", "PATCH", "/api/v1/hosts/host-4")
-check("点查+谓词放行 200（ip=10.0.0.11）", s == 200, (s, g))
+# host-6 = db-01（ip=10.0.1.11，与 grant 条件同值；reset 后 mock 实例重排——id 以运行时解析为准）
+s, g = gw("alice", "cmdb", "PATCH", "/api/v1/hosts/host-6")
+check("点查+谓词放行 200（ip=10.0.1.11）", s == 200, (s, g))
 s, g = gw("alice", "cmdb", "PATCH", "/api/v1/hosts/host-5")
 check("谓词不匹配 403 NO_PERMISSION（ip=.12）", s == 403 and g.get("code") == "NO_PERMISSION", (s, g))
 s, g = gw("alice", "cmdb", "PATCH", "/api/v1/hosts/host-999")

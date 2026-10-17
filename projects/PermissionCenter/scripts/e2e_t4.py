@@ -50,6 +50,11 @@ TOK = d["access_token"]
 
 # ---- 起点清残留（历史崩溃运行可能留下坏 pending）----
 sql("DELETE FROM route_pendings WHERE path LIKE '/api/v1/e2e-bad%'")
+# fixture 自愈（T9）：seed-reset 后 e2e-things 待确认项会丢——不存在则重建（incomplete 态依赖它）
+sql("""INSERT INTO route_pendings (created_at, updated_at, app_id, method, path, inferred_code, rw, reason, status)
+      SELECT now(), now(), 1, 'GET', '/api/v1/e2e-things', 'cmdb:e2e-thing:list', 'read',
+             '④形态表：GET 集合路径 → list', 'pending'
+      WHERE NOT EXISTS (SELECT 1 FROM route_pendings WHERE path='/api/v1/e2e-things')""")
 
 print("===== T4-1 未确认路由停『未完成』态（存量 e2e-things）=====")
 st, rep = http("GET", f"{IAM}/api/v1/apps/1/onboard-report", token=TOK)
