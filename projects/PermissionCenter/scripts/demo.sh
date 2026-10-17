@@ -359,4 +359,58 @@ curl -s "$IAM/api/v1/tickets?type=all&role=applicant" -H "Authorization: Bearer 
 for t in json.load(sys.stdin)["items"][:4]:
     print("  %s %s [%s]" % (t["ticket_no"], t["title"], t["status"]))'
 
+say "23. deny 治理（T8）：显式禁止 + deny-overrides（allow 全在，deny 一票否决）+ 精确性 + 生命周期"
+echo "> 0) 清理历史 deny 残留（崩溃恢复友好；场景22 的 sleep 66 已自然过期决策缓存）"
+docker exec devops-postgres psql -U devops -d devops_iam -t -c "update policies set status=0 where app_id=1 and effect=2 and status=1;" >/dev/null && echo "  已清理"
+ALICE_ID=$(python3 -c 'import json;d=json.load(open("/tmp/iam-users.json"));print([u["id"] for u in d["items"] if u["username"]=="alice"][0])')
+echo "> 1) 基线：alice 读主机 = allow（seed：个人/组/组织三维授权全在）"
+B23=$(curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read"}')
+echo "  $B23"
+if ! echo "$B23" | grep -q '"decision":"allow"'; then
+  echo "  ✗ FAIL：基线应 allow（deny 治理演示前提）" >&2; exit 1
+fi
+echo "> 2) 治理钉子①：deny 无 action_ids → 400（禁通配 deny——deny-overrides 一票否决，宽 deny 会误伤全部 allow）"
+N1=$(curl -s -o /tmp/iam-deny-nail1.json -w "%{http_code}" -X POST "$IAM/api/v1/policies" -H "$CT" -H "$AUTH" -d "{\"effect\":2,\"subject_type\":1,\"subject_id\":$ALICE_ID,\"app_id\":1,\"action_ids\":[],\"reason\":\"通配封禁尝试\"}")
+echo "  http=$N1 $(cat /tmp/iam-deny-nail1.json)"
+if [ "$N1" != "400" ]; then echo "  ✗ FAIL：通配 deny 应 400 拒（治理钉子①）" >&2; exit 1; fi
+echo "  ✓ 治理钉子①：deny 必须显式 action_ids"
+echo "> 3) 治理钉子②：deny 无 reason → 400（显式禁止与授权同权重留痕）"
+N2=$(curl -s -o /tmp/iam-deny-nail2.json -w "%{http_code}" -X POST "$IAM/api/v1/policies" -H "$CT" -H "$AUTH" -d "{\"effect\":2,\"subject_type\":1,\"subject_id\":$ALICE_ID,\"app_id\":1,\"action_ids\":[$ACTION_READ]}")
+echo "  http=$N2 $(cat /tmp/iam-deny-nail2.json)"
+if [ "$N2" != "400" ]; then echo "  ✗ FAIL：无 reason 的 deny 应 400 拒（治理钉子②）" >&2; exit 1; fi
+echo "  ✓ 治理钉子②：deny reason 必填"
+echo "> 4) owner（admin）发起 deny 授权单：封禁 alice 的 host:read（安全事件响应场景）"
+DENY_REQ=$(curl -s -o /tmp/iam-deny-req.json -X POST "$IAM/api/v1/policies" -H "$CT" -H "$AUTH" -d "{\"name\":\"incident:ban-alice-host-read\",\"effect\":2,\"subject_type\":1,\"subject_id\":$ALICE_ID,\"app_id\":1,\"action_ids\":[$ACTION_READ],\"reason\":\"安全事件响应：临时封禁读取权限（demo）\"}" && python3 -c 'import json;print(json.load(open("/tmp/iam-deny-req.json"))["id"])')
+echo "  deny 授权单 #$DENY_REQ 已提交（grant 方向：被禁方知情同意 + owner 复核）"
+echo "> 5) alice 确认（SoD：申请人 admin 不能自批；被禁方知情——让他知道、让他同意）"
+curl -s -X POST "$IAM/api/v1/requests/$DENY_REQ/approve" -H "$CT" -H "Authorization: Bearer $ALICE_TOKEN" -d '{"action":1,"comment":"知悉并同意封禁（事件响应）"}' | python3 -c 'import json,sys;d=json.load(sys.stdin);print("  审批结果:", d.get("status") or d)'
+DENY_POL=$(docker exec devops-postgres psql -U devops -d devops_iam -t -A -c "select id from policies where request_id=$DENY_REQ and effect=2 limit 1;")
+echo "  deny 策略 #$DENY_POL 落库（effect=2 传播——T8 修复：此前 grantFromRequest 硬编码 allow，deny 审批通过被落成 allow 的真 gap）"
+echo "> 6) deny-overrides：alice 读主机 → 403（个人/组/组织三路 allow 全在，deny 一票否决）"
+D23=$(curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read"}')
+echo "  $D23"
+if ! echo "$D23" | grep -q '"decision":"deny"'; then
+  echo "  ✗ FAIL：deny 应一票否决全部 allow（硬断言15 deny-overrides）" >&2; exit 1
+fi
+echo "  ✓ 硬断言15：deny-overrides（deny 命中，再多 allow 也拒——allow && !deny）"
+echo "> 7) 精确性：deny 只封 host:read——alice 列主机（host:list）仍 allow（治理规矩①：deny 必须比被禁 allow 更精确，不误伤邻近动作）"
+P23=$(curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:list"}')
+echo "  $P23"
+if ! echo "$P23" | grep -q '"decision":"allow"'; then
+  echo "  ✗ FAIL：host:list 不应被 host:read 的 deny 误伤（硬断言16 精确性）" >&2; exit 1
+fi
+echo "  ✓ 硬断言16：deny 精确性（封 read 不误伤 list——治理规矩①的实证）"
+echo "> 8) 审计可指认：deny 策略落库可查（effect=2 + 申请单关联 + 理由）"
+docker exec devops-postgres psql -U devops -d devops_iam -c "select id, name, effect, request_id, created_by from policies where id=$DENY_POL;"
+echo "> 9) 解除封禁：admin 发起回收 → alice 审批（回收同留痕——生命周期闭环）"
+REVOKE_ID=$(curl -s -o /tmp/iam-deny-revoke.json -X POST "$IAM/api/v1/grants/$DENY_POL/revoke" -H "$CT" -H "$AUTH" -d '{"reason":"事件已处置，解除封禁（demo）"}' && python3 -c 'import json;print(json.load(open("/tmp/iam-deny-revoke.json"))["id"])')
+curl -s -X POST "$IAM/api/v1/revoke-requests/$REVOKE_ID/approve" -H "$CT" -H "Authorization: Bearer $ALICE_TOKEN" -d '{"action":1,"comment":"同意解除"}' | python3 -c 'import json,sys;d=json.load(sys.stdin);print("  回收审批:", d.get("status") or d)'
+echo "> 10) 恢复核验：alice 读主机 → allow 复通（deny 解除，原有 allow 自然恢复——无需重新授权）"
+R23=$(curl -s -X POST "$IAM/v1/authz/check" -H "$CT" -H "$PEP" -d '{"user":"alice","app":"cmdb","action":"cmdb:host:read"}')
+echo "  $R23"
+if ! echo "$R23" | grep -q '"decision":"allow"'; then
+  echo "  ✗ FAIL：deny 解除后 allow 应复通（硬断言15b 生命周期闭环）" >&2; exit 1
+fi
+echo "  ✓ 硬断言15b：deny 解除即复通（deny 不删除 allow——解除后授权自然恢复）"
+
 say "完成 ✅"

@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -66,6 +68,28 @@ func (d *Deps) createPolicy(c *gin.Context) {
 	if !d.isAppOwner(applicantID, req.AppID) {
 		c.JSON(403, gin.H{"error": "only app owner can grant permissions"})
 		return
+	}
+
+	// T8 deny 治理规范（§4.4）：deny 比 allow 危险（deny-overrides 一票否决）——
+	// 机器校验三道：① 精确性（必须显式 action_ids，禁通配 deny 误伤全局）；
+	// ② 理由必填（"为什么禁"与"为什么给"同权重，审计同链）；③ 配额（单应用 deny 上限）
+	if req.Effect == model.EffectDeny {
+		if len(req.ActionIDs) == 0 {
+			c.JSON(400, gin.H{"error": "deny 治理：必须显式指定 action_ids（禁通配 deny——deny-overrides 一票否决，宽 deny 会误伤全部 allow）"})
+			return
+		}
+		if strings.TrimSpace(req.Reason) == "" {
+			c.JSON(400, gin.H{"error": "deny 治理：reason 必填（显式禁止与授权同权重留痕）"})
+			return
+		}
+		var denyCnt int64
+		d.DB.Model(&model.Policy{}).
+			Where("app_id = ? AND effect = ? AND status = ?", req.AppID, model.EffectDeny, model.PolicyActive).
+			Count(&denyCnt)
+		if denyCnt >= model.DenyPolicyQuotaPerApp {
+			c.JSON(400, gin.H{"error": fmt.Sprintf("deny 治理：单应用 active deny 策略已达配额上限 %d（先清理/归档存量 deny）", model.DenyPolicyQuotaPerApp)})
+			return
+		}
 	}
 
 	// 主体类型 → 申请单主体枚举

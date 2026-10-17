@@ -1038,9 +1038,14 @@ func (d *Deps) grantFromRequest(c *gin.Context, r *model.AccessRequest, approver
 		}
 	}
 
+	// T8 deny 传播：申请单 content.effect=2 → 落 deny 策略（此前硬编码 allow——deny 审批通过被落成 allow 的真 gap）
+	polEffect := int16(model.EffectAllow)
+	if v, ok := content["effect"].(float64); ok && int16(v) == model.EffectDeny {
+		polEffect = model.EffectDeny
+	}
 	p := &model.Policy{
 		Name:          "grant:req:" + strconv.FormatUint(r.ID, 10),
-		Effect:        model.EffectAllow,
+		Effect:        polEffect,
 		SubjectType:   subjectType,
 		SubjectID:     subjectID,
 		AppID:         r.AppID,

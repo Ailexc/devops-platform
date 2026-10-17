@@ -36,6 +36,10 @@ const (
 	EffectDeny  = 2
 )
 
+// DenyPolicyQuotaPerApp T8 deny 治理配额（§4.4）：单应用 active deny 策略上限——
+// deny-overrides 一票否决，失控的 deny 面比失控的 allow 面更危险（误伤全部授权）
+const DenyPolicyQuotaPerApp = 20
+
 // 策略状态
 const (
 	PolicyDisabled = 0
@@ -76,11 +80,11 @@ const (
 
 // 申请状态
 const (
-	ReqDraft     = 0
-	ReqPending   = 1
-	ReqApproved  = 2
-	ReqRejected  = 3
-	ReqRevoked   = 4
+	ReqDraft    = 0
+	ReqPending  = 1
+	ReqApproved = 2
+	ReqRejected = 3
+	ReqRevoked  = 4
 )
 
 // 审批动作
@@ -91,10 +95,10 @@ const (
 
 // 同步任务类型
 const (
-	SyncOpenAPI    = 1
-	SyncCMDBModel  = 2
-	SyncCMDBInst   = 3
-	SyncIdentity   = 4
+	SyncOpenAPI   = 1
+	SyncCMDBModel = 2
+	SyncCMDBInst  = 3
+	SyncIdentity  = 4
 )
 
 // 决策渠道
