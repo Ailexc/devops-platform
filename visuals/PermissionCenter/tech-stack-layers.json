@@ -5,36 +5,280 @@
     "title": "权限中心 · 技术选型分层落位图",
     "locale": "zh-CN",
     "quality_profile": "showcase",
-    "viewBox": [1100, 450],
+    "viewBox": [
+      1100,
+      450
+    ],
     "views": [
-      { "id": "control-plane", "label": "控制面", "focus": ["pap", "sync"], "note": "低 QPS 管理操作：PAP 管理台以「我」为中心组织导航；Sync 三连接器——OpenAPI 解析生成权限模板、CMDB 事件+增量同步资源索引、SCIM 同步用户/组织副本。" },
-      { "id": "data-plane", "label": "数据面", "focus": ["pdp", "openfga"], "note": "高 QPS 鉴权执行、无状态水平扩展：Casbin 管动作级（能不能调接口）、OpenFGA 管实例级（能不能动这条数据）；OAuth 端点签发 M2M 令牌与审批受限令牌。" },
-      { "id": "pep-access", "label": "PEP 两级验证", "focus": ["gw", "apps"], "note": "接口级判定收口网关：ext-authz / forwardAuth 回调 PDP，共享密钥防绕过；下游业务系统零权限代码、只读身份头（与 02-CloudManager 同口径）。" },
-      { "id": "data-degrade", "label": "数据与降级", "focus": ["pg", "redis", "mock"], "note": "投影存储只存权限判断所需字段；CMDB 宕机用最后同步数据降级（synced_at 水位可告警）；mock-cmdb / mock-identity 替身演示同步、降级与 JML。" },
-      { "id": "bundle-dispatch", "label": "策略分发（进阶）", "focus": ["pdp", "gw"], "note": "借鉴 OPA bundle：策略包下发网关 agent 本地决策（最终一致），高风险写 force-remote 回源强一致；数据级策略不进 bundle、回源 OpenFGA。" }
+      {
+        "id": "control-plane",
+        "label": "控制面",
+        "focus": [
+          "pap",
+          "sync"
+        ],
+        "note": "低 QPS 管理操作：PAP 管理台以「我」为中心组织导航；Sync 契约登记——OpenAPI 解析生成动作码权限模板与路由表、SCIM 同步用户/组织副本（1.5：CMDB 数据不再同步进中心）。"
+      },
+      {
+        "id": "data-plane",
+        "label": "数据面",
+        "focus": [
+          "pdp",
+          "checkrow"
+        ],
+        "note": "高 QPS 鉴权执行、无状态水平扩展：Casbin 管动作级（能不能调接口）、自研 CheckRow 管数据级（范围谓词 × 点查权威行，fail-closed）；OAuth 端点签发 M2M 令牌与审批受限令牌。"
+      },
+      {
+        "id": "pep-access",
+        "label": "PEP 两级验证",
+        "focus": [
+          "gw",
+          "apps"
+        ],
+        "note": "接口级判定收口网关：ext-authz / forwardAuth 回调 PDP，共享密钥防绕过；下游业务系统零权限代码、只读身份头（与 02-CloudManager 同口径）。"
+      },
+      {
+        "id": "data-store",
+        "label": "数据与存储",
+        "focus": [
+          "pg",
+          "redis",
+          "mock"
+        ],
+        "note": "中心不搬业务数据——只登记数据契约与路由表；点查失败 fail-closed 三态（无隐式降级）；决策缓存 TTL；mock-cmdb 实现通用点查回查端点、mock-identity 演示 JML。"
+      },
+      {
+        "id": "bundle-dispatch",
+        "label": "策略分发（进阶）",
+        "focus": [
+          "pdp",
+          "gw"
+        ],
+        "note": "借鉴 OPA bundle：策略包下发网关 agent 本地决策（最终一致，fail-closed 降级）；数据级策略不进包——数据级判定需实时点查权威行，由中心 CheckRow 完成。"
+      }
     ]
   },
   "components": [
-    { "id": "sync", "type": "backend", "label": "Sync 同步服务", "sublabel": "Connector 抽象", "tag": "OpenAPI→模板 · CMDB→索引 · SCIM 身份", "pos": [140, 40], "size": [220, 68] },
-    { "id": "pap", "type": "frontend", "label": "PAP 管理控制台", "sublabel": "Vue 3.5 · Element Plus 2.9", "tag": "以我为中心工作台 · 弱管理员", "brand": "vue", "pos": [480, 40], "size": [220, 68] },
-    { "id": "openfga", "type": "database", "label": "OpenFGA 实例级引擎", "sublabel": "v1.8.7 · CNCF · Zanzibar", "tag": "Check / ListObjects · 自有 datastore", "pos": [140, 195], "size": [220, 68] },
-    { "id": "pdp", "type": "backend", "label": "PDP 授权决策服务", "sublabel": "Go 1.26 + Gin 1.12", "tag": "动作级 Casbin · OAuth M2M · 无状态扩展", "pos": [480, 195], "size": [220, 68] },
-    { "id": "redis", "type": "database", "label": "Redis 缓存", "sublabel": "复用 devops-redis · db3 隔离", "tag": "策略/决策缓存 · Streams 两用", "pos": [140, 350], "size": [210, 66] },
-    { "id": "pg", "type": "database", "label": "PostgreSQL 主存储", "sublabel": "策略 / 审计 / 资源索引", "tag": "追加写 · 按月分区", "pos": [480, 350], "size": [210, 66] },
-    { "id": "apps", "type": "external", "label": "下游业务系统", "sublabel": "云管 / 工单 / 事件", "tag": "零权限代码 · 只读身份头", "pos": [820, 40], "size": [220, 68] },
-    { "id": "gw", "type": "security", "label": "网关 PEP", "sublabel": "APISIX 设计 / Traefik Demo", "tag": "forwardAuth → /v1/gateway/check", "pos": [820, 195], "size": [220, 68] },
-    { "id": "mock", "type": "external", "label": "mock 数据源", "sublabel": "mock-cmdb / mock-identity", "tag": "替身演示同步 · 降级 · JML", "pos": [820, 350], "size": [220, 68] }
+    {
+      "id": "sync",
+      "type": "backend",
+      "label": "Sync 契约登记",
+      "sublabel": "OpenAPI / SCIM Connector",
+      "tag": "OpenAPI→动作码路由表+模板 · SCIM 身份",
+      "pos": [
+        140,
+        40
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "pap",
+      "type": "frontend",
+      "label": "PAP 管理控制台",
+      "sublabel": "Vue 3.5 · Element Plus 2.9",
+      "tag": "以我为中心工作台 · 弱管理员",
+      "brand": "vue",
+      "pos": [
+        480,
+        40
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "checkrow",
+      "type": "database",
+      "label": "CheckRow 数据级判定（自研）",
+      "sublabel": "谓词求值 × 点查客户端",
+      "tag": "范围谓词 × 权威行 · fail-closed 三态",
+      "pos": [
+        140,
+        195
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "pdp",
+      "type": "backend",
+      "label": "PDP 授权决策服务",
+      "sublabel": "Go 1.26 + Gin 1.12",
+      "tag": "动作级 Casbin · 数据级 CheckRow · OAuth M2M",
+      "pos": [
+        480,
+        195
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis 缓存",
+      "sublabel": "复用 devops-redis · db3 隔离",
+      "tag": "策略/决策缓存 · Streams 审计落库",
+      "pos": [
+        140,
+        350
+      ],
+      "size": [
+        210,
+        66
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL 主存储",
+      "sublabel": "策略 / 审计 / 路由表",
+      "tag": "追加写 · 按月分区 · 路由表版本快照",
+      "pos": [
+        480,
+        350
+      ],
+      "size": [
+        210,
+        66
+      ]
+    },
+    {
+      "id": "apps",
+      "type": "external",
+      "label": "下游业务系统",
+      "sublabel": "云管 / 工单 / 事件",
+      "tag": "零权限代码 · 只读身份头",
+      "pos": [
+        820,
+        40
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "gw",
+      "type": "security",
+      "label": "网关 PEP",
+      "sublabel": "APISIX 设计 / Traefik Demo",
+      "tag": "forwardAuth → /v1/gateway/check",
+      "pos": [
+        820,
+        195
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "mock",
+      "type": "external",
+      "label": "mock 外部系统",
+      "sublabel": "mock-cmdb / mock-identity",
+      "tag": "点查回查端点 · fail-closed 演示 · JML",
+      "pos": [
+        820,
+        350
+      ],
+      "size": [
+        220,
+        68
+      ]
+    }
   ],
   "boundaries": [
-    { "kind": "region", "label": "PermissionCenter Docker Compose 栈（iam-server · openfga · traefik · frontend）", "wraps": ["pap", "sync", "pdp", "openfga", "pg", "redis", "gw"], "pad": 20 },
-    { "kind": "region", "label": "外部系统与 Demo 替身", "wraps": ["apps", "mock"], "pad": 16 }
+    {
+      "kind": "region",
+      "label": "PermissionCenter Docker Compose 栈（iam-server · iam-sync · traefik · frontend）",
+      "wraps": [
+        "pap",
+        "sync",
+        "pdp",
+        "checkrow",
+        "pg",
+        "redis",
+        "gw"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "外部系统与 Demo 替身",
+      "wraps": [
+        "apps",
+        "mock"
+      ],
+      "pad": 16
+    }
   ],
   "connections": [
-    { "from": "apps", "to": "gw", "label": "业务流量 · PEP 拦截", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [935, 150] },
-    { "from": "gw", "to": "pdp", "label": "forwardAuth / ext-authz 鉴权回调", "variant": "emphasis", "fromSide": "left", "toSide": "right", "labelAt": [760, 178] },
-    { "from": "pap", "to": "pdp", "label": "策略管理与发布", "fromSide": "bottom", "toSide": "top", "labelAt": [605, 150] },
-    { "from": "pdp", "to": "openfga", "label": "Check / ListObjects", "fromSide": "left", "toSide": "right", "labelAt": [420, 178] },
-    { "from": "pdp", "to": "pg", "label": "策略 / 审计 / 索引落库", "fromSide": "bottom", "toSide": "top", "labelAt": [605, 305] }
+    {
+      "from": "apps",
+      "to": "gw",
+      "label": "业务流量 · PEP 拦截",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        935,
+        150
+      ]
+    },
+    {
+      "from": "gw",
+      "to": "pdp",
+      "label": "forwardAuth / ext-authz 鉴权回调",
+      "variant": "emphasis",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [
+        760,
+        178
+      ]
+    },
+    {
+      "from": "pap",
+      "to": "pdp",
+      "label": "策略管理与发布",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        605,
+        150
+      ]
+    },
+    {
+      "from": "pdp",
+      "to": "checkrow",
+      "label": "谓词求值 × 点查回调取行",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [
+        420,
+        178
+      ]
+    },
+    {
+      "from": "pdp",
+      "to": "pg",
+      "label": "策略 / 审计 / 索引落库",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        605,
+        305
+      ]
+    }
   ],
   "cards": []
 }
