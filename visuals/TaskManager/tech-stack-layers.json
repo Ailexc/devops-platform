@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "任务编排平台 · 技术选型分层落位图",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1380,
+      580
+    ],
+    "views": [
+      {
+        "id": "front-access",
+        "label": "前端与接入",
+        "focus": [
+          "web",
+          "gateway"
+        ],
+        "note": "Vue 3 前端 + Nginx 托管反代；前端下拉切换 API 地址即切换双栈后端——契约一致零改动。"
+      },
+      {
+        "id": "dual-stack",
+        "label": "双栈并行",
+        "focus": [
+          "pyapi",
+          "goapi"
+        ],
+        "note": "Python（Django + Celery + Beat）与 Go（Gin + asynq 单二进制多角色 --role）——契约驱动端点全对齐，绞杀者模式迁移。"
+      },
+      {
+        "id": "orchestration",
+        "label": "编排与队列",
+        "focus": [
+          "pyorch",
+          "gooch"
+        ],
+        "note": "Python 版 chord/group/chain 直译真实架构；Go 版自研 WaveState 状态机 + HINCRBY 原子计数驱动两波次切换；SINTER 资源集合并发锁。"
+      },
+      {
+        "id": "data",
+        "label": "数据与隔离",
+        "focus": [
+          "pg",
+          "store"
+        ],
+        "note": "PostgreSQL 逻辑库 devops_cmdb / devops_cmdb_go（库名遗留正名）；Redis db 5/7 隔离；cmdbstore 虚拟 ORM 波次间共享资源数据。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "管理前端",
+      "sublabel": "Vue 3 + Nginx",
+      "tag": "大盘 · 任务树 · 配置 · 历史 · 双栈切换",
+      "brand": "vue",
+      "pos": [
+        580,
+        40
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "backend",
+      "label": "Nginx 接入层",
+      "sublabel": "静态托管 + API 反代",
+      "tag": "下拉切换 API 地址选后端",
+      "pos": [
+        580,
+        148
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "pyapi",
+      "type": "backend",
+      "label": "Python API",
+      "sublabel": "Django + Celery + Beat",
+      "tag": "资源模块 ec2/vpc/rds 三族",
+      "brand": "django",
+      "pos": [
+        340,
+        256
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "goapi",
+      "type": "backend",
+      "label": "Go API",
+      "sublabel": "Gin + GORM + asynq",
+      "tag": "单二进制多角色 --role · aws-sdk-go-v2",
+      "pos": [
+        820,
+        256
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "pyorch",
+      "type": "messagebus",
+      "label": "Celery 编排",
+      "sublabel": "chord / group / chain",
+      "tag": "chain(group,group) 直译两波次 · prefork",
+      "pos": [
+        340,
+        376
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "gooch",
+      "type": "messagebus",
+      "label": "WaveState 状态机",
+      "sublabel": "自研编排 + asynq 执行",
+      "tag": "HINCRBY 计数 · SINTER 并发锁 · 哨兵 cron",
+      "pos": [
+        820,
+        376
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "devops_cmdb · devops_cmdb_go",
+      "tag": "任务元数据 + 执行历史 · 逻辑库隔离",
+      "pos": [
+        340,
+        484
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "store",
+      "type": "database",
+      "label": "Redis（db 5/7）",
+      "sublabel": "队列 + 计数 + cmdbstore",
+      "tag": "虚拟 ORM 波次间共享 · db 编号隔离",
+      "pos": [
+        820,
+        484
+      ],
+      "size": [
+        220,
+        68
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "TaskManager Docker Compose 栈（api × 2 + worker × 2 + frontend）",
+      "wraps": [
+        "web",
+        "gateway",
+        "pyapi",
+        "goapi",
+        "pyorch",
+        "gooch"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "共享基础设施（devops-postgres / devops-redis）",
+      "wraps": [
+        "pg",
+        "store"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "from": "web",
+      "to": "gateway",
+      "label": "页面与 API 请求",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        690,
+        122
+      ]
+    },
+    {
+      "from": "gateway",
+      "to": "pyapi",
+      "label": "API 反代（Python 栈）",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        460,
+        230
+      ]
+    },
+    {
+      "from": "gateway",
+      "to": "goapi",
+      "label": "API 反代（Go 栈）",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        930,
+        230
+      ]
+    },
+    {
+      "from": "pyapi",
+      "to": "pyorch",
+      "label": "任务下发",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        450,
+        350
+      ]
+    },
+    {
+      "from": "goapi",
+      "to": "gooch",
+      "label": "任务下发",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        930,
+        350
+      ]
+    },
+    {
+      "from": "pyorch",
+      "to": "pg",
+      "label": "执行历史留档",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        340,
+        452
+      ],
+      "labelDy": -30
+    },
+    {
+      "from": "gooch",
+      "to": "store",
+      "label": "计数 / 锁 / 执行留档",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        930,
+        468
+      ]
+    }
+  ]
+}
