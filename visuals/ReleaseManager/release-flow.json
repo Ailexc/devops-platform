@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "发布系统 · 发布单全生命周期（状态机）",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "release-flow.html",
+    "viewBox": [
+      1080,
+      700
+    ],
+    "views": [
+      {
+        "id": "create-approve",
+        "label": "发起与审批",
+        "focus": [
+          "draft",
+          "pending",
+          "rejected"
+        ],
+        "note": "创建发布单按环境自动判断审批（prod/staging 需审批，dev/test 免审批直达）；审批人动态解析——应用负责人/组长/业务线负责人，不绑定固定用户。"
+      },
+      {
+        "id": "running-rail",
+        "label": "执行主链路",
+        "focus": [
+          "approved",
+          "running",
+          "completed"
+        ],
+        "note": "ReleaseTask 固定 CI+CD 两步；部署策略三选一（滚动/蓝绿/灰度）；CD 成功后自动执行 ReleaseVerification，结果 JSON 留档可重跑。"
+      },
+      {
+        "id": "recovery",
+        "label": "失败与回滚兜底",
+        "focus": [
+          "failed",
+          "rolled_back"
+        ],
+        "note": "失败走补偿发布只重发失败目标（selected_targets）；回滚是一等公民——rollback_from 血缘 + RollbackRecord 版本前后关系，制品不可变保证回滚确定；灰度发布支持暂停观察（canary_percent 调整）与恢复放量。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "主链路"
+    },
+    {
+      "id": "waiting",
+      "label": "审批"
+    },
+    {
+      "id": "terminal",
+      "label": "终态出口"
+    }
+  ],
+  "states": [
+    {
+      "id": "draft",
+      "type": "start",
+      "label": "草稿",
+      "sublabel": "draft · 判审批",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "创建"
+    },
+    {
+      "id": "pending",
+      "type": "waiting",
+      "label": "审批中",
+      "sublabel": "pending · 解析审批人",
+      "lane": "waiting",
+      "col": 0,
+      "step": "02",
+      "tag": "prod/staging"
+    },
+    {
+      "id": "rejected",
+      "type": "neutral",
+      "label": "审批驳回",
+      "sublabel": "rejected · 可重发",
+      "lane": "terminal",
+      "col": 0,
+      "step": "03",
+      "tag": "终态"
+    },
+    {
+      "id": "approved",
+      "type": "active",
+      "label": "审批通过",
+      "sublabel": "approved · 待执行",
+      "lane": "main",
+      "col": 1,
+      "step": "04",
+      "tag": "dev/test 免审直达"
+    },
+    {
+      "id": "running",
+      "type": "active",
+      "label": "发布中",
+      "sublabel": "running · 三策略",
+      "lane": "main",
+      "col": 2,
+      "step": "05",
+      "tag": "滚动/蓝绿/灰度"
+    },
+    {
+      "id": "completed",
+      "type": "success",
+      "label": "已完成",
+      "sublabel": "completed · 留档",
+      "lane": "main",
+      "col": 3,
+      "step": "06",
+      "tag": "终态"
+    },
+    {
+      "id": "failed",
+      "type": "failure",
+      "label": "失败",
+      "sublabel": "failed · 可补偿",
+      "lane": "terminal",
+      "col": 1,
+      "step": "07",
+      "tag": "可恢复"
+    },
+    {
+      "id": "rolled_back",
+      "type": "neutral",
+      "label": "已回滚",
+      "sublabel": "rolled_back",
+      "lane": "main",
+      "col": 4,
+      "step": "09",
+      "tag": "终态"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "draft",
+      "to": "pending",
+      "label": "发起审批",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [
+        [
+          94,
+          240
+        ],
+        [
+          402,
+          240
+        ]
+      ],
+      "labelAt": [
+        160,
+        232
+      ]
+    },
+    {
+      "from": "draft",
+      "to": "approved",
+      "label": "dev/test 免审批",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        171,
+        114
+      ]
+    },
+    {
+      "from": "pending",
+      "to": "approved",
+      "label": "审批通过",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [
+        [
+          402,
+          248
+        ],
+        [
+          248,
+          248
+        ]
+      ],
+      "labelAt": [
+        325,
+        260
+      ]
+    },
+    {
+      "from": "pending",
+      "to": "rejected",
+      "label": "驳回",
+      "variant": "security",
+      "labelAt": [
+        436,
+        380
+      ]
+    },
+    {
+      "from": "approved",
+      "to": "running",
+      "label": "执行 CI+CD",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        325,
+        114
+      ]
+    },
+    {
+      "from": "running",
+      "to": "completed",
+      "label": "验证通过",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        480,
+        114
+      ]
+    },
+    {
+      "from": "running",
+      "to": "failed",
+      "label": "部署/验证失败",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "right",
+      "via": [
+        [
+          402,
+          64
+        ],
+        [
+          1080,
+          64
+        ],
+        [
+          1080,
+          470
+        ],
+        [
+          615,
+          470
+        ]
+      ],
+      "labelAt": [
+        740,
+        80
+      ]
+    },
+    {
+      "from": "failed",
+      "to": "running",
+      "label": "补偿发布 · 只重发失败目标",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [
+        [
+          556,
+          380
+        ],
+        [
+          1120,
+          380
+        ],
+        [
+          1120,
+          224
+        ],
+        [
+          402,
+          224
+        ]
+      ],
+      "labelAt": [
+        840,
+        396
+      ]
+    },
+    {
+      "from": "completed",
+      "to": "rolled_back",
+      "label": "回滚发布 · 重新部署旧制品",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [
+        633,
+        114
+      ]
+    }
+  ]
+}
