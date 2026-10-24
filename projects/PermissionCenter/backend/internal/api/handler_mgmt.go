@@ -182,6 +182,21 @@ func (d *Deps) mgScope(c *gin.Context) {
 		c.AbortWithStatusJSON(403, gin.H{"error": "not owner of this application"})
 		return
 
+	// v1.5 T1 动作码路由表 + T2 通用点查配置：仅 owner（admin 已在前面放行）——deny-by-default，不登记必 403
+	case path == "/api/v1/apps/:id/routes" ||
+		path == "/api/v1/apps/:id/perm-query" ||
+		path == "/api/v1/apps/:id/onboard-report" ||
+		path == "/api/v1/apps/:id/exempt-paths" ||
+		strings.HasPrefix(path, "/api/v1/apps/:id/routes/") ||
+		strings.HasPrefix(path, "/api/v1/apps/:id/pending-routes/"):
+		appID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+		if d.isAppOwner(actor.ID, appID) {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(403, gin.H{"error": "not owner of this application"})
+		return
+
 	// 策略模板写操作：仅 owner
 	case path == "/api/v1/apps/:id/templates" ||
 		path == "/api/v1/apps/:id/templates/:tid" ||
@@ -272,10 +287,6 @@ func (d *Deps) mgScope(c *gin.Context) {
 		return
 
 	// --- 同步 ---
-	case path == "/api/v1/sync/cmdb":
-		c.Next() // CMDB 同步：任何登录用户可触发
-		return
-
 	case path == "/api/v1/sync/identity":
 		c.Next() // 身份源同步：任何登录用户可触发
 		return
@@ -305,6 +316,15 @@ func (d *Deps) mgScope(c *gin.Context) {
 		c.Next() // 审批：任何登录用户可尝试审批（SoD 在 handler 中校验）
 		return
 
+	// --- A8 定制需求卡（非目录请求）：申请人任何登录用户；处置 owner 链在 handler 内 inChain 校验 ---
+	case path == "/api/v1/apps/:id/custom-requests" && method == "POST":
+		c.Next() // 提交定制需求单：任何登录用户可提诉求（对标 ServiceNow "Something else" 入口）
+		return
+
+	case path == "/api/v1/requests/:id/fulfill":
+		c.Next() // 定制单处置（grant/package）：链内 owner 准入在 handler 中校验
+		return
+
 	// --- 程序化兜底 ---
 	case path == "/api/v1/owner-check":
 		c.Next() // 巡检：任何登录用户可触发
@@ -329,7 +349,7 @@ func (d *Deps) mgScope(c *gin.Context) {
 	// --- 系统观测：任何登录用户只读（鉴权链路/PEP解析/PIP身份/Agent/分发/同步/缓存/指标/图谱/owner）---
 	case path == "/api/v1/debug/resolve" || path == "/api/v1/debug/pip/:user" ||
 		path == "/api/v1/debug/cache" || path == "/api/v1/debug/cache/clear" ||
-		path == "/api/v1/debug/metrics" || path == "/api/v1/debug/ofga" ||
+		path == "/api/v1/debug/metrics" ||
 		path == "/api/v1/debug/owners" ||
 		path == "/api/v1/agents" || path == "/api/v1/apps/:id/bundles" ||
 		path == "/api/v1/sync-jobs":

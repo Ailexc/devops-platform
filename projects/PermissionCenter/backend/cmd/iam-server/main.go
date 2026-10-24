@@ -1,11 +1,9 @@
-// iam-server：中心 PDP + 管理 API + Sync（控制面+数据面主体服务）
+// iam-server：中心 PDP + 管理 API（判定与控制面 HTTP——1.5 起后台仅 iam-sync 的 TTL 回收）
 package main
 
 import (
-	"context"
 	"log"
 	"os"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xcy/permission-center/internal/api"
@@ -42,17 +40,8 @@ func main() {
 
 	deps := api.NewDeps(cfg, db, cache)
 
-	// 初始化 OpenFGA：store + 授权模型（幂等）
-	// 启动初期 OpenFGA 可能未就绪（容器编排时序），重试直至成功，避免 storeID 为空导致数据级鉴权失效
-	ctx := context.Background()
-	if err := ensureOpenFGA(ctx, deps); err != nil {
-		log.Printf("[iam-server] openfga init warn: %v（数据级鉴权将降级 fail-closed）", err)
-	} else {
-		log.Println("[iam-server] openfga schema ready")
-	}
-
-	// 后台 worker：消费 CMDB 变更事件（Redis Streams，与审计事件总线两用）
-	go consumeCMDBEvents(ctx, deps)
+	// （1.5 T3）OpenFGA 数据面与后台同步循环均已退役：数据级=点查权威行（material/CheckRow），
+	// 后台仅存 iam-sync 的 TTL 回收；本进程纯判定/API，可独立多副本
 
 	gin.SetMode(gin.ReleaseMode)
 	r := api.NewRouter(deps)
@@ -62,19 +51,4 @@ func main() {
 	}
 }
 
-// ensureOpenFGA 重试 EnsureSchema（最多 10 次，间隔 2s）
-func ensureOpenFGA(ctx context.Context, deps *api.Deps) error {
-	var err error
-	for i := 1; i <= 10; i++ {
-		if err = deps.DataPlane.EnsureSchema(ctx); err == nil {
-			return nil
-		}
-		log.Printf("[iam-server] openfga init retry %d/10: %v", i, err)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(2 * time.Second):
-		}
-	}
-	return err
-}
+// （1.5 T3）EnsureOpenFGA 已随 OpenFGA 数据面退役移除——数据级判定=点查权威行（material/CheckRow）

@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "工作流平台 · 流程实例状态机",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "process-flow.html",
+    "viewBox": [
+      1080,
+      640
+    ],
+    "views": [
+      {
+        "id": "draft-run",
+        "label": "发起与运行",
+        "focus": [
+          "draft",
+          "running"
+        ],
+        "note": "选择模板发起填动态表单（form-create）可暂存草稿；提交后引擎按定义 JSON 推进——审批节点生成任务签收制处理，服务调用节点立即调能力，条件节点选分支。"
+      },
+      {
+        "id": "approve-actions",
+        "label": "审批动作",
+        "focus": [
+          "running",
+          "completed"
+        ],
+        "note": "同意/驳回/转办/加签/挂起恢复/终止——全部在引擎单事务+select_for_update 内原子完成；每个动作写 ApprovalRecord + django-fsm-log 留痕。"
+      },
+      {
+        "id": "terminal-arch",
+        "label": "终态与归档",
+        "focus": [
+          "completed",
+          "archived"
+        ],
+        "note": "完成/驳回/取消三终态；完成后归档（ARCHIVED 冷数据分离）；状态变更全程发布事件，Webhook 经 Celery 异步 HMAC 签名投递。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "实例主链路"
+    },
+    {
+      "id": "event",
+      "label": "中断分支"
+    },
+    {
+      "id": "terminal",
+      "label": "终态出口"
+    }
+  ],
+  "states": [
+    {
+      "id": "draft",
+      "type": "start",
+      "label": "草稿",
+      "sublabel": "draft · 可暂存",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "发起"
+    },
+    {
+      "id": "running",
+      "type": "active",
+      "label": "运行中",
+      "sublabel": "running · 引擎推进",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "节点流转"
+    },
+    {
+      "id": "completed",
+      "type": "success",
+      "label": "已完成",
+      "sublabel": "completed · 结果留档",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "终态"
+    },
+    {
+      "id": "rejected",
+      "type": "failure",
+      "label": "已驳回",
+      "sublabel": "rejected · 终态",
+      "lane": "terminal",
+      "col": 1,
+      "step": "05",
+      "tag": "终态"
+    },
+    {
+      "id": "cancelled",
+      "type": "neutral",
+      "label": "已取消",
+      "sublabel": "cancelled · 发起人撤回",
+      "lane": "event",
+      "col": 0,
+      "step": "06",
+      "tag": "终态"
+    },
+    {
+      "id": "archived",
+      "type": "neutral",
+      "label": "已归档",
+      "sublabel": "archived · 冷数据",
+      "lane": "terminal",
+      "col": 2,
+      "step": "07",
+      "tag": "终态"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "draft",
+      "to": "running",
+      "label": "提交 · 引擎启动推进",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        171,
+        112
+      ]
+    },
+    {
+      "from": "running",
+      "to": "completed",
+      "label": "全节点流转完成",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        325,
+        112
+      ]
+    },
+    {
+      "from": "running",
+      "to": "rejected",
+      "label": "审批驳回 / 终止",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [
+        [
+          248,
+          222
+        ],
+        [
+          556,
+          222
+        ],
+        [
+          556,
+          421
+        ]
+      ],
+      "labelAt": [
+        520,
+        260
+      ]
+    },
+    {
+      "from": "draft",
+      "to": "cancelled",
+      "label": "撤回 / 取消",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [
+        [
+          94,
+          240
+        ],
+        [
+          402,
+          240
+        ],
+        [
+          402,
+          421
+        ]
+      ],
+      "labelAt": [
+        200,
+        250
+      ]
+    },
+    {
+      "from": "completed",
+      "to": "archived",
+      "label": "归档 · 冷热分离",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "via": [
+        [
+          402,
+          196
+        ],
+        [
+          780,
+          196
+        ],
+        [
+          780,
+          479
+        ]
+      ],
+      "labelAt": [
+        560,
+        210
+      ]
+    }
+  ]
+}

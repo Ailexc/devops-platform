@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "事件管理系统 · 技术选型分层落位图",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1380,
+      580
+    ],
+    "views": [
+      {
+        "id": "front-access",
+        "label": "前端与接入",
+        "focus": [
+          "web",
+          "gateway"
+        ],
+        "note": "React + Vite + TanStack Query 纯前端 SPA；Nginx/Traefik 双路由 /api/v1 → Python、/go-api/v1 → Go，前端运行时切换 backend-mode。"
+      },
+      {
+        "id": "dual-stack",
+        "label": "双栈并行",
+        "focus": [
+          "pyapi",
+          "goapi"
+        ],
+        "note": "Python（Django 5.1 + Ninja + Celery）与 Go（Gin + GORM）API 契约一致——绞杀者模式迁移载体，双跑对比验证。"
+      },
+      {
+        "id": "queue",
+        "label": "队列与投递语义",
+        "focus": [
+          "pyq",
+          "goq"
+        ],
+        "note": "RabbitMQ 持久化 + acks_late（至少一次）+ 死信交换机，无 MQ 自动降级 eager；asynq 基于 Redis（DB 1）内置 MaxRetry(3) 与死信。"
+      },
+      {
+        "id": "data",
+        "label": "数据与隔离",
+        "focus": [
+          "pg",
+          "redis0"
+        ],
+        "note": "PostgreSQL 双逻辑库 eventdb / eventdb_go 数据隔离；JSONB 存原始事件 + append-only 日志表；Redis DB 0 进度/锁/缓存。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "管理台前端",
+      "sublabel": "React + Vite + TS · TanStack Query",
+      "tag": "仪表盘 · 时间线 · 测试实验室 · 双栈切换",
+      "brand": "react",
+      "pos": [
+        580,
+        40
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "backend",
+      "label": "Nginx / Traefik",
+      "sublabel": "双路由接入",
+      "tag": "/api/v1 → Python · /go-api/v1 → Go",
+      "pos": [
+        580,
+        148
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "pyapi",
+      "type": "backend",
+      "label": "Python API",
+      "sublabel": "Django 5.1 + Ninja",
+      "tag": "Pydantic 校验 · 自动 OpenAPI · 202 快速返回",
+      "brand": "django",
+      "pos": [
+        340,
+        256
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "goapi",
+      "type": "backend",
+      "label": "Go API",
+      "sublabel": "Gin + GORM",
+      "tag": "validator 校验 · 契约与 Python 一致",
+      "pos": [
+        820,
+        256
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "pyq",
+      "type": "messagebus",
+      "label": "RabbitMQ + Celery",
+      "sublabel": "持久化 + 手动 ACK + 死信",
+      "tag": "acks_late 至少一次 · 无 MQ 降级 eager",
+      "pos": [
+        340,
+        376
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "goq",
+      "type": "messagebus",
+      "label": "asynq + Redis DB 1",
+      "sublabel": "list 队列 + sorted set 延迟",
+      "tag": "MaxRetry(3) · 内置重试/死信/监控",
+      "pos": [
+        820,
+        376
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "eventdb · eventdb_go",
+      "tag": "JSONB 原始事件 · append-only 日志",
+      "pos": [
+        340,
+        484
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "redis0",
+      "type": "database",
+      "label": "Redis DB 0",
+      "sublabel": "进度上报 · 锁 · 缓存",
+      "tag": "Python 栈隔离用 DB 0 / asynq 用 DB 1",
+      "pos": [
+        820,
+        484
+      ],
+      "size": [
+        220,
+        68
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "EventManager Docker Compose 栈（api × 2 + worker × 2 + frontend）",
+      "wraps": [
+        "web",
+        "gateway",
+        "pyapi",
+        "goapi",
+        "pyq",
+        "goq"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "共享基础设施（devops-net）",
+      "wraps": [
+        "pg",
+        "redis0"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "from": "web",
+      "to": "gateway",
+      "label": "页面与 API 请求",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        690,
+        122
+      ]
+    },
+    {
+      "from": "gateway",
+      "to": "pyapi",
+      "label": "/api/v1（backend-mode=python）",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        470,
+        230
+      ]
+    },
+    {
+      "from": "gateway",
+      "to": "goapi",
+      "label": "/go-api/v1（backend-mode=go）",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        930,
+        230
+      ]
+    },
+    {
+      "from": "pyapi",
+      "to": "pyq",
+      "label": "事件入队（持久化）",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        450,
+        350
+      ]
+    },
+    {
+      "from": "goapi",
+      "to": "goq",
+      "label": "asynq 投递",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        930,
+        350
+      ]
+    },
+    {
+      "from": "pyq",
+      "to": "pg",
+      "label": "",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        400,
+        478
+      ],
+      "labelDy": -16
+    },
+    {
+      "from": "goq",
+      "to": "pg",
+      "label": "Worker 消费写结果/日志",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "labelAt": [
+        930,
+        470
+      ]
+    }
+  ]
+}

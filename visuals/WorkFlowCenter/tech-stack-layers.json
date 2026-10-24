@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "工作流平台 · 技术选型分层落位图",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1380,
+      580
+    ],
+    "views": [
+      {
+        "id": "front-access",
+        "label": "前端与接入",
+        "focus": [
+          "web",
+          "gateway"
+        ],
+        "note": "Vue 3.5 + Pinia + Element Plus/Arco 双 UI 库；LogicFlow 2.x + Vue Flow 流程设计器；form-create JSON Schema 动态表单。"
+      },
+      {
+        "id": "service",
+        "label": "服务层",
+        "focus": [
+          "api"
+        ],
+        "note": "Django 5 + DRF 六大 app：accounts/processes/tickets/capabilities/events/knowledge——API 面，流转语义全部下沉引擎层。"
+      },
+      {
+        "id": "engines",
+        "label": "四大引擎",
+        "focus": [
+          "engines"
+        ],
+        "note": "流程引擎（单事务+select_for_update 推进）· 规则引擎（结构化 AST 不用 eval）· 能力执行器（Schema 契约调用）· 事件总线（Celery 异步 Webhook + HMAC）。"
+      },
+      {
+        "id": "data",
+        "label": "数据与留痕",
+        "focus": [
+          "pg",
+          "fsmlog"
+        ],
+        "note": "PostgreSQL 流程/任务/能力主存储；django-fsm 实例状态机 + django-fsm-log 状态变更留痕 + ApprovalRecord 审批记录。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "管理前端",
+      "sublabel": "Vue 3.5 + Pinia + EP/Arco",
+      "tag": "设计器 LogicFlow+Vue Flow · form-create 动态表单",
+      "brand": "vue",
+      "pos": [
+        580,
+        40
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "backend",
+      "label": "Nginx 接入层",
+      "sublabel": "托管 + API 反代",
+      "tag": "网关认证对接 · SimpleJWT",
+      "pos": [
+        580,
+        148
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "业务 API",
+      "sublabel": "Django 5 + DRF 六 app",
+      "tag": "流程 · 工单 · 能力 · 事件 · 账号 · 知识库",
+      "brand": "django",
+      "pos": [
+        580,
+        256
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "engines",
+      "type": "backend",
+      "label": "四大引擎",
+      "sublabel": "流程 / 规则 / 能力 / 事件",
+      "tag": "单事务推进 · AST 规则 · Schema 契约 · 异步 Webhook",
+      "pos": [
+        580,
+        376
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "流程/任务/能力主存储",
+      "tag": "PG 16 生产 · SQLite Demo 回退",
+      "pos": [
+        340,
+        484
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "fsmlog",
+      "type": "database",
+      "label": "状态与审计",
+      "sublabel": "django-fsm + fsm-log",
+      "tag": "实例状态机 · 变更留痕 · 审批记录",
+      "pos": [
+        820,
+        484
+      ],
+      "size": [
+        220,
+        68
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "WorkFlowCenter Docker Compose 栈（frontend + backend + redis）",
+      "wraps": [
+        "web",
+        "gateway",
+        "api",
+        "engines",
+        "pg",
+        "fsmlog"
+      ],
+      "pad": 20
+    }
+  ],
+  "connections": [
+    {
+      "from": "web",
+      "to": "gateway",
+      "label": "页面与 API 请求",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        690,
+        122
+      ]
+    },
+    {
+      "from": "gateway",
+      "to": "api",
+      "label": "API 反代（网关认证头）",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        690,
+        230
+      ]
+    },
+    {
+      "from": "api",
+      "to": "engines",
+      "label": "流转语义下沉引擎层",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        690,
+        350
+      ]
+    },
+    {
+      "from": "engines",
+      "to": "pg",
+      "label": "业务数据读写（ORM）",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        460,
+        468
+      ]
+    },
+    {
+      "from": "engines",
+      "to": "fsmlog",
+      "label": "状态流转 + 留痕",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        930,
+        468
+      ]
+    }
+  ]
+}

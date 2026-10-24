@@ -88,10 +88,6 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
           <span>鉴权指标面板</span>
         </router-link>
-        <router-link to="/observability/ofga" class="nav-item" :class="{ active: $route.path.startsWith('/observability/ofga') }">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="6" r="3"/><circle cx="19" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="M7 8l3 7M17 8l-3 7M8 6h8"/></svg>
-          <span>数据面图谱（OpenFGA）</span>
-        </router-link>
         <router-link to="/observability/owners" class="nav-item" :class="{ active: $route.path.startsWith('/observability/owners') }">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
           <span>Owner 巡检视图</span>

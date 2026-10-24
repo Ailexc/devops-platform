@@ -36,10 +36,7 @@ func seed(reset bool) error {
 	deps := api.NewDeps(cfg, db, cache)
 	ctx := context.Background()
 
-	// 初始化 OpenFGA
-	if err := deps.DataPlane.EnsureSchema(ctx); err != nil {
-		log.Printf("[seed] openfga init warn: %v", err)
-	}
+	// （1.5 T3）数据级=点查权威行（material/CheckRow），无需 OpenFGA schema 初始化
 
 	// 1. admin 用户
 	adminHash, _ := auth.HashPassword("admin123")
@@ -134,9 +131,9 @@ func seed(reset bool) error {
 		"vpc": "vpc-itsm", "subnet": "subnet-itsm-app", "sg": "sg-itsm-app",
 	}, model.JSONAny{
 		map[string]any{"icon": "🔑", "name": "OAuth 2.0 · Authorization Code", "type": "oauth2_auth_code", "strength": "high", "strengthLabel": "高",
-		"desc": "人工访问首选：走企业 SSO 登录后换取访问令牌，支持用户级审计"},
+			"desc": "人工访问首选：走企业 SSO 登录后换取访问令牌，支持用户级审计"},
 		map[string]any{"icon": "🔧", "name": "API Key", "type": "api_key", "strength": "medium", "strengthLabel": "中",
-		"desc": "SDK 接入常用：请求头携带固定 Key，适合工具类脚本"},
+			"desc": "SDK 接入常用：请求头携带固定 Key，适合工具类脚本"},
 	})
 	seedAppMeta(deps, cloudApp, model.JSONMap{
 		"cloud": "腾讯云", "account": "act-ops", "region": "ap-guangzhou",
@@ -186,13 +183,13 @@ func seed(reset bool) error {
 			model.JSONAny{
 				map[string]any{
 					"id": "readonly", "name": "只读监控", "status": "published",
-					"action_codes": []any{"xh-monitor:host:list", "xh-monitor:host:read"},
+					"action_codes":  []any{"xh-monitor:host:list", "xh-monitor:host:read"},
 					"grantee_types": []any{"user", "org"},
 					"data_control":  true, "data_models": []any{"host"},
 				},
 				map[string]any{
 					"id": "full", "name": "完整监控", "status": "draft",
-					"action_codes": []any{"xh-monitor:host:list", "xh-monitor:host:read", "xh-monitor:host:create"},
+					"action_codes":  []any{"xh-monitor:host:list", "xh-monitor:host:read", "xh-monitor:host:create"},
 					"grantee_types": []any{"user", "org"},
 					"data_control":  true, "data_models": []any{"host"},
 				},
@@ -225,7 +222,7 @@ func seed(reset bool) error {
 			model.JSONAny{
 				map[string]any{
 					"id": "viewer", "name": "报告查看", "status": "published",
-					"action_codes": []any{"xh-analytics:report:list", "xh-analytics:report:read"},
+					"action_codes":  []any{"xh-analytics:report:list", "xh-analytics:report:read"},
 					"grantee_types": []any{"user"},
 				},
 			},
@@ -276,6 +273,7 @@ func seed(reset bool) error {
 	grantViaRequest(deps, ctx, userID(deps, "alice"), app.ID, "user:alice:cmdb-read",
 		model.ReqSubjectUser, userID(deps, "alice"), readActionIDs, nil,
 		"alice 为 cmdb 联合负责人，需要只读权限", "", false)
+	// （1.5 T3）强一致档（force-remote）已随投影退役——点查即实时，无前置同步对象
 
 	// 7. 程序身份（M2M）
 	secret := "cloud-mgmt-secret"
@@ -320,6 +318,8 @@ func seed(reset bool) error {
 	deps.CMDBConnector.SyncModels(ctx)
 	deps.CMDBConnector.SyncInstances(ctx)
 	deps.IdentityConn.Sync(ctx)
+	// 8.0 数据契约行（A2/A4）：投影就绪后起确认制时钟——巡检与判定门槛立即可读
+	seedContractRows(deps, app.ID)
 	// 身份同步可能新建组织（path 为 mock-identity id），以本地组织树为准重算物化路径
 	refreshAllOrgPaths(deps)
 
@@ -338,7 +338,7 @@ func seed(reset bool) error {
 		log.Printf("[seed] openapi sync done: %v", res)
 	}
 
-	// 8.2 爱丽丝演示权限（须在资源模型/实例同步之后：限定实例范围需解析到实例 ID，并写 OpenFGA tuple）
+	// 8.2 爱丽丝演示权限（须在资源模型/实例同步之后：自建组限定实例范围）
 	seedAliceDemo(deps, ctx)
 
 	// 9. 应用版本（放在最后：前面的 Apps.Update（如 OpenAPI 同步）会用旧对象覆盖 version 字段）
@@ -458,7 +458,7 @@ func seedResourceModel(deps *api.Deps, appID uint64, sourceID uint64, code, name
 	if _, err := deps.Res.ModelByCode(code); err == nil {
 		return
 	}
-	if err := deps.Res.UpsertModel(&model.ResourceModel{
+	if _, err := deps.Res.UpsertModel(&model.ResourceModel{
 		SourceID:         sourceID,
 		AppID:            appID,
 		Code:             code,
@@ -467,6 +467,62 @@ func seedResourceModel(deps *api.Deps, appID uint64, sourceID uint64, code, name
 	}); err != nil {
 		log.Printf("[seed] resource model %s warn: %v", code, err)
 	}
+}
+
+// seedContractSpecs 数据域契约默认值（种子专用）：host 用短承诺（SLA 15s / 上限 30s）——
+// ⚠️ 设计约束：**巡检周期必须显著小于 SLA**（否则两次巡检之间 age 必超 SLA，Fresh 态不可达、stale 常驻）
+// demo 组合 = PATROL_INTERVAL 5s / SLA 15s / max 30s → 正常 fresh、停上游 40s 内演示 Expired 三态
+// （清单 2.3.1 时序走查）；字段只取基础判定字段（白名单恒可算）
+var seedContractSpecs = map[string]map[string]any{
+	"host":            {"fields": []any{"name", "owner_id"}, "algorithm": "L2", "staleness_sla_sec": 15, "degrade_max_age_sec": 30},
+	"database":        {"fields": []any{"name", "owner_id"}, "algorithm": "L2", "staleness_sla_sec": 300, "degrade_max_age_sec": 0},
+	"public_resource": {"fields": []any{"name"}, "algorithm": "L1", "staleness_sla_sec": 300, "degrade_max_age_sec": 0},
+}
+
+// withDataContractMeta 预设回填契约元数据（幂等）：data_control 预设缺 data_contract →
+// 按数据域套默认契约——让发布链路门禁（ensureDataContracts）对种子能力可正向通过（清单 A2）
+func withDataContractMeta(presets model.JSONAny) model.JSONAny {
+	for _, raw := range presets {
+		p, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if dc, _ := p["data_control"].(bool); !dc {
+			continue
+		}
+		if _, has := p["data_contract"]; has {
+			continue
+		}
+		dms, _ := p["data_models"].([]any)
+		if len(dms) == 0 {
+			continue
+		}
+		mc, _ := dms[0].(string)
+		if spec, ok := seedContractSpecs[mc]; ok {
+			p["data_contract"] = spec
+		}
+	}
+	return presets
+}
+
+// seedContractRows 数据契约行种子（清单 A2/A4）：确认制时钟起钟、增量水位空（首轮巡检从零拉）；
+// 巡检按契约域遍历、无投影域（如 public_resource）自动跳过，判定门槛同款跳过——不误伤
+func seedContractRows(deps *api.Deps, appID uint64) {
+	for mc, spec := range seedContractSpecs {
+		fields := []string{}
+		for _, f := range spec["fields"].([]any) {
+			fields = append(fields, f.(string))
+		}
+		sla, _ := spec["staleness_sla_sec"].(int)
+		maxAge, _ := spec["degrade_max_age_sec"].(int)
+		if _, err := deps.Contracts.UpsertContract(&model.DataContract{
+			AppID: appID, ModelCode: mc, Fields: fields,
+			Algorithm: spec["algorithm"].(string), StalenessSlaSec: sla, DegradeMaxAgeSec: maxAge,
+		}); err != nil {
+			log.Printf("[seed] contract %s warn: %v", mc, err)
+		}
+	}
+	log.Printf("[seed] data contracts ready (host: sla=15s/max=30s — 分钟级新鲜度三态演示；巡检 5s < SLA)")
 }
 
 func findOrCreateOrg(deps *api.Deps, name string, parentID *uint64) *model.Group {
@@ -500,10 +556,16 @@ func ensureOwner(deps *api.Deps, appID, userID uint64, isPrimary bool) {
 func findOrCreateCapability(deps *api.Deps, appID uint64, name, desc, status string, ownerID uint64,
 	modelFields, presets model.JSONAny, tags model.StringArray, actionIDs []uint64,
 ) *model.CapabilityManifest {
+	presets = withDataContractMeta(presets) // A2：契约元数据注入（创建路径）
 	// 查找已有
 	caps, _ := deps.Caps.List(appID)
 	for _, c := range caps {
 		if c.Name == name {
+			// 幂等自愈：早期种子的能力包缺 data_contract → 原地回填后保存（发布门禁可正向通过）
+			withDataContractMeta(c.Presets)
+			if err := deps.Caps.Update(&c); err != nil {
+				log.Printf("[seed] heal capability %q contract meta warn: %v", name, err)
+			}
 			return &c
 		}
 	}
@@ -565,8 +627,8 @@ func grantViaRequest(deps *api.Deps, ctx context.Context, applicantID, appID uin
 		}
 	}
 	req := &model.AccessRequest{
-		AppID:               appID,
-		ApplicantID:         applicantID,
+		AppID:                appID,
+		ApplicantID:          applicantID,
 		ApplicantSubjectType: applicantSubjectType,
 		ApplicantSubjectID:   applicantSubjectID,
 		RequestType:          model.RequestApply,
@@ -753,7 +815,7 @@ func refreshAllOrgPaths(deps *api.Deps) {
 // ==================== 富 Demo 数据（v12：应用市场 / 能力市场内容） ====================
 
 // resetDemoData 清空全部 demo 域表并重置自增序列（seed --reset 一键重建）
-// OpenFGA 授权模型/元组独立于这些表，seed 内 EnsureSchema 幂等重建，无需处理
+// （1.5 T3）OpenFGA 已退役——重置仅涉及下列关系表
 func resetDemoData(db *gorm.DB) error {
 	tables := "scope_options, capability_actions, capability_manifests, capability_publish_tasks, " +
 		"revoke_requests, access_requests, approval_tasks, policies, policy_versions, clients, app_owners, apps, actions, " +
@@ -809,6 +871,7 @@ func capActionRows(actionIDs []uint64) []*model.CapabilityAction {
 func upsertCapability(deps *api.Deps, appID uint64, name, desc, status string, ownerID uint64,
 	modelFields, presets model.JSONAny, tags model.StringArray, actionIDs []uint64,
 ) *model.CapabilityManifest {
+	presets = withDataContractMeta(presets) // A2：data_control 预设回填契约元数据（发布门禁对种子能力可正向通过）
 	caps, _ := deps.Caps.List(appID)
 	for i := range caps {
 		if caps[i].Name == name {
@@ -904,10 +967,24 @@ func seedRichDemoData(deps *api.Deps) {
 		},
 		model.JSONAny{
 			map[string]any{
+				// T6 升级版（§4.2）：host→disk 层级编排 + 场景参数联动（只选一次防域间错位）
 				"id": "readonly", "name": "只读查看", "status": "published",
-				"action_codes":  []any{"cmdb:host:list", "cmdb:host:read"},
+				"action_codes":  []any{"cmdb:host:list", "cmdb:host:read", "cmdb:disk:list", "cmdb:disk:read"},
 				"grantee_types": []any{"user", "org", "group", "app"},
-				"data_control":  true, "data_models": []any{"host"},
+				"data_control":  true, "data_models": []any{"host", "disk"},
+				"param_linkage": "shared",
+				"scenario_params": []any{
+					map[string]any{"key": "account", "label": "云账号", "type": "select", "required": true,
+						"choices": []any{
+							map[string]any{"label": "运维账号", "value": "acc-ops-001"},
+							map[string]any{"label": "研发账号", "value": "acc-rd-002"},
+						}},
+				},
+				"data_model_tree": []any{
+					map[string]any{"model": "host", "children": []any{
+						map[string]any{"model": "disk"},
+					}},
+				},
 			},
 			map[string]any{
 				"id": "operator", "name": "运维操作", "status": "published",
@@ -933,6 +1010,13 @@ func seedRichDemoData(deps *api.Deps) {
 	)
 	seedScopeOptions(deps, hostCap.ID, "readonly", "host", []*model.ScopeOption{
 		{Type: model.ScopeOptAll, Label: "所有数据", Desc: "无需填写"},
+		// T6 联动绑定域（§4.2 升级一）：field=account 与场景参数 key 同名——
+		// shared 模式下值只认 "$account" 引用（申请时只选一次，服务端钉子防域间错位）
+		{Type: model.ScopeOptSelect, Label: "按云账号（联动）", Desc: "场景参数联动——全域同值，防错位", Field: "account", Op: "==",
+			Choices: model.JSONAny{
+				map[string]any{"label": "运维账号", "value": "acc-ops-001"},
+				map[string]any{"label": "研发账号", "value": "acc-rd-002"},
+			}},
 		{Type: model.ScopeOptInstance, Label: "具体实例", Desc: "勾选要访问的主机实例", API: "/api/v1/hosts"},
 		{Type: model.ScopeOptSelect, Label: "选择环境", Desc: "选择目标环境（单选）", Field: "env", Op: "==",
 			Choices: model.JSONAny{
@@ -948,6 +1032,17 @@ func seedRichDemoData(deps *api.Deps) {
 			}},
 		{Type: model.ScopeOptVariable, Label: "仅自己的资源", Desc: "自动匹配你的身份，只能看到自己创建的资源", Field: "owner_id", Op: "==", Variable: model.VarCurrentUser, VarLabel: "当前用户"},
 		{Type: model.ScopeOptInput, Label: "按标签过滤", Desc: "输入标签名进行模糊匹配", Field: "tags", Op: "contains", Placeholder: "如 web、prod"},
+	})
+	// T6 层级从属域（§4.2 升级二）：disk 随 host——落底层各域仍是独立策略（层级是编排不是存储）
+	seedScopeOptions(deps, hostCap.ID, "readonly", "disk", []*model.ScopeOption{
+		{Type: model.ScopeOptAll, Label: "所有数据", Desc: "无需填写"},
+		// 与 host 域同 key 联动：shared 模式下同一次 account 选定带出全域（结构上不可能错位）
+		{Type: model.ScopeOptSelect, Label: "按云账号（联动）", Desc: "随 host 域场景参数——全域同值", Field: "account", Op: "==",
+			Choices: model.JSONAny{
+				map[string]any{"label": "运维账号", "value": "acc-ops-001"},
+				map[string]any{"label": "研发账号", "value": "acc-rd-002"},
+			}},
+		{Type: model.ScopeOptInstance, Label: "具体实例", Desc: "勾选要访问的磁盘实例", API: "/api/v1/disks"},
 	})
 
 	// ===== cmdb · 数据库管理（published）=====
@@ -1199,7 +1294,7 @@ type seedDataScope struct {
 
 // grantCapabilityViaRequest 已通过的能力包申请单 + 策略落库（“我的权限”展示 & 授权真实生效）
 // 幂等：同一 grantee × 能力包 × 预设 已有已通过申请单则跳过，避免重复 seed 产生重复授权
-// scope=nil 表示数据范围“全部”；scope.Type=instance 时写 OpenFGA instance tuple（数据级鉴权真实限定）
+// scope=nil 表示数据范围“全部”；scope.Type=instance 时落 Policy.ResourceScope 的 instance_ids（集合式范围谓词，判定=点查行 id 比对）
 func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID, appID, capID uint64, presetID, granteeType, granteeName string, granteeID uint64, scope *seedDataScope, reason string) {
 	var existing int64
 	deps.DB.Model(&model.AccessRequest{}).
@@ -1216,7 +1311,7 @@ func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID,
 	}
 	ids := presetActionIDs(deps, cap, presetID)
 
-	// 数据范围：展示（Content.scope_selections）与真实生效（Policy.ResourceScope + OpenFGA tuple）
+	// 数据范围：展示（Content.scope_selections）与真实生效（Policy.ResourceScope——集合式=点查行 id 比对）
 	var scopeSel model.JSONAny
 	var resScope model.JSONMap
 	dataScopeType := ""
@@ -1232,7 +1327,7 @@ func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID,
 			"instance_ids": toAnyFloats(instanceIDsByExternal(deps, scope.Model, scope.Instances)),
 		}
 		dataScopeType = "instance"
-		expr = "// OpenFGA 直接授权 tuple（instance 类型）\n"
+		expr = "// 集合式范围谓词（勾选实例——判定：点查行 id ∈ 集合）\n"
 		for _, ext := range scope.Instances {
 			expr += fmt.Sprintf("(%s:%s, reader, %s)\n", scope.Model, ext, granteeName)
 		}
@@ -1259,7 +1354,7 @@ func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID,
 			"preset_id":         presetID,
 			"scope_selections":  scopeSel,
 			"scope_expression":  expr,
-			"expression_engine": "OpenFGA",
+			"expression_engine": "CheckRow",
 		},
 		Reason:    reason,
 		RiskLevel: model.RiskLow,
@@ -1277,38 +1372,24 @@ func grantCapabilityViaRequest(deps *api.Deps, ctx context.Context, applicantID,
 		policySubjectType = model.SubjectService
 	}
 	p := &model.Policy{
-		AppID:          appID,
-		Name:           fmt.Sprintf("cap:%s:%s", presetID, granteeName),
-		ActionIDs:      ids,
-		SubjectType:    policySubjectType,
-		SubjectID:      granteeID,
-		Effect:         model.EffectAllow,
-		Status:         model.PolicyActive,
-		Source:         model.SourceViaRequest,
-		RequestID:      &req.ID,
-		ResourceScope:  resScope,
-		DataScopeType:  dataScopeType,
+		AppID:         appID,
+		Name:          fmt.Sprintf("cap:%s:%s", presetID, granteeName),
+		ActionIDs:     ids,
+		SubjectType:   policySubjectType,
+		SubjectID:     granteeID,
+		Effect:        model.EffectAllow,
+		Status:        model.PolicyActive,
+		Source:        model.SourceViaRequest,
+		RequestID:     &req.ID,
+		ResourceScope: resScope,
+		DataScopeType: dataScopeType,
 	}
 	if err := deps.DB.Create(p).Error; err != nil {
 		log.Printf("[seed] capability policy warn: %v", err)
 		return
 	}
-	// 数据级限制真实生效：写 OpenFGA instance tuples
-	if len(resScope) > 0 {
-		if err := deps.DataPlane.PublishPolicy(ctx, p); err != nil {
-			log.Printf("[seed] capability policy openfga warn: %v", err)
-		}
-		// 组级授权：OpenFGA 需物化组成员关系（group:X#member → user:xx）才能对成员生效
-		if granteeType == model.GranteeGroup {
-			if members, err := deps.Groups.Members(granteeID); err == nil {
-				for _, m := range members {
-					if err := deps.OFGA.WriteTuple(ctx, "user:"+m.Username, "member", fmt.Sprintf("group:%d", granteeID)); err != nil {
-						log.Printf("[seed] group member tuple warn: %v", err)
-					}
-				}
-			}
-		}
-	}
+	// （1.5 T3）集合式判定=点查行比对（CheckRow）——不再物化 OpenFGA 元组；
+	// 组级授权的成员关系也不再需要物化（主体闭包由 Casbin/策略快照处理）
 }
 
 func toAnyStrings(ss []string) []any {
@@ -1343,7 +1424,7 @@ func instanceIDsByExternal(deps *api.Deps, modelCode string, externals []string)
 }
 
 // seedAliceDemo 爱丽丝演示权限：自建组 + 个人/组织/自建组 三个维度的能力包授权
-// 数据范围差异化：个人/组织 = 全部；自建组 = 限定主机实例（web-01/web-02，真实 OpenFGA 元组）
+// 数据范围差异化：个人/组织 = 全部；自建组 = 限定主机实例（web-01/web-02，集合式范围谓词）
 func seedAliceDemo(deps *api.Deps, ctx context.Context) {
 	alice := userID(deps, "alice")
 	cmdb := appByCode(deps, "cmdb")

@@ -11,7 +11,8 @@ source scripts/lib.sh
 load_env >/dev/null
 
 echo "── [iam] seed --reset（用户/应用/授权模型）..."
-ensure_up iam iam-server
+# S1 拆分后主 reset 路径必须同时拉起 iam-sync（对抗审查 S-2：否则三后台循环全死且假绿）
+ensure_up iam iam-server iam-sync
 ( cd projects/PermissionCenter && docker compose -f deploy/docker-compose.yml run -T --rm iam-server iam-server seed --reset < /dev/null )
 
 ok "  ✓ iam 重置完成"

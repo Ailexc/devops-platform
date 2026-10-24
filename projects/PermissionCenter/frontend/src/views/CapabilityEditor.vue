@@ -158,7 +158,7 @@
 
       <div class="sub-title">🗄️ 数据权限控制（每预设独立）</div>
       <label class="check switch-row">
-        <input type="checkbox" v-model="p.data_control" :disabled="viewOnly" />
+        <input type="checkbox" v-model="p.data_control" :disabled="viewOnly" @change="onDataControlChange(p)" />
         <span>{{ p.data_control ? '开启：绑定接口 + 数据范围双重控制' : '关闭：绑定接口可访问全部数据' }}</span>
       </label>
 
@@ -168,6 +168,45 @@
           <span v-for="mc in appModels" :key="mc" class="chip" :class="{ on: p.data_models.includes(mc) }"
             @click="!viewOnly && toggleModel(p, mc)">{{ mc }}</span>
         </div>
+
+        <!-- T6 预设参数联动 + 层级编排（§4.2 升级一/二）：联动=申请时只选一次防域间错位；树=编排不是存储（落底各域仍独立策略） -->
+        <div class="sub-title" style="margin-top:10px;">🔗 参数联动 <span class="text-secondary">（升级设计：场景参数一次选定，全域同值防错位）</span></div>
+        <div class="form-grid">
+          <label>联动模式
+            <select v-model="p.param_linkage" :disabled="viewOnly" class="input">
+              <option value="independent">独立（各域各选——现状）</option>
+              <option value="shared">联动（共享场景参数——全域同值）</option>
+            </select>
+          </label>
+        </div>
+        <template v-if="p.param_linkage === 'shared'">
+          <div class="text-secondary" style="font-size:12px;margin:4px 0 6px;">场景参数（申请时只选一次；各域条件字段与参数 key 同名 → 值锁定为 <span class="mono">$key</span> 引用）：</div>
+          <div v-for="(sp, spi) in p.scenario_params || []" :key="spi" class="chip-row" style="margin-bottom:6px;">
+            <input v-model="sp.key" :disabled="viewOnly" class="input input-sm" placeholder="key（如 account）" style="width:130px;" />
+            <input v-model="sp.label" :disabled="viewOnly" class="input input-sm" placeholder="显示名" style="width:120px;" />
+            <select v-model="sp.type" :disabled="viewOnly" class="input input-sm" style="width:100px;">
+              <option value="select">select</option>
+              <option value="input">input</option>
+            </select>
+            <input v-if="sp.type === 'select'" v-model="sp._choices" :disabled="viewOnly" class="input input-sm" placeholder="选项：显示名=值,…" style="width:240px;" />
+            <label class="m-check" style="white-space:nowrap;"><input type="checkbox" v-model="sp.required" :disabled="viewOnly" /> 必填</label>
+            <button v-if="!viewOnly" class="btn btn-sm" @click="(p.scenario_params || []).splice(spi, 1)">✕</button>
+          </div>
+          <button v-if="!viewOnly" class="btn btn-sm" @click="addScenarioParam(p)">＋ 场景参数</button>
+        </template>
+
+        <template v-if="p.data_control && (p.data_models || []).length > 1">
+          <div class="sub-title" style="margin-top:10px;">🌲 层级编排 <span class="text-secondary">（子域随父域带出；落底层各域仍是独立策略——层级是编排不是存储）</span></div>
+          <div v-for="mc in p.data_models" :key="'tp' + mc" class="chip-row" style="margin-bottom:4px;">
+            <span class="chip on mono">{{ mc }}</span>
+            <span class="text-secondary" style="font-size:12px;">← 父域：</span>
+            <select :value="treeParentOf(p, mc)" :disabled="viewOnly" class="input input-sm" style="width:150px;" @change="setTreeParent(p, mc, ($event.target as HTMLSelectElement).value)">
+              <option value="">（顶层——独立申请）</option>
+              <option v-for="pm in (p.data_models || []).filter((m: string) => m !== mc)" :key="pm" :value="pm">{{ pm }}</option>
+            </select>
+          </div>
+          <div class="text-secondary" style="font-size:11px;">跨出层级（管其他账号的磁盘）→ 不挂树 → 申请时单独选值。</div>
+        </template>
 
         <div v-for="mc in p.data_models" :key="mc" class="dim-block">
           <div class="dim-head"><b class="mono">{{ mc }}</b>
@@ -220,6 +259,34 @@
             <button v-for="t in ['select','multi_select','variable','input']" :key="t" class="btn btn-sm"
               @click="addScopeOpt(p, mc, t)">＋ {{ SCOPE_LABEL[t] }}</button>
           </div>
+        </div>
+      </template>
+
+      <!-- 数据契约（清单 A2 发布必填：字段 + 算法档位 + 新鲜度承诺；
+           发布时后端另有失败二分自检：字段不可算=400 拒绝+出路；端点不可达=502 可重试非拒绝） -->
+      <template v-if="p.data_control && p.data_contract">
+        <div class="sub-title">📜 数据契约 <span class="text-secondary">（勾选数据级 → 发布必填）</span></div>
+        <p class="field-hint">字段须能算出确定性指纹（三元素：新增/删除/更新可判定）——算不出的出路：不勾数据级、只发接口级能力包。发布时自动做指纹端点可达自检（不可达=可重试提示，不算契约拒绝）。</p>
+        <div class="form-grid">
+          <label class="span2">指纹字段
+            <div class="chip-row">
+              <span v-for="f in contractFieldOptions(p)" :key="f" class="chip" :class="{ on: p.data_contract.fields.includes(f) }"
+                @click="!viewOnly && toggleContractField(p, f)">{{ f }}</span>
+            </div>
+          </label>
+          <label>算法档位
+            <select v-model="p.data_contract.algorithm" :disabled="viewOnly" class="input">
+              <option value="L1">L1 · count + max(updated_at)（最简）</option>
+              <option value="L2">L2 · 集合哈希（推荐）</option>
+              <option value="L3">L3 · 判定字段全量哈希（最强）</option>
+            </select>
+          </label>
+          <label>新鲜度承诺 SLA（秒）
+            <input type="number" v-model.number="p.data_contract.staleness_sla_sec" :disabled="viewOnly" class="input" min="1" />
+          </label>
+          <label>降级容忍上限（秒，0 = SLA×6）
+            <input type="number" v-model.number="p.data_contract.degrade_max_age_sec" :disabled="viewOnly" class="input" min="0" />
+          </label>
         </div>
       </template>
     </div>
@@ -396,6 +463,27 @@ function addFromPicker(p: any, kind: string) {
   if (kind === 'people' && filteredPeople.value.length) pickPerson(p, filteredPeople.value[0])
   picker.query = ''
 }
+// ---- 数据契约（清单 A2：发布必填，UI 闭环）----
+function defaultContract() {
+  return { fields: ['name', 'owner_id'], algorithm: 'L2', staleness_sla_sec: 300, degrade_max_age_sec: 0 }
+}
+// ensureContract：data_control 开启的预设必须持有契约对象（load/YAML 应用/开关三入口自愈填充默认）
+function ensureContract(p: any) {
+  if (p.data_control && !p.data_contract) p.data_contract = defaultContract()
+}
+function onDataControlChange(p: any) { ensureContract(p) }
+// 字段白名单 = 能力包资源模型字段 ∪ 基础判定字段（与后端 validateDataContractSpec 同一集合）
+function contractFieldOptions(p: any) {
+  const base = ['name', 'owner_id', 'external_id', 'updated_at']
+  const names = (fieldsOf(p.data_models?.[0]) || []).map((f: any) => f.name).filter(Boolean)
+  return [...new Set([...names, ...base])]
+}
+function toggleContractField(p: any, f: string) {
+  ensureContract(p)
+  const arr = p.data_contract.fields as string[]
+  const i = arr.indexOf(f)
+  i < 0 ? arr.push(f) : arr.splice(i, 1)
+}
 
 function toggleTag(t: string) {
   const i = form.tags.indexOf(t)
@@ -436,7 +524,60 @@ function addPreset() {
     data_control: false,
     data_models: [],
     scopeOptions: {},
+    // T6：参数联动 + 层级编排（可选字段，缺省=独立+平面向后兼容）
+    param_linkage: 'independent',
+    scenario_params: [],
   })
+}
+// T6 场景参数（§4.2 升级一）：key/label/type/choices(_choices 编辑态 "显示名=值,…")
+function addScenarioParam(p: any) {
+  if (!p.scenario_params) p.scenario_params = []
+  p.scenario_params.push({ key: '', label: '', type: 'select', required: true, _choices: '' })
+}
+// T6 层级编排（§4.2 升级二）：编辑态用平铺 parent 映射（data_model_tree 存树——编排不是存储）
+function treeParentOf(p: any, mc: string): string {
+  const walk = (nodes: any[], parent: string): string => {
+    for (const n of nodes || []) {
+      if (n?.model === mc) return parent
+      const hit = walk(n?.children || [], n?.model)
+      if (hit) return hit
+    }
+    return ''
+  }
+  return walk(p.data_model_tree || [], '')
+}
+function setTreeParent(p: any, mc: string, parent: string) {
+  // 重建树：先收集现有父子映射，改动一条，重建嵌套结构（防环——子不能做父的祖先）
+  const parents: Record<string, string> = {}
+  for (const m of p.data_models || []) parents[m] = treeParentOf(p, m)
+  parents[mc] = parent
+  if (parent) { // 防环：沿新父链上溯，若遇到 mc 说明成环 → 拒绝（落回空）
+    let cur = parent, guard = 0
+    while (cur && guard < 10) { if (cur === mc) { parents[mc] = ''; break } cur = parents[cur] || ''; guard++ }
+  }
+  const roots: any[] = []
+  const nodeOf: Record<string, any> = {}
+  for (const m of p.data_models || []) { nodeOf[m] = { model: m, children: [] } }
+  for (const m of p.data_models || []) {
+    const par = parents[m]
+    if (par && nodeOf[par]) nodeOf[par].children.push(nodeOf[m])
+    else roots.push(nodeOf[m])
+  }
+  const prune = (nodes: any[]) => { for (const n of nodes) { n.children = prune(n.children || []) } return nodes.filter((n: any) => n.model) }
+  p.data_model_tree = prune(roots)
+}
+// scenario_params choices 编辑态解析："显示名=值,显示名2=值2" → [{label,value}]
+function scenarioParamsForSave(p: any) {
+  return (p.scenario_params || []).map((sp: any) => {
+    const out: any = { key: (sp.key || '').trim(), label: (sp.label || sp.key || '').trim(), type: sp.type || 'select', required: sp.required !== false }
+    if (sp.type === 'select') {
+      out.choices = String(sp._choices || '').split(',').map((pair: string) => {
+        const [label, value] = pair.split('=').map((s: string) => s.trim())
+        return { label: label || value, value: value || label }
+      }).filter((c: any) => c.value)
+    }
+    return out
+  }).filter((sp: any) => sp.key)
 }
 function removePreset(pi: number) {
   form.presets.splice(pi, 1)
@@ -485,6 +626,7 @@ function manifestForYaml() {
         apply_scope: p.apply_scope,
         data_control: p.data_control,
         data_models: p.data_models,
+        data_contract: p.data_contract,
       })),
     },
   }
@@ -516,6 +658,7 @@ function applyYaml() {
       grantee_types: p.grantee_types || [],
       scopeOptions: {},
     }))
+    for (const p of form.presets) ensureContract(p)
     saveMsg.value = '已从 YAML 应用到表单'
     saveErr.value = false
   } catch (e: any) {
@@ -548,10 +691,14 @@ async function load() {
     data_models: p.data_models || [],
     action_codes: p.action_codes || [],
     grantee_types: p.grantee_types || [],
+    // T6：联动/层级字段回填 + scenario_params 编辑态（choices 数组 → _choices 串）
+    param_linkage: p.param_linkage || 'independent',
+    scenario_params: (p.scenario_params || []).map((sp: any) => ({ ...sp, _choices: (sp.choices || []).map((c: any) => `${c.label}=${c.value}`).join(',') })),
     scopeOptions: {},
   }))
   // 加载各预设×模型的范围选项（独立表）
   for (const p of form.presets) {
+    ensureContract(p) // A2：已开数据级但缺契约的旧预设 → 回填默认（发布门禁可正向通过）
     p.scopeOptions = {}
     for (const mc of p.data_models || []) {
       try {
@@ -591,6 +738,11 @@ async function save() {
         id: p.id, name: p.name, status: p.status, desc: p.desc,
         action_codes: p.action_codes, grantee_types: p.grantee_types,
         apply_scope: p.apply_scope, data_control: p.data_control, data_models: p.data_models,
+        data_contract: p.data_contract, // A2：数据契约随预设透传（发布门禁校验对象）
+        // T6（§4.2）：参数联动 + 层级编排（缺省 independent/空树=向后兼容）
+        param_linkage: p.param_linkage || 'independent',
+        scenario_params: scenarioParamsForSave(p),
+        data_model_tree: (p.data_model_tree || []).length ? p.data_model_tree : undefined,
       })),
     }
     await api.updateCapability(appId, cid, payload)

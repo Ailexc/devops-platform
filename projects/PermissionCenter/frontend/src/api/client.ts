@@ -24,6 +24,22 @@ export async function request<T = any>(url: string, method: string = 'GET', body
   return data as T
 }
 
+// requestWithStatus：非 2xx 不抛错，返回 {status, data}——用于读 409 变更阻断的受影响清单
+export async function requestWithStatus<T = any>(
+  url: string,
+  method: string = 'GET',
+  body?: any,
+): Promise<{ status: number; data: T }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const res = await fetch(BASE + url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const data = await res.json().catch(() => ({}))
+  return { status: res.status, data: data as T }
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request('/api/v1/auth/login', 'POST', { username, password }),
@@ -65,6 +81,25 @@ export const api = {
   syncApp: (id: number) => request(`/api/v1/apps/${id}/sync`, 'POST'),
   actions: (id: number) => request(`/api/v1/apps/${id}/actions`),
   validateApp: (id: number) => request(`/api/v1/apps/${id}/validate`, 'POST'),
+
+  // ---- v1.5 T1 动作码路由表（§3.7 五格登记 / §3.8 导入 / §3.9 生命周期）----
+  routes: (id: number) => request(`/api/v1/apps/${id}/routes`),
+  onboardReport: (id: number) => request(`/api/v1/apps/${id}/onboard-report`),
+  setExemptPaths: (id: number, body: any) =>
+    request(`/api/v1/apps/${id}/exempt-paths`, 'PUT', body),
+  importRoutes: (id: number, body: any) => request(`/api/v1/apps/${id}/routes`, 'POST', body),
+  updateRoute: (id: number, rid: number, body: any) =>
+    request(`/api/v1/apps/${id}/routes/${rid}`, 'PATCH', body),
+  // 迁移/归档需要读 409 响应体（受影响清单），用带状态变体
+  migrateRoute: (id: number, rid: number, body: any) =>
+    requestWithStatus(`/api/v1/apps/${id}/routes/${rid}/migrate-code`, 'POST', body),
+  archiveRoute: (id: number, rid: number) =>
+    requestWithStatus(`/api/v1/apps/${id}/routes/${rid}/archive`, 'POST'),
+  restoreRoute: (id: number, rid: number) => request(`/api/v1/apps/${id}/routes/${rid}/restore`, 'POST'),
+  confirmPendingRoute: (id: number, pid: number, body?: any) =>
+    request(`/api/v1/apps/${id}/pending-routes/${pid}/confirm`, 'POST', body || {}),
+  discardPendingRoute: (id: number, pid: number) =>
+    request(`/api/v1/apps/${id}/pending-routes/${pid}/discard`, 'POST'),
 
   // 能力声明（L1）
   capabilities: (id: number) => request(`/api/v1/apps/${id}/capabilities`),
@@ -117,6 +152,8 @@ export const api = {
   capabilityPrereqs: (cid: number) => request(`/api/v1/marketplace/capabilities/${cid}/prereqs`),
   // 应用市场公开目录（申请接入用：网络/鉴权公开，不含管理信息）
   marketplaceApps: () => request('/api/v1/marketplace/apps'),
+  // T7 关联推荐（共现信号，非依赖）：capability_id → top3 常一起申请
+  marketplaceRecommend: (capabilityId: number) => request(`/api/v1/marketplace/recommend?capability_id=${capabilityId}`),
   marketplaceAppDetail: (id: number) => request(`/api/v1/marketplace/apps/${id}`),
 
   // 能力打包申请（能力包向导）：范围选项（预设×模型粒度，v12）+ 申请单预览
@@ -141,6 +178,9 @@ export const api = {
   requestDetail: (id: number) => request(`/api/v1/requests/${id}`),
   requestsByRole: (role: string) => request(`/api/v1/requests?role=${role}`),
   submitRequest: (r: any) => request('/api/v1/requests', 'POST', r),
+  // A8 定制需求卡：非目录请求（创建）与 owner 处置（grant 直授带 TTL / package 转为能力包）
+  customRequest: (appId: number, body: any) => request(`/api/v1/apps/${appId}/custom-requests`, 'POST', body),
+  fulfillRequest: (id: number, body: any) => request(`/api/v1/requests/${id}/fulfill`, 'POST', body),
   approveRequest: (id: number, action: number, comment: string) =>
     request(`/api/v1/requests/${id}/approve`, 'POST', { action, comment }),
 
@@ -165,7 +205,6 @@ export const api = {
   debugCache: () => request('/api/v1/debug/cache'),
   debugCacheClear: () => request('/api/v1/debug/cache/clear', 'POST'),
   debugMetrics: () => request('/api/v1/debug/metrics'),
-  debugOfga: () => request('/api/v1/debug/ofga'),
   debugOwners: () => request('/api/v1/debug/owners'),
   ownerCheck: () => request('/api/v1/owner-check', 'POST'),
   agents: () => request('/api/v1/agents'),

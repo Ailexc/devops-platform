@@ -81,19 +81,6 @@
           <div v-if="!(data.personal_policies || []).length" class="empty-state" style="padding: 12px;">无个人策略</div>
         </div>
       </div>
-
-      <!-- OpenFGA 关系 -->
-      <div class="panel">
-        <div class="panel-title">OpenFGA 数据级关系（{{ (data.ofga_relations || []).length }}）</div>
-        <div class="card-body">
-          <div v-for="(r, i) in data.ofga_relations || []" :key="i" class="ofga-row">
-            <span class="mono">{{ r.user }}</span>
-            <span class="ofga-rel">—{{ r.relation }}→</span>
-            <span class="mono">{{ r.object }}</span>
-          </div>
-          <div v-if="!(data.ofga_relations || []).length" class="empty-state" style="padding: 12px;">无数据级关系（关系由数据策略发布物化）</div>
-        </div>
-      </div>
     </div>
   </div>
 </template>

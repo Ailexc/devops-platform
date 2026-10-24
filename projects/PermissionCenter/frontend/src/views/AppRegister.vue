@@ -380,7 +380,7 @@ async function submit() {
 
     const result = await api.registerApp(payload)
     ElMessage.success('应用注册成功')
-    router.push(`/apps/${(result as any).id}`)
+    router.push(`/apps/${(result as any).app?.id ?? (result as any).id}`)
   } catch (e: any) {
     ElMessage.error(e.message)
   } finally {

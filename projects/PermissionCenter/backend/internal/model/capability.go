@@ -127,7 +127,7 @@ type ScopeOption struct {
 	Placeholder  string  `gorm:"size:128" json:"placeholder,omitempty"` // input
 }
 
-// ScopeOptOps 各类型允许的操作符白名单（对齐 demo 编辑器与 OpenFGA CEL 子集）
+// ScopeOptOps 各类型允许的操作符白名单（对齐 demo 编辑器与 CEL 子集）
 func ScopeOptOps(t string) []string {
 	switch t {
 	case ScopeOptSelect:

@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "事件管理系统 · 事件处理状态机",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "event-flow.html",
+    "viewBox": [
+      1080,
+      640
+    ],
+    "views": [
+      {
+        "id": "receive",
+        "label": "接收与解耦",
+        "focus": [
+          "pending"
+        ],
+        "note": "POST /events 校验后落库并立即返回 202——接收与处理解耦，上游永不阻塞；随后投递队列（RabbitMQ 持久化 / asynq）。"
+      },
+      {
+        "id": "process",
+        "label": "处理与幂等",
+        "focus": [
+          "processing",
+          "completed"
+        ],
+        "note": "Worker 行锁领取（SELECT FOR UPDATE）标记处理中；按 Handler 注册表路由执行；成功写结果+耗时留档，append-only 日志全程记录。"
+      },
+      {
+        "id": "retry-dlq",
+        "label": "重试与死信",
+        "focus": [
+          "failed",
+          "dlq"
+        ],
+        "note": "瞬时错误指数退避重试（2^n×4s 封顶 300s + jitter，Python 5 次 / asynq 3 次）；永久错误直接死信；DLQ 支持人工重试与批量回放——急救室不是垃圾桶。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "主链路"
+    },
+    {
+      "id": "event",
+      "label": "失败分支"
+    },
+    {
+      "id": "terminal",
+      "label": "终态"
+    }
+  ],
+  "states": [
+    {
+      "id": "pending",
+      "type": "start",
+      "label": "待处理",
+      "sublabel": "pending · 202 已返回",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "接收"
+    },
+    {
+      "id": "processing",
+      "type": "active",
+      "label": "处理中",
+      "sublabel": "processing · 行锁领取",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "Handler 执行"
+    },
+    {
+      "id": "completed",
+      "type": "success",
+      "label": "已完成",
+      "sublabel": "completed · 结果留档",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "终态"
+    },
+    {
+      "id": "failed",
+      "type": "failure",
+      "label": "失败",
+      "sublabel": "failed · 重试中",
+      "lane": "event",
+      "col": 1,
+      "step": "04",
+      "tag": "瞬时错误"
+    },
+    {
+      "id": "dlq",
+      "type": "failure",
+      "label": "死信",
+      "sublabel": "dlq · 可人工回放",
+      "lane": "terminal",
+      "col": 2,
+      "step": "05",
+      "tag": "终态"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "pending",
+      "to": "processing",
+      "label": "Worker 领取 · 行锁",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        171,
+        112
+      ]
+    },
+    {
+      "from": "processing",
+      "to": "completed",
+      "label": "Handler 成功",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        325,
+        112
+      ]
+    },
+    {
+      "from": "processing",
+      "to": "failed",
+      "label": "瞬时错误",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [
+        [
+          248,
+          233
+        ],
+        [
+          556,
+          233
+        ]
+      ],
+      "labelAt": [
+        420,
+        250
+      ]
+    },
+    {
+      "from": "failed",
+      "to": "processing",
+      "label": "重试 · 指数退避 + jitter",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "bottom",
+      "via": [
+        [
+          480,
+          307
+        ],
+        [
+          480,
+          212
+        ],
+        [
+          248,
+          212
+        ]
+      ],
+      "labelAt": [
+        400,
+        224
+      ]
+    },
+    {
+      "from": "failed",
+      "to": "dlq",
+      "label": "重试耗尽（5/3 次）",
+      "variant": "security",
+      "labelAt": [
+        640,
+        386
+      ]
+    },
+    {
+      "from": "processing",
+      "to": "dlq",
+      "label": "永久错误 · 直接死信",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "via": [
+        [
+          248,
+          200
+        ],
+        [
+          800,
+          200
+        ],
+        [
+          800,
+          479
+        ]
+      ],
+      "labelAt": [
+        620,
+        214
+      ]
+    }
+  ]
+}

@@ -15,13 +15,28 @@ import (
 // submitRequest 提交权限申请（自助 / 业务系统对接）
 // content: {action_ids:[], resource_scope:{...}}
 // 扩展（FR-3 智能申请）：subject_type 申请主体（1=我 2=自建组 3=组织 4=下游应用）、
-//   items 申请项 [{capability_id, action_ids, data_scope, ttl}]、prereq_actions 联动接口权限点、expires_at TTL
+//
+//	items 申请项 [{capability_id, action_ids, data_scope, ttl}]、prereq_actions 联动接口权限点、expires_at TTL
+//
 // 扩展（能力打包申请）：capability_id + preset_id + scope + scope_params
-//   → 后端解析预设 action_codes → action_ids、风险组合升级、条件表达式生成（Casbin/OpenFGA）
+//
+//	→ 后端解析预设 action_codes → action_ids、风险组合升级、条件表达式生成（Casbin）
+//
 // 审批规则（审批即策略）：
 //   - 低风险：可自动审批（应用 owner 在线时自动路由）
 //   - 中风险：需应用 owner 审批（组织上级可参与）
 //   - 高风险：需应用 owner + 安全复核
+//
+// capRequestItem T7 多包一次性申请（#4）：一包一 preset 一范围选择——逐包生成表达式、
+// 落独立策略（可指认哪个包），审批合并为一单（单一审批视图=同应用 owner 链）
+type capRequestItem struct {
+	CapabilityID    uint64           `json:"capability_id"`
+	PresetID        string           `json:"preset_id"`
+	Scope           string           `json:"scope"`
+	ScopeSelections []map[string]any `json:"scope_selections"`
+	ScenarioParams  map[string]any   `json:"scenario_params"`
+}
+
 func (d *Deps) submitRequest(c *gin.Context) {
 	var req struct {
 		AppID         uint64         `json:"app_id"`
@@ -34,15 +49,20 @@ func (d *Deps) submitRequest(c *gin.Context) {
 		RiskLevel     int16          `json:"risk_level"`
 		ExpiresAt     *time.Time     `json:"expires_at"`
 		// 能力打包申请（能力包向导）：预设 + 数据范围 + 范围参数
-		CapabilityID uint64           `json:"capability_id"`
-		PresetID     string           `json:"preset_id"`
-		Scope        string           `json:"scope"`
-		ScopeParams  map[string]any   `json:"scope_params"`
+		CapabilityID uint64         `json:"capability_id"`
+		PresetID     string         `json:"preset_id"`
+		Scope        string         `json:"scope"`
+		ScopeParams  map[string]any `json:"scope_params"`
 		// v12 双主体 + 范围字段类型系统
-		GranteeType     string           `json:"grantee_type"`     // user|org|group|app
-		GranteeName     string           `json:"grantee_name"`     // client:xxx / 用户名 / 组织路径
+		GranteeType     string           `json:"grantee_type"` // user|org|group|app
+		GranteeName     string           `json:"grantee_name"` // client:xxx / 用户名 / 组织路径
 		GranteeID       uint64           `json:"grantee_id"`
 		ScopeSelections []map[string]any `json:"scope_selections"` // v12：[{model,type,selectedValue,selectedValues[]}]
+		// T7 多包一次性申请（#4）：≥2 包一单一审批批量开通——与单包字段互斥；
+		// 同应用多包（单一审批视图=一个 app 的 owner 链），跨应用请分别申请
+		CapabilityRequests []capRequestItem `json:"capability_requests"`
+		// T6（§4.2 升级一）：场景参数——联动模式只选一次，各域 "$key" 引用同值（结构防错位）
+		ScenarioParams map[string]any `json:"scenario_params"`
 		// 接入申请（Phase 6.5，D4 定案）：request_type=3
 		RequestType   int16  `json:"request_type"`    // 1=自助申请 2=owner授权 3=接入申请
 		ConsumerAppID uint64 `json:"consumer_app_id"` // 申请方（下游应用）
@@ -73,8 +93,8 @@ func (d *Deps) submitRequest(c *gin.Context) {
 			return
 		}
 		r := &model.AccessRequest{
-			ApplicantID:    applicantID,
-			RequestType:    model.RequestOnboard,
+			ApplicantID:          applicantID,
+			RequestType:          model.RequestOnboard,
 			ApplicantSubjectType: model.ReqSubjectApp,
 			ApplicantSubjectID:   req.ConsumerAppID,
 			GranteeType:          model.GranteeApp,
@@ -82,7 +102,7 @@ func (d *Deps) submitRequest(c *gin.Context) {
 			GranteeID:            req.ConsumerAppID,
 			AppID:                req.ProviderAppID,
 			Content: model.JSONMap{
-				"onboard":        true,
+				"onboard":         true,
 				"consumer_app_id": req.ConsumerAppID,
 				"provider_app_id": req.ProviderAppID,
 				"auth_method":     req.AuthMethod,
@@ -172,7 +192,7 @@ func (d *Deps) submitRequest(c *gin.Context) {
 		var engine, code string
 		if len(req.ScopeSelections) > 0 {
 			// v12：范围字段类型系统——按模型结构化选择，后端生成 CEL（§4.5）
-			engine, code, err = d.buildV12ScopeExpression(cap, preset, req.ScopeSelections, actionCodes, subjName)
+			engine, code, err = d.buildV12ScopeExpression(cap, preset, req.ScopeSelections, req.ScenarioParams, actionCodes, subjName)
 			if err != nil {
 				c.JSON(400, gin.H{"error": err.Error()})
 				return
@@ -183,13 +203,17 @@ func (d *Deps) submitRequest(c *gin.Context) {
 					"type": "selections", "selections": req.ScopeSelections,
 				},
 			}}}
-			req.Content = map[string]any{
+			content := map[string]any{
 				"capability_id":     req.CapabilityID,
 				"preset_id":         req.PresetID,
 				"scope_selections":  req.ScopeSelections,
 				"scope_expression":  code,
 				"expression_engine": engine,
 			}
+			if len(req.ScenarioParams) > 0 {
+				content["scenario_params"] = req.ScenarioParams // T6：审批视图可见"只选一次"的场景参数
+			}
+			req.Content = content
 			// 数据级控制 → 至少中风险（demo applyRisk 一致）
 			if dc, _ := preset["data_control"].(bool); dc && req.RiskLevel < model.RiskMedium {
 				req.RiskLevel = model.RiskMedium
@@ -231,6 +255,91 @@ func (d *Deps) submitRequest(c *gin.Context) {
 		// 风险组合升级（§5.4）
 		if len(req.ScopeSelections) == 0 {
 			req.RiskLevel = comboRiskFromOps(subjectType, req.Scope, ops)
+		}
+	}
+
+	// T7 多包一次性申请（#4）：≥2 包一单一审批 → 逐包生成表达式、items 逐包一条（落底独立策略）；
+	// 同应用多包（单一审批视图=一个 app 的 owner 链），跨应用请分别申请；与单包字段互斥
+	if len(req.CapabilityRequests) >= 2 {
+		if req.CapabilityID > 0 {
+			c.JSON(400, gin.H{"error": "capability_requests 与单包字段互斥"})
+			return
+		}
+		packages := make([]any, 0, len(req.CapabilityRequests))
+		items := make([]any, 0, len(req.CapabilityRequests))
+		seenCaps := map[uint64]bool{}
+		pkgRiskMax := int16(model.RiskLow)
+		for _, cr := range req.CapabilityRequests {
+			cap, err := d.Caps.ByID(cr.CapabilityID)
+			if err != nil {
+				c.JSON(404, gin.H{"error": fmt.Sprintf("capability %d not found", cr.CapabilityID)})
+				return
+			}
+			if cap.AppID != req.AppID {
+				c.JSON(400, gin.H{"error": "多包申请须同一应用（单一审批视图=一个 app 的 owner 链）——跨应用请分别申请"})
+				return
+			}
+			if seenCaps[cap.ID] {
+				continue // 去重
+			}
+			seenCaps[cap.ID] = true
+			preset := d.findPreset(cap.Presets, cr.PresetID)
+			if preset == nil {
+				c.JSON(400, gin.H{"error": fmt.Sprintf("preset %q not found in capability %d", cr.PresetID, cr.CapabilityID)})
+				return
+			}
+			resolved := d.enrichOnePreset(cap.AppID, preset)
+			aids, _ := resolved["action_ids"].([]uint64)
+			ops, _ := resolved["ops"].([]map[string]any)
+			if len(aids) == 0 {
+				c.JSON(400, gin.H{"error": fmt.Sprintf("preset %q resolves to no actions", cr.PresetID)})
+				return
+			}
+			actionCodes := make([]string, 0, len(ops))
+			for _, op := range ops {
+				if code, ok := op["action"].(string); ok {
+					actionCodes = append(actionCodes, code)
+				}
+			}
+			subjName := d.subjectNameForExpression(subjectType, subjectID, req.AppID)
+			engine, code := "Casbin", "// 无数据层限制（all 类型）\n"
+			dataScope := map[string]any{"type": "all"}
+			pkgRisk := comboRiskFromOps(subjectType, cr.Scope, ops)
+			if len(cr.ScopeSelections) > 0 {
+				engine, code, err = d.buildV12ScopeExpression(cap, preset, cr.ScopeSelections, cr.ScenarioParams, actionCodes, subjName)
+				if err != nil {
+					c.JSON(400, gin.H{"error": err.Error()})
+					return
+				}
+				dataScope = map[string]any{"type": "selections", "selections": cr.ScopeSelections}
+				if dc, _ := preset["data_control"].(bool); dc && pkgRisk < model.RiskMedium {
+					pkgRisk = model.RiskMedium
+				}
+			}
+			if pkgRisk > pkgRiskMax {
+				pkgRiskMax = pkgRisk
+			}
+			presetName, _ := preset["name"].(string)
+			items = append(items, map[string]any{
+				"capability_id": cap.ID, "preset_id": cr.PresetID,
+				"action_ids": aids, "data_scope": dataScope,
+			})
+			packages = append(packages, map[string]any{
+				"capability_id": cap.ID, "capability_name": cap.Name,
+				"preset_id": cr.PresetID, "preset_name": presetName,
+				"scope_selections": cr.ScopeSelections,
+				"scope_expression": code, "expression_engine": engine,
+				"risk": pkgRisk, "risk_label": riskLabel(pkgRisk),
+			})
+		}
+		if len(items) < 2 {
+			c.JSON(400, gin.H{"error": "多包申请须 ≥2 个不同能力包（单包请走单包通道）"})
+			return
+		}
+		req.Items = map[string]any{"items": items}
+		req.Content = map[string]any{"multi": true, "packages": packages}
+		if pkgRiskMax > req.RiskLevel {
+			req.RiskLevel = pkgRiskMax
 		}
 	}
 
@@ -279,7 +388,7 @@ func (d *Deps) submitRequest(c *gin.Context) {
 			r.Status = model.ReqApproved
 			d.DB.Save(&r)
 			d.DB.Create(&model.ApprovalTask{
-				RequestID:  r.ID, Step: 1, ApproverID: autoApprover,
+				RequestID: r.ID, Step: 1, ApproverID: autoApprover,
 				Action: model.ApproveYes, Comment: "auto-approved (low risk)",
 			})
 			if err := d.grantFromRequest(c, r, autoApprover); err != nil {
@@ -306,6 +415,167 @@ func (d *Deps) submitRequest(c *gin.Context) {
 //   - 自助申请（apply）：应用 owner（排除申请人）→ 高风险追加安全复核
 //   - owner 授权（grant）：被授权方确认（本人/组长/对方应用 owner）+ 应用其他 owner 复核
 //     → owner 给自己授权时跳过"本人确认"（SoD），仅其他 owner 审批
+//
+// createCustomRequest 创建定制需求单（清单 A8 非目录请求——对标 SailPoint non-catalog /
+// ServiceNow "Something else"）：能力市场包组合覆盖不到时，申请人提交诉求 → 目标应用 owner 待办 →
+// 二选一处置（fulfillCustomRequest：直授带 TTL / 转为能力包）。审批链复用 buildApprovalChain（=目标应用 owners）。
+// body: { description 必填, action_ids []optional 想要的能力目录动作, data_scope {}optional }
+func (d *Deps) createCustomRequest(c *gin.Context) {
+	appID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	var req struct {
+		Description string         `json:"description"`
+		ActionIDs   []uint64       `json:"action_ids"`
+		DataScope   map[string]any `json:"data_scope"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Description == "" {
+		c.JSON(400, gin.H{"error": "description required"})
+		return
+	}
+	app, err := d.Apps.ByID(appID)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "app not found"})
+		return
+	}
+	applicantID := d.currentUserID(c)
+	granteeName := strconv.FormatUint(applicantID, 10)
+	if u, err := d.Users.ByID(applicantID); err == nil {
+		granteeName = u.Username
+	}
+	content := model.JSONMap{
+		"custom":      true,
+		"description": req.Description,
+		"action_ids":  req.ActionIDs,
+	}
+	if req.DataScope != nil {
+		content["data_scope"] = req.DataScope
+	}
+	r := &model.AccessRequest{
+		ApplicantID:          applicantID,
+		RequestType:          model.RequestCustom,
+		ApplicantSubjectType: model.ReqSubjectUser,
+		ApplicantSubjectID:   applicantID,
+		GranteeType:          model.GranteeUser,
+		GranteeName:          granteeName,
+		GranteeID:            applicantID,
+		AppID:                appID,
+		Content:              content,
+		Reason:               req.Description,
+		RiskLevel:            model.RiskLow, // 处置即直授/转包，不走自动审批链
+		Status:               model.ReqPending,
+	}
+	if err := d.DB.Create(r).Error; err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	chain := d.buildApprovalChain(r, app, applicantID)
+	d.audit(c, "request.custom.create", "request", strconv.FormatUint(r.ID, 10),
+		gin.H{"app_id": appID, "actions": len(req.ActionIDs)})
+	c.JSON(201, gin.H{"id": r.ID, "status": "pending", "approval_chain": chain})
+}
+
+// fulfillCustomRequest owner 处置定制需求单（A8）：
+//
+//	mode=grant  → 直授落策略（Source=owner_grant，**TTL 必填 1-365 天**，到期判定排除 + sweep 回收——
+//	              防 AWS inline policy 式游离授权碎片）+ 数据范围落策略行（1.5：点查行比对） + 刷缓存/bundle
+//	mode=package → 标记"已转为能力包"（owner 线下补包上架，申请人走正常申请——包从使用数据里长出来）
+//
+// 校验：类型/状态 + 处置人必须在审批链内（=目标应用 owners，复用 inChain）
+func (d *Deps) fulfillCustomRequest(c *gin.Context) {
+	rid, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	var r model.AccessRequest
+	if err := d.DB.First(&r, rid).Error; err != nil {
+		c.JSON(404, gin.H{"error": "request not found"})
+		return
+	}
+	if r.RequestType != model.RequestCustom {
+		c.JSON(400, gin.H{"error": "not a custom request"})
+		return
+	}
+	if r.Status != model.ReqPending {
+		c.JSON(400, gin.H{"error": "request already handled"})
+		return
+	}
+	app, err := d.Apps.ByID(r.AppID)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "app not found"})
+		return
+	}
+	uid := d.currentUserID(c)
+	if !d.inChain(uid, d.buildApprovalChain(&r, app, r.ApplicantID)) {
+		c.JSON(403, gin.H{"error": "only app owners can fulfill"})
+		return
+	}
+	var req struct {
+		Mode    string `json:"mode"`     // grant | package
+		TTLDays int    `json:"ttl_days"` // grant 必填 1-365
+		Note    string `json:"note"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "bad request"})
+		return
+	}
+	now := time.Now()
+	r.Status = model.ReqApproved
+	r.Content["fulfill"] = model.JSONMap{"mode": req.Mode, "note": req.Note, "by": uid, "at": now.Format(time.RFC3339)}
+
+	if req.Mode == "package" {
+		if err := d.DB.Save(&r).Error; err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		d.audit(c, "request.custom.package", "request", strconv.FormatUint(r.ID, 10), gin.H{"note": req.Note})
+		c.JSON(200, gin.H{"ok": true, "mode": "package"})
+		return
+	}
+	if req.Mode != "grant" {
+		c.JSON(400, gin.H{"error": "mode must be grant|package"})
+		return
+	}
+	if req.TTLDays < 1 || req.TTLDays > 365 {
+		c.JSON(400, gin.H{"error": "ttl_days must be 1-365（直授必须带 TTL，到期自动回收）"})
+		return
+	}
+	actionIDs := parseActionIDs(r.Content["action_ids"])
+	if len(actionIDs) == 0 {
+		c.JSON(400, gin.H{"error": "custom request has no action_ids（请在诉求中勾选想要的接口动作）"})
+		return
+	}
+	var scope model.JSONMap
+	if s, ok := r.Content["data_scope"].(map[string]any); ok && len(s) > 0 {
+		scope = s
+	}
+	expires := now.Add(time.Duration(req.TTLDays) * 24 * time.Hour)
+	p := &model.Policy{
+		Name:          "custom:fulfill:" + strconv.FormatUint(r.ID, 10),
+		Effect:        model.EffectAllow,
+		SubjectType:   model.SubjectUser,
+		SubjectID:     r.GranteeID,
+		AppID:         r.AppID,
+		ActionIDs:     actionIDs,
+		ResourceScope: scope,
+		Conditions:    map[string]any{},
+		Status:        model.PolicyActive,
+		CreatedBy:     uid,
+		Source:        model.SourceOwnerGrant,
+		RequestID:     &r.ID,
+		ExpiresAt:     &expires, // A8：直授强制 TTL
+	}
+	if err := d.Pol.Create(p); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	// （1.5 T3）集合式判定=点查行比对（CheckRow），不再物化 OpenFGA 元组
+	if err := d.DB.Save(&r).Error; err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	d.bumpAllCaches(c)
+	d.BundleMgr.Publish(c.Request.Context(), r.AppID)
+	d.audit(c, "request.custom.grant", "policy", strconv.FormatUint(p.ID, 10),
+		gin.H{"request_id": r.ID, "ttl_days": req.TTLDays, "actions": len(actionIDs)})
+	c.JSON(200, gin.H{"ok": true, "mode": "grant", "policy_id": p.ID, "expires_at": expires.Format(time.RFC3339)})
+}
+
 func (d *Deps) buildApprovalChain(r *model.AccessRequest, app *model.App, applicantID uint64) []uint64 {
 	chain := make([]uint64, 0, 4)
 
@@ -706,9 +976,76 @@ func (d *Deps) grantFromRequest(c *gin.Context, r *model.AccessRequest, approver
 	if r.RequestType == model.RequestGrant {
 		source = model.SourceOwnerGrant
 	}
+
+	// T7 多包开通（#4）：content.multi → 一 item 一策略（capability_id 可指认哪个包）；
+	// 一单一审批批量开通，各包落底仍是独立策略（与单包 items=1 路径等价，行为不变）
+	if multi, _ := content["multi"].(bool); multi {
+		if rawItems, ok := r.Items["items"].([]any); ok && len(rawItems) > 0 {
+			created := 0
+			for _, it := range rawItems {
+				item, _ := it.(map[string]any)
+				var cid uint64
+				switch v := item["capability_id"].(type) {
+				case float64:
+					cid = uint64(v)
+				case uint64:
+					cid = v
+				}
+				aids := parseActionIDs(item["action_ids"])
+				if len(aids) == 0 {
+					continue
+				}
+				var itemScope map[string]any
+				dst := ""
+				if ds, ok := item["data_scope"].(map[string]any); ok {
+					itemScope = ds
+					dst, _ = ds["type"].(string)
+				}
+				var cidPtr *uint64
+				if cid > 0 {
+					cidPtr = &cid
+				}
+				pp := &model.Policy{
+					Name:          fmt.Sprintf("grant:req:%d:cap%d", r.ID, cid),
+					Effect:        model.EffectAllow,
+					SubjectType:   subjectType,
+					SubjectID:     subjectID,
+					AppID:         r.AppID,
+					ActionIDs:     aids,
+					ResourceScope: itemScope,
+					Conditions:    map[string]any{},
+					Status:        model.PolicyActive,
+					CreatedBy:     approver,
+					Source:        source,
+					RequestID:     &r.ID,
+					CapabilityID:  cidPtr,
+					DataScopeType: dst,
+					ExpiresAt:     r.ExpiresAt,
+				}
+				if err := d.Pol.Create(pp); err != nil {
+					return fmt.Errorf("多包开通 cap%d 失败: %w", cid, err)
+				}
+				created++
+			}
+			if created == 0 {
+				return fmt.Errorf("multi request has no items with action_ids")
+			}
+			d.bumpAllCaches(c)
+			d.BundleMgr.Publish(c.Request.Context(), r.AppID)
+			d.audit(c, "request.multi_grant", "request", strconv.FormatUint(r.ID, 10),
+				gin.H{"policies": created})
+			return nil
+		}
+	}
+
+	// T8 deny 传播：申请单 content.effect=2 → 落 deny 策略（此前硬编码 allow——deny 审批通过被落成 allow 的真 gap）
+	polEffect := int16(model.EffectAllow)
+	if v, ok := content["effect"].(float64); ok && int16(v) == model.EffectDeny {
+		polEffect = model.EffectDeny
+	}
 	p := &model.Policy{
 		Name:          "grant:req:" + strconv.FormatUint(r.ID, 10),
-		Effect:        model.EffectAllow,
+		Effect:        polEffect,
 		SubjectType:   subjectType,
 		SubjectID:     subjectID,
 		AppID:         r.AppID,
@@ -717,8 +1054,8 @@ func (d *Deps) grantFromRequest(c *gin.Context, r *model.AccessRequest, approver
 		Conditions:    map[string]any{},
 		Status:        model.PolicyActive,
 		CreatedBy:     approver,
-		Source:        source,  // owner 授权走审批单后仍留痕（request_id）
-		RequestID:     &r.ID,   // 关联申请单（"为什么给我授权"可查）
+		Source:        source, // owner 授权走审批单后仍留痕（request_id）
+		RequestID:     &r.ID,  // 关联申请单（"为什么给我授权"可查）
 		CapabilityID:  capabilityID,
 		DataScopeType: dataScopeType,
 		ExpiresAt:     r.ExpiresAt, // 策略级 TTL
@@ -730,9 +1067,7 @@ func (d *Deps) grantFromRequest(c *gin.Context, r *model.AccessRequest, approver
 	if tplID, ok := r.Items["template_id"].(float64); ok && tplID > 0 {
 		d.Tpls.IncApply(uint64(tplID))
 	}
-	if scope != nil {
-		d.DataPlane.PublishPolicy(c.Request.Context(), p)
-	}
+	// （1.5 T3）集合式判定=点查行比对（CheckRow），不再物化 OpenFGA 元组
 	d.bumpAllCaches(c)
 	d.BundleMgr.Publish(c.Request.Context(), r.AppID)
 	return nil
@@ -744,17 +1079,19 @@ func (d *Deps) grantFromRequest(c *gin.Context, r *model.AccessRequest, approver
 // 能力包向导 Step 5 确认页调用，实时展示最终风险等级与审批链
 func (d *Deps) previewRequest(c *gin.Context) {
 	var req struct {
-		AppID           uint64           `json:"app_id"`
-		SubjectType     int16            `json:"subject_type"`
-		SubjectID       uint64           `json:"subject_id"`
-		CapabilityID    uint64           `json:"capability_id"`
-		PresetID        string           `json:"preset_id"`
-		Scope           string           `json:"scope"`
-		ScopeParams     map[string]any   `json:"scope_params"`
-		GranteeType     string           `json:"grantee_type"`
-		GranteeName     string           `json:"grantee_name"`
-		GranteeID       uint64           `json:"grantee_id"`
-		ScopeSelections []map[string]any `json:"scope_selections"`
+		AppID              uint64           `json:"app_id"`
+		SubjectType        int16            `json:"subject_type"`
+		SubjectID          uint64           `json:"subject_id"`
+		CapabilityID       uint64           `json:"capability_id"`
+		PresetID           string           `json:"preset_id"`
+		Scope              string           `json:"scope"`
+		ScopeParams        map[string]any   `json:"scope_params"`
+		GranteeType        string           `json:"grantee_type"`
+		GranteeName        string           `json:"grantee_name"`
+		GranteeID          uint64           `json:"grantee_id"`
+		ScopeSelections    []map[string]any `json:"scope_selections"`
+		ScenarioParams     map[string]any   `json:"scenario_params"`     // T6 场景参数（联动）
+		CapabilityRequests []capRequestItem `json:"capability_requests"` // T7 多包预览
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.AppID == 0 {
 		c.JSON(400, gin.H{"error": "app_id required"})
@@ -813,6 +1150,91 @@ func (d *Deps) previewRequest(c *gin.Context) {
 		}
 	}
 
+	// T7 多包预览（#4）：≥2 包逐包表达式 + 最高风险 + 合并审批链（不落库）
+	if len(req.CapabilityRequests) >= 2 {
+		pkgs := make([]map[string]any, 0, len(req.CapabilityRequests))
+		pkgRiskMax := int16(model.RiskLow)
+		seen := map[uint64]bool{}
+		for _, cr := range req.CapabilityRequests {
+			pcap, err := d.Caps.ByID(cr.CapabilityID)
+			if err != nil {
+				c.JSON(404, gin.H{"error": fmt.Sprintf("capability %d not found", cr.CapabilityID)})
+				return
+			}
+			if pcap.AppID != req.AppID {
+				c.JSON(400, gin.H{"error": "多包申请须同一应用——跨应用请分别申请"})
+				return
+			}
+			if seen[pcap.ID] {
+				continue
+			}
+			seen[pcap.ID] = true
+			ppreset := d.findPreset(pcap.Presets, cr.PresetID)
+			if ppreset == nil {
+				c.JSON(400, gin.H{"error": fmt.Sprintf("preset %q not found in capability %d", cr.PresetID, cr.CapabilityID)})
+				return
+			}
+			resolved := d.enrichOnePreset(pcap.AppID, ppreset)
+			pops, _ := resolved["ops"].([]map[string]any)
+			pcodes := make([]string, 0, len(pops))
+			for _, op := range pops {
+				if code, ok := op["action"].(string); ok {
+					pcodes = append(pcodes, code)
+				}
+			}
+			subjName := d.subjectNameForExpression(subjectType, subjectID, req.AppID)
+			pengine, pcode := "Casbin", "// 无数据层限制（all 类型）"
+			pRisk := comboRiskFromOps(subjectType, cr.Scope, pops)
+			if len(cr.ScopeSelections) > 0 {
+				var perr error
+				pengine, pcode, perr = d.buildV12ScopeExpression(pcap, ppreset, cr.ScopeSelections, cr.ScenarioParams, pcodes, subjName)
+				if perr != nil {
+					c.JSON(400, gin.H{"error": perr.Error()})
+					return
+				}
+				if dc, _ := ppreset["data_control"].(bool); dc && pRisk < model.RiskMedium {
+					pRisk = model.RiskMedium
+				}
+			}
+			if pRisk > pkgRiskMax {
+				pkgRiskMax = pRisk
+			}
+			pname, _ := ppreset["name"].(string)
+			pkgs = append(pkgs, map[string]any{
+				"capability_id": pcap.ID, "capability_name": pcap.Name,
+				"preset_id": cr.PresetID, "preset_name": pname,
+				"scope_selections": cr.ScopeSelections,
+				"scope_expression": pcode, "expression_engine": pengine,
+				"risk": pRisk, "risk_label": riskLabel(pRisk),
+			})
+		}
+		if len(pkgs) < 2 {
+			c.JSON(400, gin.H{"error": "多包申请须 ≥2 个不同能力包"})
+			return
+		}
+		risk := pkgRiskMax
+		if subjectType == model.ReqSubjectApp && risk < model.RiskMedium {
+			risk = model.RiskMedium
+		}
+		rm := &model.AccessRequest{
+			ApplicantID: applicantID, RequestType: model.RequestApply,
+			ApplicantSubjectType: subjectType, ApplicantSubjectID: subjectID,
+			AppID: req.AppID, RiskLevel: risk, Status: model.ReqPending,
+		}
+		chain := d.decorateApprovalChain(d.buildApprovalChain(rm, app, applicantID), app)
+		gt, gn, gid := req.GranteeType, req.GranteeName, req.GranteeID
+		if gt == "" {
+			gt, gn, gid = d.granteeFields(subjectType, subjectID)
+		}
+		c.JSON(200, gin.H{
+			"multi": true, "packages": pkgs,
+			"risk_level": risk, "risk_label": riskLabel(risk),
+			"approval_chain": chain,
+			"grantee":        gin.H{"type": gt, "name": gn, "id": gid},
+		})
+		return
+	}
+
 	risk := comboRiskFromOps(subjectType, req.Scope, ops)
 
 	// 审批链（不落库，仅预览）
@@ -836,7 +1258,7 @@ func (d *Deps) previewRequest(c *gin.Context) {
 	subjName := d.subjectNameForExpression(subjectType, subjectID, req.AppID)
 	var engine, exprCode string
 	if len(req.ScopeSelections) > 0 && cap != nil && preset != nil {
-		engine, exprCode, err = d.buildV12ScopeExpression(cap, preset, req.ScopeSelections, actionCodes, subjName)
+		engine, exprCode, err = d.buildV12ScopeExpression(cap, preset, req.ScopeSelections, req.ScenarioParams, actionCodes, subjName)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
@@ -857,20 +1279,20 @@ func (d *Deps) previewRequest(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{
-		"risk_level":     risk,
-		"risk_label":     riskLabel(risk),
-		"risk_reasons":   riskReasons(subjectType, req.Scope, ops),
-		"approval_chain": chainView,
-		"scope":          req.Scope,
-		"scope_label":    scopeLabel,
+		"risk_level":       risk,
+		"risk_label":       riskLabel(risk),
+		"risk_reasons":     riskReasons(subjectType, req.Scope, ops),
+		"approval_chain":   chainView,
+		"scope":            req.Scope,
+		"scope_label":      scopeLabel,
 		"scope_value_text": scopeValueText,
 		"expression": gin.H{
 			"engine": engine,
 			"code":   exprCode,
 		},
-		"preset":   preset,
-		"capability": cap,
-		"grantee": gin.H{"type": granteeType, "name": granteeName, "id": granteeID},
+		"preset":           preset,
+		"capability":       cap,
+		"grantee":          gin.H{"type": granteeType, "name": granteeName, "id": granteeID},
 		"scope_selections": req.ScopeSelections,
 	})
 }
@@ -890,8 +1312,9 @@ func (d *Deps) findPreset(presets model.JSONAny, presetID string) map[string]any
 }
 
 // comboRiskFromOps 风险组合升级（§5.4）：
-//   完整管理（含 delete）→ 高；运维操作（create/update）→ 中；
-//   只读 + 所有数据 → 中；下游应用(M2M) → 至少中
+//
+//	完整管理（含 delete）→ 高；运维操作（create/update）→ 中；
+//	只读 + 所有数据 → 中；下游应用(M2M) → 至少中
 func comboRiskFromOps(subjectType int16, scope string, ops []map[string]any) int16 {
 	risk := int16(model.RiskLow)
 	hasDelete, hasWrite := false, false
@@ -956,8 +1379,9 @@ func riskLabel(risk int16) string {
 	return "?"
 }
 
-// buildScopeExpression 数据范围 + 参数 → 条件表达式（Casbin / OpenFGA 模板）
+// buildScopeExpression 数据范围 + 参数 → 判定表达式（Casbin 动作级 + 数据级范围谓词模板）
 // 前端 Step 4/5 实时展示；提交时后端同样生成并落申请单留痕
+// （1.5：数据级=范围谓词 × 点查权威行，CheckRow；表达式仅示意，判定由策略行消费）
 func buildScopeExpression(scope string, params map[string]any, modelCode *string, actions []string, subjName string) (string, string) {
 	modelName := "resource"
 	if modelCode != nil && *modelCode != "" {
@@ -973,18 +1397,15 @@ func buildScopeExpression(scope string, params map[string]any, modelCode *string
 	}
 	switch scope {
 	case model.ScopeAll:
-		return "Casbin", fmt.Sprintf("p, %s, {app}, %s, *, allow\n// 无数据层限制", subj, actionStr)
+		return "Casbin", fmt.Sprintf("p, %s, {app}, %s, *, allow\n// 无数据层限制（全量）", subj, actionStr)
 	case model.ScopeOwner:
-		return "OpenFGA", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// OpenFGA 关系\n(%s:xxx, owner, user:%s)\n→ Check(user:%s, reader, %s:xxx) if owner_id == %s",
-			subj, actionStr, modelName, subj, subj, modelName, subj)
+		return "CheckRow", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// 数据级范围谓词（属性式 × 点查权威行）\nresource_scope: {\"model\": %q, \"condition\": {\"op\": \"eq\", \"field\": \"owner_id\", \"value\": \"%s\"}}\n→ 行.owner_id == %s 才放行", subj, actionStr, modelName, subj, subj)
 	case model.ScopeDimension:
 		dim := stringParam(params, "dimension", "value")
-		return "OpenFGA", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// OpenFGA 组织维度\n(group:%s, member, user:%s)\n(%s:xxx, org, group:%s)\n→ ListObjects(user:%s, reader, %s)\n  仅返回 org=%s 的实例",
-			subj, actionStr, dim, subj, modelName, dim, subj, modelName, dim)
+		return "CheckRow", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// 数据级范围谓词（维度式）\nresource_scope: {\"model\": %q, \"condition\": {\"op\": \"eq\", \"field\": %q, \"value\": \"%s\"}}\n→ 列表判定两步：请求 %s 参数 ⊆ 授权集合", subj, actionStr, modelName, dim, subj, dim)
 	case "account":
 		acc := stringParam(params, "account", "value")
-		return "OpenFGA", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// OpenFGA 账号维度\n(cloud_account:%s, member, user:%s)\n(%s:xxx, account, cloud_account:%s)\n→ Check(user:%s, reader, %s:xxx)\n  仅返回账号 %s 的资源",
-			subj, actionStr, acc, subj, modelName, acc, subj, modelName, acc)
+		return "CheckRow", fmt.Sprintf("// Casbin 动作级\np, %s, {app}, %s, *, allow\n\n// 数据级范围谓词（账号维度）\nresource_scope: {\"model\": %q, \"condition\": {\"op\": \"eq\", \"field\": \"account\", \"value\": \"%s\"}}\n→ 行.account == %s 才放行", subj, actionStr, modelName, acc, acc)
 	case "tag":
 		expr := stringParam(params, "expression", "value")
 		return "Casbin ABAC", fmt.Sprintf("// ABAC 条件策略\np, %s, {app}, %s,\n  { %s },\n  allow", subj, actionStr, expr)
@@ -998,18 +1419,20 @@ func buildScopeExpression(scope string, params map[string]any, modelCode *string
 			}
 		}
 		if len(names) == 0 {
-			return "OpenFGA", "// 未选择实例"
+			return "CheckRow", "// 未选择实例"
+		}
+		quoted := make([]string, 0, len(names))
+		for _, n := range names {
+			quoted = append(quoted, fmt.Sprintf("%q", n))
 		}
 		var b strings.Builder
-		b.WriteString("// 直接授权 tuple\n")
+		b.WriteString("// 集合式范围谓词（勾选实例，存外部 id）\n")
+		fmt.Fprintf(&b, "resource_scope: {\"model\": %q, \"instance_ids\": [%s]}\n\n", modelName, strings.Join(quoted, ", "))
+		b.WriteString("// 判定：点查行 id ∈ 集合 才放行\n")
 		for _, n := range names {
-			fmt.Fprintf(&b, "(%s:%s, reader, user:%s)\n", modelName, n, subj)
+			fmt.Fprintf(&b, "row.id ∈ %s:%s → Check(user:%s)\n", modelName, n, subj)
 		}
-		b.WriteString("\n// Check\n")
-		for _, n := range names {
-			fmt.Fprintf(&b, "Check(user:%s, reader, %s:%s) → true\n", subj, modelName, n)
-		}
-		return "OpenFGA", b.String()
+		return "CheckRow", b.String()
 	}
 	return "-", ""
 }
@@ -1017,7 +1440,10 @@ func buildScopeExpression(scope string, params map[string]any, modelCode *string
 // buildV12ScopeExpression v12 范围字段类型系统：按模型结构化选择 → CEL（§4.5 规则）
 // 字段/操作符/变量取自 owner 配置的 ScopeOption（独立表），applicant 只提供值；
 // variable 类型保存变量名，运行时按 grantee（权限作用主体）解析
-func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map[string]any, selections []map[string]any, actions []string, subjName string) (string, string, error) {
+// T6（§4.2 升级一）：scenarioParams=场景参数（申请时只选一次）；selections 值位置可写
+// "$key" 引用 → 统一解析（同一参数全域同值=结构防错位）。shared 联动模式服务端钉子：
+// 条件 field 与场景参数 key 同名的域禁填字面值——只认 $key 引用。
+func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map[string]any, selections []map[string]any, scenarioParams map[string]any, actions []string, subjName string) (string, string, error) {
 	actionStr := strings.Join(actions, ", ")
 	if actionStr == "" {
 		actionStr = "{actions}"
@@ -1032,7 +1458,7 @@ func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map
 	fmt.Fprintf(&b, "p, %s, {app}, %s, *, allow\n", subj, actionStr)
 	var conds []string
 	var tuples []string
-	for _, sel := range selections {
+	for _, sel := range selections { // 注：$key 解析值回写 sel——调用方 content/审批视图直接可见解析后值
 		modelCode, _ := sel["model"].(string)
 		typ, _ := sel["type"].(string)
 		if typ == "" {
@@ -1046,14 +1472,23 @@ func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map
 			return "", "", err
 		}
 		var opt *model.ScopeOption
+		// field 精确匹配（同类型多选项防歧义）：selections[i]["field"] 非空按 type+field，否则首个（兼容旧）
+		wantField, _ := sel["field"].(string)
 		for i := range opts {
-			if opts[i].Type == typ {
+			if opts[i].Type != typ {
+				continue
+			}
+			if wantField == "" || opts[i].Field == wantField {
 				opt = &opts[i]
 				break
 			}
 		}
 		if opt == nil {
 			return "", "", fmt.Errorf("scope option type %q not configured for model %q", typ, modelCode)
+		}
+		// T6 场景参数联动（§4.2 升级一）：$key 引用解析 + shared 防错位（纯函数，单测覆盖）
+		if err := applyScenarioParam(preset, sel, opt.Field, modelCode, scenarioParams); err != nil {
+			return "", "", err
 		}
 		switch typ {
 		case model.ScopeOptInstance:
@@ -1089,13 +1524,13 @@ func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map
 		}
 	}
 	if len(tuples) > 0 {
-		b.WriteString("\n// OpenFGA 直接授权 tuple（instance 类型）\n")
+		b.WriteString("\n// 集合式范围谓词（勾选实例，instance 类型——判定：点查行 id ∈ 集合）\n")
 		for _, t := range tuples {
 			b.WriteString(t + "\n")
 		}
 	}
 	if len(conds) > 0 {
-		b.WriteString("\n// OpenFGA 数据级条件（CEL 落库格式；variable 运行时按 grantee 解析）\n")
+		b.WriteString("\n// 数据级范围条件（CEL 落库格式；variable 运行时按 grantee 解析——判定由 CheckRow 对权威行求值）\n")
 		for _, c := range conds {
 			if err := validateCEL(c); err != nil {
 				return "", "", err
@@ -1108,7 +1543,7 @@ func (d *Deps) buildV12ScopeExpression(cap *model.CapabilityManifest, preset map
 	}
 	engine := "Casbin"
 	if len(tuples) > 0 || len(conds) > 0 {
-		engine = "OpenFGA"
+		engine = "CheckRow"
 	}
 	return engine, b.String(), nil
 }

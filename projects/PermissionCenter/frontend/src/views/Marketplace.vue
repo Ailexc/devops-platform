@@ -34,11 +34,77 @@
           <div class="cap-foot">
             <span class="cap-badge gray">{{ cap.presets?.length || 0 }} 预设可申请</span>
             <span class="cap-badge green">含数据级</span>
+            <button class="btn btn-sm" @click.stop="addToCart(cap)">🛒 加入清单</button>
             <button class="btn btn-primary btn-sm" @click.stop="startApply(cap)">📋 申请</button>
+          </div>
+        </div>
+        <!-- A8 定制需求卡（虚拟卡，非目录请求入口——对标 SailPoint non-catalog / ServiceNow "Something else"） -->
+        <div class="cap-card custom-card" @click="customOpen = true">
+          <div class="custom-inner">
+            <span class="custom-plus">＋</span>
+            <b>申请定制能力</b>
+            <span class="custom-sub">现有能力包组合不满足？提交诉求 → owner 直授（带 TTL 到期回收）或为你补包</span>
           </div>
         </div>
       </div>
       <EmptyState v-if="!filtered.length" text="暂无匹配的能力（应用 owner 需先声明并发布能力）" />
+
+      <!-- T7 多包申请清单（#4）：加购 ≥2 包 → 一单一审批批量开通 -->
+      <div v-if="multiCart.length" class="cart-bar">
+        <div class="cart-items">
+          <span class="cart-title">🛒 申请清单（{{ multiCart.length }}）</span>
+          <span v-for="ci in multiCart" :key="ci.cap.id" class="cart-chip">
+            {{ ci.cap.name }}
+            <span class="cart-x" @click="removeFromCart(ci.cap.id)">✕</span>
+          </span>
+          <span v-if="recs.length" class="cart-recs">常一起申请：
+            <span v-for="r in recs" :key="r.capability_id" class="cart-chip rec" @click="addRecToCart(r)">＋ {{ r.name }}</span>
+          </span>
+        </div>
+        <div class="cart-actions">
+          <button class="btn btn-ghost btn-sm" @click="clearCart">清空</button>
+          <button class="btn btn-primary btn-sm" :disabled="multiCart.length < 2" @click="startMultiApply">
+            📦 多包申请（{{ multiCart.length }}）→
+          </button>
+        </div>
+      </div>
+
+      <!-- A8 定制需求弹窗（非目录请求） -->
+      <div v-if="customOpen" class="modal-mask" @click.self="customOpen = false">
+        <div class="modal-card">
+          <div class="modal-head"><b>＋ 申请定制能力（非目录请求）</b>
+            <button class="modal-x" @click="customOpen = false">✕</button></div>
+          <p class="modal-hint">现有能力包组合不满足时提交诉求——进入该应用 <b>owner 的待办</b>，二选一处置：
+            <b>直接授权</b>（强制带 TTL、到期自动回收）或 <b>补建能力包</b>上架后你走正常申请流程。</p>
+          <label class="modal-label">目标应用
+            <select v-model="customForm.app_id" class="m-input" @change="loadCustomActions">
+              <option value="">请选择…</option>
+              <option v-for="a in apps" :key="a.id" :value="a.id">{{ a.name }}（{{ a.code }}）</option>
+            </select>
+          </label>
+          <label class="modal-label">诉求描述 <span class="req">*</span>
+            <textarea v-model="customForm.description" class="m-input" rows="3"
+              placeholder="为什么现有能力包满足不了？需要完成什么工作？（owner 处置依据）"></textarea>
+          </label>
+          <div v-if="customForm.app_id" class="modal-label">想要的接口动作（可选，来自该应用能力目录）
+            <div class="action-scroll">
+              <label v-for="a in customActions" :key="a.id" class="m-check">
+                <input type="checkbox" :checked="customForm.action_ids.includes(a.id)"
+                  @change="toggleCustomAction(a.id)" />
+                <span class="mono">{{ a.code }}</span>
+              </label>
+              <div v-if="!customActions.length" class="m-empty">该应用暂无能力目录</div>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <span class="m-hint">提交后可在「审批中心 → 我发起的 → 定制需求」跟踪处置</span>
+            <button class="btn btn-ghost" @click="customOpen = false">取消</button>
+            <button class="btn btn-primary"
+              :disabled="customSubmitting || !customForm.app_id || !customForm.description.trim()"
+              @click="submitCustom">{{ customSubmitting ? '提交中…' : '📨 提交定制需求单' }}</button>
+          </div>
+        </div>
+      </div>
     </template>
 
     <!-- 申请向导 4 步 -->
@@ -62,8 +128,22 @@
         <div class="btn-row"><router-link to="/requests" class="btn btn-primary">去审批中心查看</router-link><button class="btn" @click="resetWizard">返回市场</button></div>
       </div>
 
-      <div v-else-if="step === 1" class="wizard-body">
-        <div class="info-box">🔖 选择要申请的权限组合（预设）——市场只显示已上架预设，点击接口可查看调用契约</div>
+      <div v-else-if="step === 1" class="wizard-body">        <!-- T7 多包向导：每包选一个已上架预设（单一审批视图的预览步另见 step 4） -->
+        <template v-if="multiMode">
+          <div class="info-box">📦 多包申请（{{ multiCart.length }} 包一单）——为每个能力包选择预设；同一审批单批量开通，各包落底仍是独立策略</div>
+          <div v-for="ci in multiCart" :key="ci.cap.id" class="multi-pkg">
+            <div class="multi-pkg-head">{{ ci.cap.name }} <span class="badge">{{ ci.cap.app_name }}</span></div>
+            <div class="preset-grid">
+              <div v-for="p in mPublishedPresets(ci.cap)" :key="p.id" class="preset-card" :class="{ selected: mstate(ci.cap.id).presetId === p.id, blocked: !eligible(p) }" @click="eligible(p) && (mstate(ci.cap.id).presetId = p.id)">
+                <div class="preset-name">{{ p.icon || '🔖' }} {{ p.name }}</div>
+                <div class="preset-line"><span class="badge">{{ (p.grantee_types || []).map((g: string) => GRANTEE[g] || g).join('·') }}</span><span class="badge">{{ scopeBadge(p) }}</span></div>
+                <div v-if="p.data_control" class="data-badge">数据级: {{ (p.data_models || []).join(',') }}</div>
+                <div v-if="!eligible(p)" class="block-hint">🚫 可申请范围与你不符</div>
+              </div>
+            </div>
+          </div>
+        </template>
+        <template v-else>        <div class="info-box">🔖 选择要申请的权限组合（预设）——市场只显示已上架预设，点击接口可查看调用契约</div>
         <div class="preset-grid">
           <div v-for="p in applyCap?.presets || []" :key="p.id" class="preset-card" :class="{ selected: applyPreset?.id === p.id, blocked: !eligible(p) }" @click="selectPreset(p)">
             <div class="preset-name">{{ p.icon || '🔖' }} {{ p.name }}</div>
@@ -84,8 +164,7 @@
             <div v-if="p.data_control" class="data-badge">数据级: {{ (p.data_models || []).join(',') }}</div>
             <div v-if="!eligible(p)" class="block-hint">🚫 该预设的可申请范围与你不符（{{ scopeDesc(p) }}）。<br />💡 可申请同能力的「查看类」预设，或联系负责人。</div>
           </div>
-        </div>
-      </div>
+        </div>        </template>      </div>
 
       <div v-else-if="step === 2" class="wizard-body">
         <div v-if="appOnly" class="info-box orange">该预设<b>仅限程序主体</b>——程序无法自己操作，由应用 owner（人）代理申请，因此只能选择「下游应用」。</div>
@@ -110,11 +189,69 @@
       </div>
 
       <div v-else-if="step === 3" class="wizard-body">
+        <!-- T7 多包：逐包选范围（复用单包选择器语义，每域独立策略） -->
+        <template v-if="multiMode">
+          <div class="info-box">📦 为每个能力包的每个数据域选择范围（各包各域落底仍是独立策略——合并只在审批视图）</div>
+          <div v-for="ci in multiCart" :key="ci.cap.id" class="multi-pkg">
+            <div class="multi-pkg-head">{{ ci.cap.name }} <span class="badge">/ {{ mPreset(ci.cap.id)?.name }}</span></div>
+            <template v-if="!mPreset(ci.cap.id)?.data_control">
+              <div class="info-box green">✅ 该预设未开启数据级控制：接口可访问全部数据。</div>
+            </template>
+            <template v-else>
+              <div v-if="mLinkedParams(ci.cap.id).length" class="linkage-bar">
+                <div class="linkage-title">🔗 场景参数（只选一次——全域同值防错位）</div>
+                <div v-for="sp in mLinkedParams(ci.cap.id)" :key="sp.key" class="linkage-param">
+                  <span class="lp-label">{{ sp.label || sp.key }}<span v-if="sp.required" class="req-star">*</span></span>
+                  <div class="choice-chips">
+                    <div v-for="ch in sp.choices || []" :key="ch.value" class="choice-chip" :class="{ selected: mstate(ci.cap.id).scenarioParams[sp.key] === ch.value }" @click="mstate(ci.cap.id).scenarioParams[sp.key] = ch.value"><span class="cc-label">{{ ch.label }}</span><span class="cc-value">{{ ch.value }}</span></div>
+                    <input v-if="sp.type === 'input'" class="input" style="width:220px;" v-model="mstate(ci.cap.id).scenarioParams[sp.key]" />
+                  </div>
+                </div>
+              </div>
+              <div v-for="mc in mPreset(ci.cap.id)?.data_models || []" :key="mc" class="dim-row">
+                <div class="dim-head"><b class="mono">{{ mc }}</b><span class="badge">数据范围</span></div>
+                <div class="scope-opts">
+                  <div v-for="o in moptionsOf(ci.cap.id, mc)" :key="o.type" class="scope-opt" :class="{ selected: mscopeOf(ci.cap.id, mc).type === o.type }" @click="mselectScopeTypeAuto(ci.cap.id, mc, o.type)">
+                    <div class="so-icon">{{ SCOPE_ICON[o.type] }}</div><div><div class="so-name">{{ o.label }}</div><div class="so-desc">{{ o.desc || '' }}</div></div>
+                  </div>
+                </div>
+                <div class="scope-form">
+                  <template v-if="mscopeOf(ci.cap.id, mc).type === 'all'"><div class="info-box cyan">该模型全部数据（无需填写）</div></template>
+                  <template v-else-if="mscopeOf(ci.cap.id, mc).type === 'instance'">
+                    <div class="inst-list"><label v-for="i in instancesOf(mc)" :key="i.id" class="check"><input type="checkbox" :checked="mscopeOf(ci.cap.id, mc).selectedValues.includes(String(i.id))" @change="() => { const s = mscopeOf(ci.cap.id, mc); const id = String(i.id); const idx = s.selectedValues.indexOf(id); idx < 0 ? s.selectedValues.push(id) : s.selectedValues.splice(idx, 1) }" /> {{ i.name }} <span class="mono text-secondary">{{ i.id }}</span></label></div>
+                  </template>
+                  <template v-else-if="mscopeOf(ci.cap.id, mc).type === 'select'">
+                    <div v-if="mlinkedOpt(ci.cap.id, mc, 'select')" class="var-display">🔗 联动：值跟随场景参数 <b>{{ moptOf(ci.cap.id, mc, 'select')?.field }}</b> → <b>{{ mstate(ci.cap.id).scenarioParams[moptOf(ci.cap.id, mc, 'select')?.field] || '（请先在上方选定）' }}</b></div>
+                    <div v-else class="choice-chips"><div v-for="ch in moptOf(ci.cap.id, mc, 'select')?.choices || []" :key="ch.value" class="choice-chip" :class="{ selected: mscopeOf(ci.cap.id, mc).selectedValue === ch.value }" @click="mscopeOf(ci.cap.id, mc).selectedValue = ch.value; mscopeOf(ci.cap.id, mc).selectedValues = []"><span class="cc-label">{{ ch.label }}</span><span class="cc-value">{{ ch.value }}</span></div></div>
+                  </template>
+                  <template v-else-if="mscopeOf(ci.cap.id, mc).type === 'multi_select'">
+                    <div class="choice-chips"><div v-for="ch in moptOf(ci.cap.id, mc, 'multi_select')?.choices || []" :key="ch.value" class="choice-chip" :class="{ selected: mscopeOf(ci.cap.id, mc).selectedValues.includes(ch.value) }" @click="mtoggleValue(ci.cap.id, mc, ch.value)"><span class="cc-label">{{ ch.label }}</span><span class="cc-value">{{ ch.value }}</span></div></div>
+                  </template>
+                  <template v-else-if="mscopeOf(ci.cap.id, mc).type === 'variable'"><div class="var-display">🔄 自动匹配：运行时按 grantee 解析，无需手动填写</div></template>
+                  <template v-else-if="mscopeOf(ci.cap.id, mc).type === 'input'"><input class="input" :placeholder="moptOf(ci.cap.id, mc, 'input')?.placeholder || '请输入...'" :value="mscopeOf(ci.cap.id, mc).selectedValue" @input="(e: Event) => { mscopeOf(ci.cap.id, mc).selectedValue = (e.target as HTMLInputElement).value }" /></template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+        <template v-else>
         <div v-if="!applyPreset?.data_control" class="info-box green">✅ 该预设未开启数据级控制：接口可访问全部数据。</div>
         <template v-else>
+          <!-- T6 场景参数联动（§4.2 升级一）：只选一次 → 全域同值带出，结构上不可能错位 -->
+          <div v-if="linkedParams.length" class="linkage-bar">
+            <div class="linkage-title">🔗 场景参数（只选一次——全域同值防错位）</div>
+            <div v-for="sp in linkedParams" :key="sp.key" class="linkage-param">
+              <span class="lp-label">{{ sp.label || sp.key }}<span v-if="sp.required" class="req-star">*</span></span>
+              <div class="choice-chips">
+                <div v-for="ch in sp.choices || []" :key="ch.value" class="choice-chip" :class="{ selected: scenarioParams[sp.key] === ch.value }" @click="scenarioParams[sp.key] = ch.value"><span class="cc-label">{{ ch.label }}</span><span class="cc-value">{{ ch.value }}</span></div>
+                <input v-if="sp.type === 'input'" class="input" style="width:220px;" :placeholder="sp.placeholder || '请输入'" v-model="scenarioParams[sp.key]" />
+              </div>
+            </div>
+            <div class="linkage-hint">选定后，下方各域中绑定该参数的条件自动带出同一值（条件字段与参数 key 同名）——服务端同样钉死引用，绕过前端也错不了位。</div>
+          </div>
           <div class="card-desc">该预设开启数据级控制，请为每个数据模型选择数据范围（选择后自动生成表达式）。</div>
-          <div v-for="mc in applyPreset?.data_models || []" :key="mc" class="dim-row">
-            <div class="dim-head"><b class="mono">{{ mc }}</b><span class="badge">数据范围</span></div>
+          <div v-for="mc in orderedDomainCodes" :key="mc" class="dim-row" :style="{ marginLeft: (depthOf(mc) * 22) + 'px' }">
+            <div class="dim-head"><b class="mono">{{ mc }}</b><span class="badge">数据范围</span><span v-if="depthOf(mc) > 0" class="tag tag-blue tree-tag">↳ 随 {{ parentOf(mc) }}（层级带出，落底仍独立策略）</span></div>
             <div class="scope-opts">
               <div v-for="o in optionsOf(mc)" :key="o.type" class="scope-opt" :class="{ selected: scopeOf(mc).type === o.type }" @click="selectScopeType(mc, o.type)">
                 <div class="so-icon">{{ SCOPE_ICON[o.type] }}</div><div><div class="so-name">{{ o.label }}</div><div class="so-desc">{{ o.desc || '' }}</div></div>
@@ -128,22 +265,41 @@
               </template>
               <template v-else-if="scopeOf(mc).type === 'select'">
                 <label class="field-label">{{ optOf(mc, 'select')?.label }}（单选）</label>
-                <div class="choice-chips"><div v-for="ch in optOf(mc, 'select')?.choices || []" :key="ch.value" class="choice-chip" :class="{ selected: scopeOf(mc).selectedValue === ch.value }" @click="scopeOf(mc).selectedValue = ch.value; scopeOf(mc).selectedValues = []"><span class="cc-label">{{ ch.label }}</span><span class="cc-value">{{ ch.value }}</span></div></div>
+                <div v-if="isLinkedOpt(mc, 'select')" class="var-display">🔗 联动：值跟随场景参数 <b>{{ optOf(mc, 'select')?.field }}</b> → <b>{{ scenarioParams[optOf(mc, 'select')?.field] || '（请先在上方选定）' }}</b>（禁单独填——防域间错位）</div>
+                <div v-else class="choice-chips"><div v-for="ch in optOf(mc, 'select')?.choices || []" :key="ch.value" class="choice-chip" :class="{ selected: scopeOf(mc).selectedValue === ch.value }" @click="scopeOf(mc).selectedValue = ch.value; scopeOf(mc).selectedValues = []"><span class="cc-label">{{ ch.label }}</span><span class="cc-value">{{ ch.value }}</span></div></div>
               </template>
               <template v-else-if="scopeOf(mc).type === 'multi_select'">
                 <label class="field-label">{{ optOf(mc, 'multi_select')?.label }}（可多选）</label>
                 <div class="choice-chips"><div v-for="ch in optOf(mc, 'multi_select')?.choices || []" :key="ch.value" class="choice-chip" :class="{ selected: scopeOf(mc).selectedValues.includes(ch.value) }" @click="toggleValue(mc, ch.value)"><span class="cc-label">{{ ch.label }}</span><span class="cc-value">{{ ch.value }}</span></div></div>
               </template>
               <template v-else-if="scopeOf(mc).type === 'variable'"><div class="var-display">🔄 自动匹配：<b>{{ optOf(mc, 'variable')?.var_label || optOf(mc, 'variable')?.variable }}</b> → 运行时按 grantee（权限作用主体）解析，无需手动填写</div></template>
-              <template v-else-if="scopeOf(mc).type === 'input'"><label class="field-label">{{ optOf(mc, 'input')?.label }}（自由填写）</label><input class="input" :placeholder="optOf(mc, 'input')?.placeholder || '请输入...'" :value="scopeOf(mc).selectedValue" @input="onScopeInput(mc, $event)" /></template>
+              <template v-else-if="scopeOf(mc).type === 'input'">
+                <label class="field-label">{{ optOf(mc, 'input')?.label }}（自由填写）</label>
+                <div v-if="isLinkedOpt(mc, 'input')" class="var-display">🔗 联动：值跟随场景参数 <b>{{ optOf(mc, 'input')?.field }}</b> → <b>{{ scenarioParams[optOf(mc, 'input')?.field] || '（请先在上方选定）' }}</b></div>
+                <input v-else class="input" :placeholder="optOf(mc, 'input')?.placeholder || '请输入...'" :value="scopeOf(mc).selectedValue" @input="onScopeInput(mc, $event)" />
+              </template>
             </div>
             <div v-if="autoExpr(mc)" class="expr-preview">生成表达式：<b>{{ autoExpr(mc) }}</b></div>
           </div>
         </template>
+        </template>
       </div>
 
       <div v-else class="wizard-body">
-        <div v-if="preview">
+        <!-- T7 多包预览：合并展示各包范围与表达式（单一审批视图）+ 批量开通说明 -->
+        <div v-if="multiMode && multiPreview">
+          <div class="preview-sec"><div class="ps-head">👤 申请主体（双主体）</div><div class="ps-body"><div class="prow"><span class="pk">授权主体</span><span class="pv">{{ granteeLabel() }}</span></div><div class="prow"><span class="pk">申请人</span><span class="pv">{{ me?.display_name || me?.username }} · applicant = 人代理</span></div></div></div>
+          <div class="preview-sec"><div class="ps-head">📦 多包申请（{{ multiPreview.packages?.length }} 包一单一审批 → 批量开通）</div><div class="ps-body">
+            <div v-for="p in multiPreview.packages || []" :key="p.capability_id" class="multi-pkg">
+              <div class="multi-pkg-head">{{ p.capability_name }} <span class="badge">/ {{ p.preset_name }}</span> <span class="tag" :class="(p.risk_label || '').includes('高') ? 'tag-red' : 'tag-amber'">{{ p.risk_label }}</span></div>
+              <pre class="codeblock">{{ p.scope_expression }}</pre>
+            </div>
+          </div></div>
+          <div class="info-box purple">审批链：{{ (multiPreview.approval_chain || []).map((a: any) => a.role).join(' → ') }} · 风险：<b>{{ multiPreview.risk_label }}</b>（取各包最高）</div>
+          <div class="info-box green">审批通过后按包逐条落策略（capability_id 可指认哪个包）——合并只在审批视图，落底各包仍是独立策略。</div>
+          <div class="btn-row"><button class="btn btn-primary" @click="submit" :disabled="submitting">{{ submitting ? '提交中…' : '🚀 发起审批' }}</button></div>
+        </div>
+        <div v-else-if="preview">
           <div class="preview-sec"><div class="ps-head">👤 申请主体（双主体）</div><div class="ps-body"><div class="prow"><span class="pk">授权主体</span><span class="pv">{{ granteeLabel() }}</span></div><div class="prow"><span class="pk">申请人</span><span class="pv">{{ me?.display_name || me?.username }} · applicant = 人代理</span></div></div></div>
           <div class="preview-sec"><div class="ps-head">📦 能力基本信息</div><div class="ps-body"><div class="prow"><span class="pk">能力包</span><span class="pv">{{ applyCap?.name }}</span></div><div class="prow"><span class="pk">所属应用</span><span class="pv">{{ appName(applyCap?.app_id) }}</span></div></div></div>
           <div class="preview-sec"><div class="ps-head">🎯 申请的预设</div><div class="ps-body"><div class="prow"><span class="pk">预设</span><span class="pv"><b>{{ applyPreset?.name }}</b></span></div><div class="prow"><span class="pk">数据范围</span><span class="pv">{{ scopeText }}</span></div></div></div>
@@ -176,7 +332,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import { ElMessage } from 'element-plus'
@@ -220,6 +376,134 @@ const scopeSel = ref<Record<string, any>>({})
 const instMap = ref<Record<string, any[]>>({})
 const groups = ref<any[]>([])
 const optCache = ref<Record<string, any[]>>({})
+// T7 多包一次性申请（#4）：加购清单 → 一单一审批批量开通（同应用多包；跨应用分别申请）
+const multiCart = ref<{ cap: any }[]>([])
+const multiMode = ref(false)
+const multiSel = ref<Record<number, { presetId: string; scopeSel: Record<string, any>; scenarioParams: Record<string, string> }>>({})
+const multiPreview = ref<any>(null)
+const recs = ref<any[]>([])
+function addToCart(cap: any) {
+  if (multiCart.value.find((c) => c.cap.id === cap.id)) return
+  multiCart.value.push({ cap })
+  loadRecs(cap.id)
+}
+function removeFromCart(capId: number) {
+  multiCart.value = multiCart.value.filter((c) => c.cap.id !== capId)
+  delete multiSel.value[capId]
+}
+function clearCart() { multiCart.value = []; multiSel.value = {}; recs.value = [] }
+// 关联推荐（共现信号）：加购时拉取，可一键加进清单
+async function loadRecs(capId: number) {
+  try { recs.value = ((await api.marketplaceRecommend(capId)) as any).items || [] } catch { recs.value = [] }
+}
+function addRecToCart(r: any) {
+  const cap = caps.value.find((c: any) => c.id === r.capability_id)
+  if (cap) addToCart(cap)
+}
+function mstate(capId: number) {
+  if (!multiSel.value[capId]) multiSel.value[capId] = { presetId: '', scopeSel: {}, scenarioParams: {} }
+  return multiSel.value[capId]
+}
+function mPublishedPresets(cap: any) { return (cap.presets || []).filter((p: any) => p.status === 'published') }
+function mPreset(capId: number) {
+  const ci = multiCart.value.find((c) => c.cap.id === capId)
+  if (!ci) return null
+  return (ci.cap.presets || []).find((p: any) => p.id === mstate(capId).presetId) || null
+}
+function moptionsOf(capId: number, mc: string) {
+  const pid = mstate(capId).presetId
+  return optCache.value[`${capId}_${pid}_${mc}`] || []
+}
+function moptOf(capId: number, mc: string, type: string) { return moptionsOf(capId, mc).find((o: any) => o.type === type) }
+function mscopeOf(capId: number, mc: string) {
+  const st = mstate(capId)
+  if (!st.scopeSel[mc]) st.scopeSel[mc] = { type: moptionsOf(capId, mc)[0]?.type || 'all', selectedValue: '', selectedValues: [] as string[] }
+  return st.scopeSel[mc]
+}
+function mselectScopeType(capId: number, mc: string, type: string) { const s = mscopeOf(capId, mc); s.type = type; s.selectedValue = ''; s.selectedValues = [] }
+function mtoggleValue(capId: number, mc: string, v: string) { const s = mscopeOf(capId, mc); const i = s.selectedValues.indexOf(v); i < 0 ? s.selectedValues.push(v) : s.selectedValues.splice(i, 1) }
+function mLinkedParams(capId: number) {
+  const p = mPreset(capId)
+  if (!p || p.param_linkage !== 'shared') return []
+  return p.scenario_params || []
+}
+function mlinkedOpt(capId: number, mc: string, type: string) {
+  const keys = mLinkedParams(capId).map((p: any) => p.key)
+  const o = moptOf(capId, mc, type)
+  return !!o && keys.includes(o.field)
+}
+function mselectScopeTypeAuto(capId: number, mc: string, type: string) {
+  mselectScopeType(capId, mc, type)
+  if (mlinkedOpt(capId, mc, type)) mscopeOf(capId, mc).selectedValue = '$' + (moptOf(capId, mc, type)?.field || '')
+}
+function mscopeSelectionsPayload(capId: number) {
+  const p = mPreset(capId)
+  const out: any[] = []
+  for (const mc of p?.data_models || []) {
+    const s = mscopeOf(capId, mc); const o = moptOf(capId, mc, s.type)
+    const item: any = { model: mc, type: s.type, selectedValue: s.selectedValue, selectedValues: s.selectedValues }
+    if (o?.field) item.field = o.field
+    out.push(item)
+  }
+  return out
+}
+function multiCapabilityRequestsPayload() {
+  return multiCart.value.map((ci) => {
+    const st = mstate(ci.cap.id)
+    const out: any = { capability_id: ci.cap.id, preset_id: st.presetId, scope_selections: mscopeSelectionsPayload(ci.cap.id) }
+    if (mLinkedParams(ci.cap.id).length) out.scenario_params = st.scenarioParams
+    return out
+  })
+}
+// T6 场景参数联动（§4.2 升级一）：申请时只选一次，各域 "$key" 引用同值（结构防错位）
+const scenarioParams = ref<Record<string, string>>({})
+const linkedParams = computed<any[]>(() => {
+  if (applyPreset.value?.param_linkage !== 'shared') return []
+  return applyPreset.value?.scenario_params || []
+})
+// T6 层级编排（§4.2 升级二）：data_model_tree 先序展开——父域先渲染、从属子域缩进带出；
+// 树外的 data_models（不在树里）= 跨出层级，平铺在尾部独立选择（单独申请语义）
+const orderedDomainCodes = computed<string[]>(() => {
+  const flat: string[] = applyPreset.value?.data_models || []
+  const tree: any[] = applyPreset.value?.data_model_tree || []
+  const out: string[] = []
+  const walk = (nodes: any[]) => {
+    for (const n of nodes || []) {
+      if (n?.model && flat.includes(n.model) && !out.includes(n.model)) out.push(n.model)
+      walk(n?.children || [])
+    }
+  }
+  walk(tree)
+  for (const mc of flat) if (!out.includes(mc)) out.push(mc)
+  return out
+})
+function parentOf(mc: string): string {
+  const walk = (nodes: any[], parent: string): string => {
+    for (const n of nodes || []) {
+      if (n?.model === mc) return parent
+      const hit = walk(n?.children || [], n?.model)
+      if (hit) return hit
+    }
+    return ''
+  }
+  return walk(applyPreset.value?.data_model_tree || [], '')
+}
+function depthOf(mc: string): number {
+  let d = 0, cur = mc
+  while (true) {
+    const p = parentOf(cur)
+    if (!p) break
+    d++; cur = p
+    if (d > 5) break
+  }
+  return d
+}
+// 联动绑定域：选项 field 与场景参数 key 同名 → 值锁定为 "$key" 引用（禁单独填）
+function isLinkedOpt(mc: string, type: string): boolean {
+  const keys = linkedParams.value.map((p: any) => p.key)
+  const o = optOf(mc, type)
+  return !!o && keys.includes(o.field)
+}
 
 const filtered = computed(() => {
   const k = q.value.trim().toLowerCase()
@@ -243,23 +527,77 @@ const appOnly = computed(() => applyPreset.value?.grantee_types?.length === 1 &&
 function optionsOf(mc: string) { return optCache.value[`${applyCap.value?.id}_${applyPreset.value?.id}_${mc}`] || [] }
 function optOf(mc: string, type: string) { return optionsOf(mc).find((o: any) => o.type === type) }
 function scopeOf(mc: string) { if (!scopeSel.value[mc]) scopeSel.value[mc] = { type: optionsOf(mc)[0]?.type || 'all', selectedValue: '', selectedValues: [] as string[] }; return scopeSel.value[mc] }
-function selectScopeType(mc: string, type: string) { const s = scopeOf(mc); s.type = type; s.selectedValue = ''; s.selectedValues = [] }
+function selectScopeType(mc: string, type: string) {
+  const s = scopeOf(mc); s.type = type; s.selectedValue = ''; s.selectedValues = []
+  // T6 联动：绑定域选中即锁定为 "$key" 引用（值由上方场景参数带出，禁单独填）
+  if (isLinkedOpt(mc, type)) s.selectedValue = '$' + (optOf(mc, type)?.field || '')
+}
 function toggleValue(mc: string, v: string) { const s = scopeOf(mc); const i = s.selectedValues.indexOf(v); i < 0 ? s.selectedValues.push(v) : s.selectedValues.splice(i, 1) }
 function toggleInstance(mc: string, inst: any) { const s = scopeOf(mc); const id = String(inst.id); const i = s.selectedValues.indexOf(id); i < 0 ? s.selectedValues.push(id) : s.selectedValues.splice(i, 1) }
 function onScopeInput(mc: string, e: Event) { scopeOf(mc).selectedValue = (e.target as HTMLInputElement).value }
 function autoExpr(mc: string) {
   const s = scopeOf(mc); const o = optOf(mc, s.type); if (!o) return ''
+  // T6 联动引用：显示解析后值（一次选定全域同值）
+  if (String(s.selectedValue).startsWith('$')) {
+    const key = String(s.selectedValue).slice(1)
+    const v = scenarioParams.value[key]
+    return v ? `${o.field} ${o.op} "${v}"（🔗 $${key}）` : `等场景参数 $${key} 选定后生效`
+  }
   switch (s.type) {
     case 'select': return s.selectedValue ? `${o.field} ${o.op} "${s.selectedValue}"` : ''
-    case 'multi_select': return s.selectedValues.length ? `${o.field} ${o.op} [${s.selectedValues.map(v => '"' + v + '"').join(', ')}]` : ''
+    case 'multi_select': return s.selectedValues.length ? `${o.field} ${o.op} [${s.selectedValues.map((v: string) => '"' + v + '"').join(', ')}]` : ''
     case 'variable': return `${o.field} ${o.op} "${o.variable}"`
     case 'input': return s.selectedValue ? `${o.field} ${o.op} "${s.selectedValue}"` : ''
   }
   return ''
 }
-function scopeSelectionsPayload() { const out: any[] = []; for (const mc of applyPreset.value?.data_models || []) { const s = scopeOf(mc); out.push({ model: mc, type: s.type, selectedValue: s.selectedValue, selectedValues: s.selectedValues }) } return out }
+function scopeSelectionsPayload() {
+  const out: any[] = []
+  for (const mc of orderedDomainCodes.value) {
+    const s = scopeOf(mc); const o = optOf(mc, s.type)
+    const item: any = { model: mc, type: s.type, selectedValue: s.selectedValue, selectedValues: s.selectedValues }
+    if (o?.field) item.field = o.field // T6：field 精确匹配（同类型多选项防歧义）
+    out.push(item)
+  }
+  return out
+}
 const scopeText = computed(() => scopeSelectionsPayload().map(s => `${s.model}: ${SCOPE_LABEL[s.type] || s.type}`).join(' · '))
 
+// ---- A8 定制需求卡（非目录请求：创建诉求单 → owner 处置）----
+const customOpen = ref(false)
+const customSubmitting = ref(false)
+const customActions = ref<any[]>([])
+const customForm = reactive<{ app_id: number | ''; description: string; action_ids: number[] }>(
+  { app_id: '', description: '', action_ids: [] })
+
+async function loadCustomActions() {
+  customForm.action_ids = []
+  customActions.value = []
+  if (!customForm.app_id) return
+  try { customActions.value = (await api.actions(Number(customForm.app_id))).items || [] }
+  catch { customActions.value = [] }
+}
+function toggleCustomAction(id: number) {
+  const i = customForm.action_ids.indexOf(id)
+  i < 0 ? customForm.action_ids.push(id) : customForm.action_ids.splice(i, 1)
+}
+async function submitCustom() {
+  customSubmitting.value = true
+  try {
+    await api.customRequest(Number(customForm.app_id), {
+      description: customForm.description.trim(),
+      action_ids: customForm.action_ids,
+    })
+    customOpen.value = false
+    customForm.description = ''
+    customForm.action_ids = []
+    ElMessage.success('定制需求单已提交——审批中心「定制需求」可见，owner 将直授（带 TTL）或转为能力包')
+  } catch (e: any) { ElMessage.error(e.message) } finally { customSubmitting.value = false }
+}
+
+// A7 口径固化（清单）：申请向导的实例选择器读 IAM 本地投影（api.instances → ResourceRepo 直查投影表），
+// 不调发布方接口——三理由：鸡生蛋（申请人对目标资源零权限）、解耦（申请不依赖发布方在线）、最小暴露
+// （选择器只需判断字段）。代价=分钟级新鲜度窗口（新资源投影未同步到时选不到）：演示前先触发一轮同步。
 async function loadInstances(mc: string) {
   if (instMap.value[mc]) return
   try {
@@ -274,6 +612,7 @@ async function loadScopeOptions() {
   const cid = applyCap.value?.id, pid = applyPreset.value?.id
   if (!cid || !pid) return
   scopeSel.value = {}
+  scenarioParams.value = {} // T6：重置场景参数（只选一次——每次进向导重新选）
   for (const mc of applyPreset.value?.data_models || []) {
     const key = `${cid}_${pid}_${mc}`
     try { const r: any = await api.presetScopeOptions(cid, pid, mc); optCache.value[key] = (r.options || []).map((o: any) => ({ ...o, choices: o.choices || [] })) } catch { optCache.value[key] = [] }
@@ -296,15 +635,70 @@ function granteeId() { return granteeType.value === 'user' ? me.value?.id : Numb
 function onboardedFor(consumerAppId: string) { return myRequests.value.some((r: any) => r.request_type === 3 && r.status === 2 && r.content?.provider_app_id === applyCap.value?.app_id && String(r.content?.consumer_app_id) === consumerAppId) }
 
 function startApply(cap: any, presetId?: string) {
-  applyCap.value = cap; applyPreset.value = null; granteeType.value = ''; granteeDetail.value = ''; scopeSel.value = {}; submitted.value = null; preview.value = null; step.value = 1; wizard.value = true
+  multiMode.value = false; multiPreview.value = null
+  applyCap.value = cap; applyPreset.value = null; granteeType.value = ''; granteeDetail.value = ''; scopeSel.value = {}; scenarioParams.value = {}; submitted.value = null; preview.value = null; step.value = 1; wizard.value = true
   if (presetId) { const p = (cap.presets || []).find((x: any) => x.id === presetId); if (p && eligible(p)) selectPreset(p) }
 }
 function selectPreset(p: any) { if (!eligible(p)) return; applyPreset.value = p; step.value = 2; loadScopeOptions() }
-function resetWizard() { wizard.value = false; applyCap.value = null; applyPreset.value = null }
-const canNext = computed(() => { if (step.value === 1) return !!applyPreset.value; if (step.value === 2) return !!granteeDetail.value; return true })
-function next() { if (step.value === 3) loadPreview(); if (canNext.value) step.value++ }
-watch(step, async (s) => { if (s === 3) await loadScopeOptions(); if (s === 4) await loadPreview() })
+function resetWizard() { wizard.value = false; applyCap.value = null; applyPreset.value = null; multiMode.value = false; multiPreview.value = null }
+// T7 多包向导入口：同应用校验 + 每包预选首个已发布预设
+function startMultiApply() {
+  if (multiCart.value.length < 2) return
+  const appId = multiCart.value[0].cap.app_id
+  if (multiCart.value.some((c) => c.cap.app_id !== appId)) {
+    ElMessage.error('多包申请须同一应用（单一审批视图=一个 app 的 owner 链）——跨应用请分别申请')
+    return
+  }
+  multiMode.value = true; multiPreview.value = null
+  applyCap.value = multiCart.value[0].cap; applyPreset.value = null
+  granteeType.value = ''; granteeDetail.value = ''; submitted.value = null; step.value = 1; wizard.value = true
+  for (const ci of multiCart.value) {
+    const st = mstate(ci.cap.id)
+    if (!st.presetId) st.presetId = mPublishedPresets(ci.cap)[0]?.id || ''
+  }
+}
+async function loadMultiScopeOptions() {
+  for (const ci of multiCart.value) {
+    const pid = mstate(ci.cap.id).presetId
+    if (!pid) continue
+    const p = mPreset(ci.cap.id)
+    for (const mc of p?.data_models || []) {
+      const key = `${ci.cap.id}_${pid}_${mc}`
+      if (optCache.value[key]) continue
+      try { const r: any = await api.presetScopeOptions(ci.cap.id, pid, mc); optCache.value[key] = (r.options || []).map((o: any) => ({ ...o, choices: o.choices || [] })) } catch { optCache.value[key] = [] }
+      await loadInstances(mc)
+    }
+  }
+}
+const canNext = computed(() => {
+  if (step.value === 1) {
+    if (multiMode.value) return multiCart.value.length >= 2 && multiCart.value.every((ci) => mstate(ci.cap.id).presetId)
+    return !!applyPreset.value
+  }
+  if (step.value === 2) return !!granteeDetail.value
+  return true
+})
+function next() { if (step.value === 3) multiMode.value ? loadMultiPreview() : loadPreview(); if (canNext.value) step.value++ }
+watch(step, async (s) => {
+  if (s === 3) multiMode.value ? await loadMultiScopeOptions() : await loadScopeOptions()
+  if (s === 4) multiMode.value ? await loadMultiPreview() : await loadPreview()
+})
 
+// T7 多包预览：capability_requests → 合并审批视图（各包表达式 + 最高风险 + 审批链）
+async function loadMultiPreview() {
+  multiPreview.value = null
+  try {
+    multiPreview.value = await api.previewRequest({
+      app_id: multiCart.value[0].cap.app_id,
+      subject_type: granteeType.value === 'app' ? 4 : granteeType.value === 'org' ? 3 : granteeType.value === 'group' ? 2 : 1,
+      subject_id: granteeId(),
+      grantee_type: granteeType.value,
+      grantee_name: granteeType.value === 'app' ? 'client:' + (apps.value.find(a => String(a.id) === granteeDetail.value)?.code || granteeDetail.value) : '',
+      grantee_id: granteeId(),
+      capability_requests: multiCapabilityRequestsPayload(),
+    })
+  } catch (e: any) { ElMessage.error(e.message) }
+}
 async function loadPreview() {
   preview.value = null
   try {
@@ -317,21 +711,31 @@ async function loadPreview() {
       grantee_name: granteeType.value === 'app' ? 'client:' + (apps.value.find(a => String(a.id) === granteeDetail.value)?.code || granteeDetail.value) : '',
       grantee_id: granteeId(),
       scope_selections: scopeSelectionsPayload(),
+      scenario_params: linkedParams.value.length ? scenarioParams.value : undefined, // T6 联动参数
     })
   } catch (e: any) { ElMessage.error(e.message) }
 }
 async function submit() {
   submitting.value = true
   try {
-    submitted.value = await api.submitRequest({
-      app_id: applyCap.value?.app_id,
+    // T7 多包提交：capability_requests（与单包字段互斥）
+    const base = {
+      app_id: multiMode.value ? multiCart.value[0].cap.app_id : applyCap.value?.app_id,
       subject_type: granteeType.value === 'app' ? 4 : granteeType.value === 'org' ? 3 : granteeType.value === 'group' ? 2 : 1,
       subject_id: granteeId(),
-      capability_id: applyCap.value?.id, preset_id: applyPreset.value?.id,
       grantee_type: granteeType.value,
       grantee_name: granteeType.value === 'app' ? 'client:' + (apps.value.find(a => String(a.id) === granteeDetail.value)?.code || granteeDetail.value) : '',
       grantee_id: granteeId(),
+    }
+    submitted.value = await api.submitRequest(multiMode.value ? {
+      ...base,
+      capability_requests: multiCapabilityRequestsPayload(),
+      reason: `多包申请（${multiCart.value.length} 包一单）：${multiCart.value.map((c) => c.cap.name).join('、')}`,
+    } : {
+      ...base,
+      capability_id: applyCap.value?.id, preset_id: applyPreset.value?.id,
       scope_selections: scopeSelectionsPayload(),
+      scenario_params: linkedParams.value.length ? scenarioParams.value : undefined, // T6 联动参数（审批视图可见）
       reason: `申请「${applyCap.value?.name} / ${applyPreset.value?.name}」`,
     })
   } catch (e: any) { ElMessage.error(e.message) } finally { submitting.value = false }
@@ -498,4 +902,45 @@ onMounted(async () => {
 .empty-state { padding: 40px; text-align: center; color: var(--text-tertiary); font-size: 13px; }
 .mono { font-family: var(--font-mono); font-size: 12px; }
 .text-secondary { color: var(--text-secondary); }
+/* ---- A8 定制需求卡与弹窗 ---- */
+.custom-card { border: 2px dashed var(--border-strong); background: var(--bg-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; min-height: 148px; transition: all .15s; }
+.custom-card:hover { border-color: var(--brand, #2f6fed); background: var(--brand-soft, #eaf1fe); }
+.custom-inner { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 16px; color: var(--text-secondary); }
+.custom-plus { font-size: 28px; font-weight: 300; color: var(--brand, #2f6fed); line-height: 1; }
+.custom-inner b { font-size: 14px; color: var(--text); }
+.custom-sub { font-size: 11px; line-height: 1.5; max-width: 200px; }
+.modal-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal-card { width: 480px; max-width: 92vw; max-height: 86vh; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 18px 48px rgba(15, 23, 42, .22); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; margin-bottom: 8px; }
+.modal-x { border: none; background: none; font-size: 16px; cursor: pointer; color: var(--text-secondary); }
+.modal-hint { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 12px; }
+.modal-label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.modal-label .req { color: var(--danger, #dc2626); }
+.m-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text); font-size: 13px; font-family: inherit; }
+.m-input:focus { outline: none; border-color: var(--brand, #2f6fed); }
+.action-scroll { max-height: 168px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; font-weight: 400; }
+.m-check { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+.m-empty { font-size: 11px; color: var(--text-tertiary, #8a919c); }
+.modal-foot { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.m-hint { margin-right: auto; font-size: 11px; color: var(--text-tertiary, #8a919c); }
+/* T6 场景参数联动条（§4.2 升级一）+ 层级树缩进标记（升级二） */
+.linkage-bar { margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--brand, #2f6fed); border-radius: 10px; background: var(--brand-soft, rgba(47,111,237,.06)); display: flex; flex-direction: column; gap: 10px; }
+.linkage-title { font-size: 13px; font-weight: 700; }
+.linkage-param { display: flex; align-items: center; gap: 12px; }
+.lp-label { font-size: 12px; font-weight: 600; min-width: 90px; }
+.req-star { color: var(--danger, #d9363e); margin-left: 2px; }
+.linkage-hint { font-size: 11px; color: var(--text-secondary, #5b6470); }
+.tree-tag { margin-left: 8px; }
+/* T7 多包申请清单与逐包渲染 */
+.cart-bar { position: sticky; bottom: 0; margin-top: 14px; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border-strong, #c9ced6); border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 -6px 20px rgba(0,0,0,.08); z-index: 50; }
+.cart-items { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.cart-title { font-size: 13px; font-weight: 700; }
+.cart-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--bg-inset, #f2f4f7); border: 1px solid var(--border); font-size: 12px; }
+.cart-chip.rec { cursor: pointer; border-style: dashed; color: var(--brand-strong, #2f6fed); }
+.cart-chip.rec:hover { background: var(--brand-soft, rgba(47,111,237,.08)); }
+.cart-x { cursor: pointer; color: var(--text-tertiary, #8a919c); }
+.cart-recs { font-size: 11px; color: var(--text-secondary, #5b6470); }
+.cart-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.multi-pkg { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; background: var(--bg-card); }
+.multi-pkg-head { font-size: 13px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
 </style>

@@ -4,12 +4,17 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -25,18 +30,19 @@ type Instance struct {
 }
 
 type Model struct {
-	ID               uint64         `json:"id"`
-	Name             string         `json:"name"`
-	Code             string         `json:"code"`
-	AttributesSchema map[string]any `json:"attributes_schema"`
+	ID               uint64               `json:"id"`
+	Name             string               `json:"name"`
+	Code             string               `json:"code"`
+	AttributesSchema map[string]any       `json:"attributes_schema"`
 	Instances        map[uint64]*Instance `json:"-"`
 }
 
 type cmdb struct {
-	mu     sync.RWMutex
-	nextID uint64
-	models map[string]*Model
-	rdb    *redis.Client
+	mu      sync.RWMutex
+	nextID  uint64
+	models  map[string]*Model
+	rdb     *redis.Client
+	version uint64 // 集合变更计数（指纹端点观测字段，atomic 读写；指纹比对不依赖它）
 }
 
 func newCMDB() *cmdb {
@@ -70,13 +76,18 @@ func newCMDB() *cmdb {
 	return c
 }
 
+// seedBaseTime 种子时间固定基准值（A3 演示纪律）：重启 mock 不刷新全表 updated_at →
+// 巡检指纹不误判、IAM 侧无假变更洪水；真实变更一律走 API（毫秒精度 RFC3339Nano 时间戳）
+var seedBaseTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
 func (c *cmdb) seed(modelCode, name string, attrs map[string]any, owner *uint64) {
 	m := c.models[modelCode]
-	m.Instances[c.nextID] = &Instance{ID: c.nextID, Name: name, Attributes: attrs, OwnerID: owner, UpdatedAt: time.Now().Format(time.RFC3339)}
+	m.Instances[c.nextID] = &Instance{ID: c.nextID, Name: name, Attributes: attrs, OwnerID: owner, UpdatedAt: seedBaseTime.Format(time.RFC3339Nano)}
 	c.nextID++
 }
 
 func (c *cmdb) publish(ctx context.Context, evType, modelCode string, inst *Instance) {
+	atomic.AddUint64(&c.version, 1) // 每次集合变更 +1（观测字段；create/update/delete 五路写入全走这里）
 	if c.rdb == nil {
 		return
 	}
@@ -84,7 +95,7 @@ func (c *cmdb) publish(ctx context.Context, evType, modelCode string, inst *Inst
 		"type":        evType,
 		"model":       modelCode,
 		"instance_id": fmt.Sprintf("%s-%d", modelCode, inst.ID),
-		"ts":          time.Now().Format(time.RFC3339),
+		"ts":          time.Now().Format(time.RFC3339Nano),
 	}
 	if err := c.rdb.XAdd(ctx, &redis.XAddArgs{Stream: "cmdb-events", Values: values}).Err(); err != nil {
 		log.Printf("[mock-cmdb] publish event failed: %v", err)
@@ -112,7 +123,117 @@ func main() {
 
 	r := gin.Default()
 	r.GET("/healthz", func(g *gin.Context) { g.JSON(200, gin.H{"status": "ok"}) })
+
+	// v1.5 T2 通用点查回查端点（§3.1 "一系统一约定"）：按 (model, id) 返回权威行。
+	// 凭证=presence 轻校验（mock 演示通道存在性；真实应用=M2M 严格比对）。行=内存实时数据，无投影无落库。
+	r.POST("/__perm/query", func(g *gin.Context) {
+		if g.GetHeader("X-Perm-Query-Token") == "" {
+			g.JSON(401, gin.H{"error": "X-Perm-Query-Token required"})
+			return
+		}
+		var req struct {
+			Model string `json:"model"`
+			ID    string `json:"id"`
+		}
+		if err := g.ShouldBindJSON(&req); err != nil {
+			g.JSON(400, gin.H{"error": "bad body"})
+			return
+		}
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+		m, ok := c.models[req.Model]
+		if !ok {
+			g.JSON(404, gin.H{"error": "model not found"})
+			return
+		}
+		// id 形态兼容："<model>-<n>"（external_id 同构）/ 纯数字 / 实例名
+		var inst *Instance
+		if strings.HasPrefix(req.ID, req.Model+"-") {
+			if n, err := strconv.ParseUint(strings.TrimPrefix(req.ID, req.Model+"-"), 10, 64); err == nil {
+				inst = m.Instances[n]
+			}
+		}
+		if inst == nil {
+			if n, err := strconv.ParseUint(req.ID, 10, 64); err == nil {
+				inst = m.Instances[n]
+			}
+		}
+		if inst == nil {
+			for _, it := range m.Instances {
+				if it.Name == req.ID {
+					inst = it
+					break
+				}
+			}
+		}
+		if inst == nil {
+			g.JSON(404, gin.H{"error": "row not found"})
+			return
+		}
+		row := map[string]any{}
+		for k, v := range inst.Attributes {
+			row[k] = v
+		}
+		row["id"] = fmt.Sprintf("%s-%d", req.Model, inst.ID)
+		row["name"] = inst.Name
+		row["model"] = req.Model
+		if inst.OwnerID != nil {
+			row["owner_id"] = *inst.OwnerID
+		}
+		g.JSON(200, gin.H{"row": row})
+	})
 	r.GET("/openapi.json", func(g *gin.Context) { g.Data(200, "application/json", openapiJSON()) })
+
+	// A3 集合指纹端点（数据契约算法菜单 L2 的发布方侧实现，实施清单 A3）
+	// 指纹契约（IAM A4 巡检同款算法，两侧必须逐字一致）：
+	//   external_id = "<model>-<id>"（与 IAM 投影 ExternalID 同构），按字典序排序
+	//   hash_ids        = sha256(join(external_ids, "\n"))
+	//   hash_updated_at = sha256(join(同序 updated_at, "\n"))
+	//   fingerprint     = hash_ids XOR hash_updated_at（hex）
+	// version / count / max_updated_at 仅为观测字段——判定只认指纹比对，不数版本
+	r.GET("/sync/fingerprint", func(g *gin.Context) {
+		code := g.Query("model")
+		if code == "" {
+			g.JSON(400, gin.H{"error": "model query required"})
+			return
+		}
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+		m, ok := c.models[code]
+		if !ok {
+			g.JSON(404, gin.H{"error": "model not found"})
+			return
+		}
+		type pair struct{ ext, ts string }
+		pairs := make([]pair, 0, len(m.Instances))
+		for id, inst := range m.Instances {
+			pairs = append(pairs, pair{fmt.Sprintf("%s-%d", code, id), inst.UpdatedAt})
+		}
+		sort.Slice(pairs, func(i, j int) bool { return pairs[i].ext < pairs[j].ext })
+		var idBuf, tsBuf strings.Builder
+		maxTS := ""
+		for _, p := range pairs {
+			idBuf.WriteString(p.ext)
+			idBuf.WriteByte('\n')
+			tsBuf.WriteString(p.ts)
+			tsBuf.WriteByte('\n')
+			if p.ts > maxTS {
+				maxTS = p.ts
+			}
+		}
+		h1 := sha256.Sum256([]byte(idBuf.String()))
+		h2 := sha256.Sum256([]byte(tsBuf.String()))
+		xor := make([]byte, sha256.Size)
+		for i := range xor {
+			xor[i] = h1[i] ^ h2[i]
+		}
+		g.JSON(200, gin.H{
+			"model": code, "version": atomic.LoadUint64(&c.version), "count": len(pairs),
+			"max_updated_at": maxTS,
+			"hash_ids":       hex.EncodeToString(h1[:]), "hash_updated_at": hex.EncodeToString(h2[:]),
+			"fingerprint": hex.EncodeToString(xor),
+		})
+	})
 
 	// 模型
 	r.GET("/api/v1/models", func(g *gin.Context) {
@@ -125,7 +246,8 @@ func main() {
 		g.JSON(200, out)
 	})
 
-	// 实例列表
+	// 实例列表（A4：支持 updated_after 增量过滤 + page/page_size 分页——
+	// "updated_at 可过滤"= L1 接入义务（数据契约三级义务）在 mock 的实现；无参数=全量返回兼容既有调用）
 	r.GET("/api/v1/models/:code/instances", func(g *gin.Context) {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -134,9 +256,47 @@ func main() {
 			g.JSON(404, gin.H{"error": "model not found"})
 			return
 		}
-		var out []*Instance
-		for _, inst := range m.Instances {
-			out = append(out, inst)
+		var after time.Time
+		hasAfter := false
+		if s := g.Query("updated_after"); s != "" {
+			t, err := time.Parse(time.RFC3339, s)
+			if err != nil {
+				g.JSON(400, gin.H{"error": "bad updated_after (RFC3339): " + err.Error()})
+				return
+			}
+			after, hasAfter = t, true
+		}
+		ids := make([]uint64, 0, len(m.Instances))
+		for id := range m.Instances {
+			if hasAfter {
+				ts, err := time.Parse(time.RFC3339, m.Instances[id].UpdatedAt)
+				if err == nil && !ts.After(after) {
+					continue
+				}
+			}
+			ids = append(ids, id)
+		}
+		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+		out := make([]*Instance, 0, len(ids))
+		for _, id := range ids {
+			out = append(out, m.Instances[id])
+		}
+		// 分页（page 从 1 起；page_size 缺省/<=0 = 不分页，兼容旧全量调用）
+		page, _ := strconv.Atoi(g.DefaultQuery("page", "1"))
+		size, _ := strconv.Atoi(g.DefaultQuery("page_size", "0"))
+		if size > 0 {
+			if page < 1 {
+				page = 1
+			}
+			start := (page - 1) * size
+			if start > len(out) {
+				start = len(out)
+			}
+			end := start + size
+			if end > len(out) {
+				end = len(out)
+			}
+			out = out[start:end]
 		}
 		g.JSON(200, out)
 	})
@@ -174,7 +334,7 @@ func main() {
 			return
 		}
 		body.ID = c.nextID
-		body.UpdatedAt = time.Now().Format(time.RFC3339)
+		body.UpdatedAt = time.Now().Format(time.RFC3339Nano)
 		c.nextID++
 		m.Instances[body.ID] = &body
 		cp := body
@@ -237,11 +397,22 @@ func main() {
 			g.JSON(404, gin.H{"error": "resource not found"})
 			return
 		}
+		q := g.Request.URL.Query()
 		c.mu.RLock()
 		defer c.mu.RUnlock()
 		var out []*Instance
 		for _, inst := range m.Instances {
-			out = append(out, inst)
+			// T5 契约测试需要业务真按字段过滤（判定字段=落库字段）：query 键命中属性则等值过滤
+			match := true
+			for k, vs := range q {
+				if v, ok := inst.Attributes[k]; ok && fmt.Sprintf("%v", v) != vs[0] {
+					match = false
+					break
+				}
+			}
+			if match {
+				out = append(out, inst)
+			}
 		}
 		g.JSON(200, gin.H{"items": out})
 	})
@@ -251,10 +422,27 @@ func main() {
 			g.JSON(404, gin.H{"error": "resource not found"})
 			return
 		}
+		idParam := g.Param("id")
 		c.mu.RLock()
 		defer c.mu.RUnlock()
+		// 三种形态兼容（与回查端点 /__perm/query 同构）：数字 id / 外部 id（<model>-<n>）/ 实例名
+		find := func(n uint64) bool {
+			if inst, ok := m.Instances[n]; ok {
+				g.JSON(200, inst)
+				return true
+			}
+			return false
+		}
+		if strings.HasPrefix(idParam, m.Code+"-") {
+			if n, err := strconv.ParseUint(strings.TrimPrefix(idParam, m.Code+"-"), 10, 64); err == nil && find(n) {
+				return
+			}
+		}
+		if n, err := strconv.ParseUint(idParam, 10, 64); err == nil && find(n) {
+			return
+		}
 		for _, inst := range m.Instances {
-			if fmt.Sprintf("%d", inst.ID) == g.Param("id") {
+			if inst.Name == idParam {
 				g.JSON(200, inst)
 				return
 			}
@@ -274,7 +462,7 @@ func main() {
 		}
 		c.mu.Lock()
 		body.ID = c.nextID
-		body.UpdatedAt = time.Now().Format(time.RFC3339)
+		body.UpdatedAt = time.Now().Format(time.RFC3339Nano)
 		c.nextID++
 		m.Instances[body.ID] = &body
 		cp := body
@@ -308,7 +496,7 @@ func main() {
 		if body.Attributes != nil {
 			inst.Attributes = body.Attributes
 		}
-		inst.UpdatedAt = time.Now().Format(time.RFC3339)
+		inst.UpdatedAt = time.Now().Format(time.RFC3339Nano)
 		cp := *inst
 		c.mu.Unlock()
 		c.publish(g.Request.Context(), "update", m.Code, &cp)
@@ -370,7 +558,7 @@ func openapiJSON() []byte {
 		"components": map[string]any{
 			"schemas": map[string]any{
 				"Host": map[string]any{
-					"type": "object",
+					"type":     "object",
 					"required": []string{"name", "ip", "env"},
 					"properties": map[string]any{
 						"id":         map[string]any{"type": "integer", "example": 1},
@@ -393,10 +581,10 @@ func openapiJSON() []byte {
 				"Disk": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"id":     map[string]any{"type": "integer", "example": 1},
-						"name":   map[string]any{"type": "string", "example": "disk-data-01"},
+						"id":      map[string]any{"type": "integer", "example": 1},
+						"name":    map[string]any{"type": "string", "example": "disk-data-01"},
 						"size_gb": map[string]any{"type": "integer", "example": 100},
-						"type":   map[string]any{"type": "string", "enum": []string{"ssd", "hdd"}, "example": "ssd"},
+						"type":    map[string]any{"type": "string", "enum": []string{"ssd", "hdd"}, "example": "ssd"},
 					},
 				},
 				"HostList": map[string]any{
@@ -407,7 +595,7 @@ func openapiJSON() []byte {
 					},
 				},
 				"Ok": map[string]any{
-					"type": "object",
+					"type":       "object",
 					"properties": map[string]any{"ok": map[string]any{"type": "boolean", "example": true}},
 				},
 			},
@@ -441,7 +629,7 @@ func openapiJSON() []byte {
 			},
 			"patch": map[string]any{
 				"tags": []string{tagOf(res)}, "operationId": "update" + res, "summary": "更新" + res,
-				"parameters": []any{paramDef("id", "path", map[string]any{"type": "integer"})},
+				"parameters":  []any{paramDef("id", "path", map[string]any{"type": "integer"})},
 				"requestBody": map[string]any{"content": mediaJSON(schemaRef), "required": true},
 				"responses":   map[string]any{"200": respDef(schemaRef)},
 			},

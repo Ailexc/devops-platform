@@ -17,7 +17,7 @@ type registerAppReq struct {
 	OpenAPIURL   string           `json:"openapi_url"`
 	Description  string           `json:"description"`
 	Language     string           `json:"language"`
-	DocURL       string           `json:"doc_url"` // 产品文档/操作手册链接（人可读，纯展示）
+	DocURL       string           `json:"doc_url"`        // 产品文档/操作手册链接（人可读，纯展示）
 	OwnerGroupID *uint64          `json:"owner_group_id"` // 所属组（组织兜底锚点）
 	OwnerIDs     []uint64         `json:"owner_ids"`      // 额外负责人（注册者自动成为 owner，需再指定 ≥1 人）
 	NetInfo      map[string]any   `json:"net_info"`       // v12：网络信息（云/账号/区域/VPC/子网/安全组/容器/健康检查）
@@ -82,7 +82,9 @@ func (d *Deps) registerApp(c *gin.Context) {
 
 	d.audit(c, "app.register", "app", strconv.FormatUint(app.ID, 10),
 		gin.H{"code": app.Code, "owners": append([]uint64{registrarID}, extraOwnerIDs...)})
-	c.JSON(201, app)
+	// T4：注册即体检（§3.9 触发点之一）——空路由表=ready，报告随回执返回
+	rep, _ := d.buildOnboardReport(app.ID)
+	c.JSON(201, gin.H{"app": app, "onboard": rep})
 }
 
 // appDetail 应用详情（v12：含网络信息 + 鉴权方式 + 负责人 + 程序身份）

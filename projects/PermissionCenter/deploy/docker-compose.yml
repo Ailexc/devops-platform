@@ -1,5 +1,5 @@
 # 权限中心（IAM）全栈 Compose —— OrbStack 统一管理
-# 基础设施：postgres / redis / openfga / traefik（PEP 网关）
+# 基础设施：postgres / redis / traefik（PEP 网关）
 # 应用服务：iam-server(PDP) / mock-cmdb / mock-identity / iam-agent / frontend(管理台)
 # 镜像：backend 由 compose build 构建 iam-backend（GOARCH 按环境注入，见 iam-server.build.args）；
 #       frontend 多阶段构建（node 构建 → nginx 反代 /api /v1 → iam-server）
@@ -14,31 +14,8 @@ name: permission-center
 
 services:
   # ── 统一数据层（由根目录 infra/docker-compose.yml 提供，devops-net 网络）──
-  # PostgreSQL: devops-postgres（库 devops_iam / devops_openfga）
+  # PostgreSQL: devops-postgres（库 devops_iam）
   # Redis:      devops-redis（db index 3=iam）
-
-  # OpenFGA 数据级关系引擎（CNCF / Zanzibar 系）
-  # 容器内 HTTP=8080（IAM SDK 用 http://openfga:8080），宿主映射 18081
-  # ⚠️ openfga:v1.8.7 为 distroless 镜像（仅 /openfga 二进制，无 sh/curl/wget）
-  #    → 不可配 sh -c entrypoint，也不可用 curl/wget healthcheck
-  #    迁移单独执行（幂等）：docker compose -f deploy/docker-compose.yml run --rm openfga migrate
-  #    iam-server 启动时 EnsureSchema（幂等）自动完成授权模型初始化
-  openfga:
-    image: openfga/openfga:v1.8.7
-    container_name: iam-openfga
-    command: ["run"]   # 默认 entrypoint=/openfga 直接启动
-    environment:
-      OPENFGA_DATASTORE_ENGINE: postgres
-      OPENFGA_DATASTORE_URI: postgresql://devops:devops@devops-postgres:5432/devops_openfga?sslmode=disable
-      OPENFGA_HTTP_ADDR: 0.0.0.0:8080
-      OPENFGA_GRPC_ADDR: 0.0.0.0:8081
-      OPENFGA_AUTHN_METHOD: none
-    ports:
-      - "18081:8080"   # HTTP（IAM SDK 使用），宿主机备用端口
-      - "18082:8081"   # gRPC，宿主机备用端口
-    networks:
-      - default
-      - devops-net
 
   # Traefik 网关（PEP 执行点，forwardAuth ≈ APISIX ext-authz）
   # 镜像：docker.io 官方 traefik（中国 ECS 走阿里镜像加速器；ghcr.io 在 ECS 不可达）
@@ -64,7 +41,8 @@ services:
       dockerfile: Dockerfile.build
       args:
         GOARCH: ${GOARCH:-amd64}
-        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        # 容器内编译的模块代理：本地 AnyHaven 缓存优先 → goproxy.cn 兜底（proxy.golang.org 直连被墙，实测 exit 1）
+        GOPROXY: ${GOPROXY:-http://goproxy.home.ailexc.com,https://goproxy.cn,direct}
         APK_MIRROR: ${APK_MIRROR:-https://dl-cdn.alpinelinux.org}
     image: iam-backend:latest
     pull_policy: build   # 本地构建镜像，跳过 pull（避免 docker.io/library/iam-backend 报错噪音）
@@ -74,7 +52,6 @@ services:
       IAM_HTTP_ADDR: ":8080"
       PG_DSN: "postgresql://devops:devops@devops-postgres:5432/devops_iam?sslmode=disable"
       REDIS_ADDR: "devops-redis:6379"
-      OPENFGA_ADDR: "openfga:8080"
       CMDB_BASE_URL: "http://mock-cmdb:8090"
       IDENTITY_BASE_URL: "http://mock-identity:8091"
       JWT_SECRET: "${JWT_SECRET:-demo-jwt-secret-change-in-prod}"
@@ -82,9 +59,25 @@ services:
     ports:
       - "18080:8080"   # 管理 API + PDP（demo.sh / 本地工具使用），宿主机备用端口
     restart: unless-stopped
-    depends_on:
-      openfga:
-        condition: service_started   # openfga 无 healthcheck（distroless）；iam-server 内置 ensureOpenFGA 重试
+    networks:
+      - default
+      - devops-net
+
+  # S1 拆分：同步组件独立进程（同镜像双 workload）——1.5 T3 后仅存 TTL 回收循环
+  iam-sync:
+    image: iam-backend:latest
+    pull_policy: build
+    command: ["iam-sync"]
+    environment:
+      PG_DSN: "postgresql://devops:devops@devops-postgres:5432/devops_iam?sslmode=disable"
+      REDIS_ADDR: "devops-redis:6379"
+      SYNC_HEALTH_ADDR: ":8090"  # 仅容器内网——宿主 8090 已被 devops-gateway 占用，禁映射宿主口（S7/scale 前提）
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
     networks:
       - default
       - devops-net

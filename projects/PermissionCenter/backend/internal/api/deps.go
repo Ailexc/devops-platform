@@ -6,7 +6,7 @@ import (
 	"github.com/xcy/permission-center/internal/authz"
 	"github.com/xcy/permission-center/internal/bundle"
 	"github.com/xcy/permission-center/internal/config"
-	"github.com/xcy/permission-center/internal/openfga"
+	"github.com/xcy/permission-center/internal/material"
 	"github.com/xcy/permission-center/internal/store"
 	"github.com/xcy/permission-center/internal/sync"
 	"gorm.io/gorm"
@@ -27,13 +27,17 @@ type Deps struct {
 	Syncs  *store.SyncRepo
 	Caps   *store.CapabilityRepo
 	Tpls   *store.PolicyTemplateRepo
+	// Contracts 数据契约 + 巡检日志（清单 A2/A4：注册期契约、确认制时钟、失败历史）
+	Contracts *store.ContractRepo
 
 	JWT *auth.Manager
 
-	Checker  *authz.Checker
+	Checker   *authz.Checker
 	DataPlane *authz.DataPlane
-	Builder  *authz.Builder
-	OFGA     *openfga.Client
+	Builder   *authz.Builder
+
+	// Mat 通用点查取材客户端（T2 §3.1：中心回调应用取权威行，行用完即丢）
+	Mat *material.Client
 
 	OpenAPISyncer *sync.OpenAPISyncer
 	CMDBConnector *sync.CMDBConnector
@@ -51,17 +55,20 @@ func NewDeps(cfg *config.Config, db *gorm.DB, cache *store.Cache) *Deps {
 	res := store.NewResourceRepo(db)
 	syncs := store.NewSyncRepo(db)
 	caps := store.NewCapabilityRepo(db)
+	contracts := store.NewContractRepo(db)
 	tpls := store.NewPolicyTemplateRepo(db)
 
 	jwt := auth.NewManager(cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
 
-	ofga := openfga.NewClient(cfg.OpenFGAServerURL)
 	builder := authz.NewBuilder(cache, apps, users, groups, access, pol, apps)
 	enforcer, _ := authz.NewEnforcer()
 	checker := authz.NewChecker(cfg, cache, builder, enforcer, users, apps, pol, syncs)
-	dataPlane := authz.NewDataPlane(ofga, res, users, groups, apps, pol)
+	dataPlane := authz.NewDataPlane(pol)
 
 	bundleMgr := bundle.NewManager(syncs, pol, access, apps, users, groups, cache)
+
+	// CMDBConnector：仅 seed 期目录取数（1.5——资源目录=接入时快照；运行期同步管道已下线）
+	cmdbConn := sync.NewCMDBConnector(cfg.CMDBBaseURL, res, syncs)
 
 	return &Deps{
 		Cfg:           cfg,
@@ -75,14 +82,15 @@ func NewDeps(cfg *config.Config, db *gorm.DB, cache *store.Cache) *Deps {
 		Res:           res,
 		Syncs:         syncs,
 		Caps:          caps,
+		Contracts:     contracts,
 		Tpls:          tpls,
 		JWT:           jwt,
 		Checker:       checker,
 		DataPlane:     dataPlane,
 		Builder:       builder,
-		OFGA:          ofga,
+		Mat:           material.NewClient(),
 		OpenAPISyncer: sync.NewOpenAPISyncer(access, syncs),
-		CMDBConnector: sync.NewCMDBConnector(cfg.CMDBBaseURL, res, syncs),
+		CMDBConnector: cmdbConn,
 		IdentityConn:  sync.NewIdentityConnector(cfg.IdentityBaseURL, users, groups, syncs),
 		BundleMgr:     bundleMgr,
 	}

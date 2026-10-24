@@ -17,8 +17,8 @@ func NewRouter(d *Deps) *gin.Engine {
 	api := r.Group("/api/v1")
 	api.POST("/auth/login", d.handleLogin)
 	api.POST("/auth/refresh", d.handleRefresh)
-	api.GET("/auth/people", d.handlePeople)          // demo 登录人员列表
-	api.POST("/auth/demo-login", d.handleDemoLogin)  // demo 一键登录（免密码）
+	api.GET("/auth/people", d.handlePeople)         // demo 登录人员列表
+	api.POST("/auth/demo-login", d.handleDemoLogin) // demo 一键登录（免密码）
 
 	// ---- 管理 API（JWT 保护 + 管理面 PEP 授权域边界）----
 	// 网关信任接入：统一网关 forwardAuth 通过后注入 X-Auth-Username，直接放行
@@ -49,6 +49,20 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.POST("/apps", d.registerApp)
 		mg.POST("/apps/:id/sync", d.syncApp)
 		mg.GET("/apps/:id/actions", d.listActions)
+		// v1.5 T1 动作码路由表（§3.7 五格登记 / §3.8 导入推断 / §3.9 生命周期）
+		mg.GET("/apps/:id/routes", d.listRoutes)
+		mg.POST("/apps/:id/routes", d.importRoutes)
+		mg.PATCH("/apps/:id/routes/:rid", d.updateRouteRegistration)
+		mg.POST("/apps/:id/routes/:rid/migrate-code", d.migrateRouteCode)
+		mg.POST("/apps/:id/routes/:rid/archive", d.archiveRoute)
+		mg.POST("/apps/:id/routes/:rid/restore", d.restoreRoute)
+		mg.POST("/apps/:id/pending-routes/:pid/confirm", d.confirmPending)
+		mg.POST("/apps/:id/pending-routes/:pid/discard", d.discardPending)
+		// T2 通用点查配置（§3.1 应用注册：回查地址+M2M 凭证，owner）
+		mg.PUT("/apps/:id/perm-query", d.setPermQuery)
+		// T4 接入体检（§3.9 五类硬校验，报告回执——注册/导入时也自动跑）
+		mg.GET("/apps/:id/onboard-report", d.onboardReport)
+		mg.PUT("/apps/:id/exempt-paths", d.setExemptPaths)
 		// 能力声明（L1，仅 owner）
 		mg.GET("/apps/:id/capabilities", d.listCapabilities)
 		mg.POST("/apps/:id/capabilities", d.createCapability)
@@ -78,6 +92,7 @@ func NewRouter(d *Deps) *gin.Engine {
 		// 应用市场公开目录（申请接入用：网络/鉴权公开，不含管理信息）
 		mg.GET("/marketplace/apps", d.marketplaceApps)
 		mg.GET("/marketplace/apps/:id", d.marketplaceAppDetail)
+		mg.GET("/marketplace/recommend", d.marketplaceRecommend) // T7 共现推荐（非依赖）
 		// 能力打包申请（能力包向导）：范围选项（预设×模型粒度）+ 元数据 + 校验 + 申请单预览
 		mg.GET("/capabilities/:cid/presets/:pid/models/:mc/options", d.presetScopeOptions)
 		mg.GET("/capabilities/:cid/presets/:pid/scope-meta", d.presetScopeMeta)
@@ -100,14 +115,16 @@ func NewRouter(d *Deps) *gin.Engine {
 		// 资源索引
 		mg.GET("/resource-models", d.listResourceModels)
 		mg.GET("/resource-models/:id/instances", d.listResourceInstances)
-		// 同步
-		mg.POST("/sync/cmdb", d.syncCMDB)
+		// 同步（1.5：CMDB 运行期同步已下线——资源目录=seed 时快照；身份同步保留）
 		mg.POST("/sync/identity", d.syncIdentity)
 		// 申请/审批
 		mg.POST("/requests", d.submitRequest)
 		mg.GET("/requests", d.listRequests)
 		mg.GET("/requests/:id", d.requestDetail)
 		mg.POST("/requests/:id/approve", d.approveRequest)
+		// A8 定制需求卡：非目录请求创建与 owner 处置（grant 直授带 TTL / package 转为能力包）
+		mg.POST("/apps/:id/custom-requests", d.createCustomRequest)
+		mg.POST("/requests/:id/fulfill", d.fulfillCustomRequest)
 		// 审批中心统一工单视图（内部 mock 聚合）
 		mg.GET("/tickets", d.listTickets)
 		// 系统观测（黑盒显性化：鉴权链路/PEP解析/PIP身份/Agent/分发/同步）
@@ -116,7 +133,6 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.GET("/debug/cache", d.debugCache)
 		mg.POST("/debug/cache/clear", d.debugCacheClear)
 		mg.GET("/debug/metrics", d.debugMetrics)
-		mg.GET("/debug/ofga", d.debugOfga)
 		mg.GET("/debug/owners", d.debugOwners)
 		mg.GET("/agents", d.listAgents)
 		mg.GET("/apps/:id/bundles", d.listBundles)
@@ -130,6 +146,8 @@ func NewRouter(d *Deps) *gin.Engine {
 		mg.GET("/audit/my-requests", d.auditMyRequests)
 		mg.GET("/audit/my-approvals", d.auditMyApprovals)
 		mg.GET("/audit/my-publishes", d.auditMyPublishes)
+		// 数据契约登记（1.5：契约 fields=判定字段清单；巡检/深对账已随投影退役下线）
+		mg.GET("/sync/contracts", d.listDataContracts)
 		// 程序化兜底
 		mg.POST("/apps/:id/claim", d.ClaimApp)
 		mg.POST("/owner-check", d.CheckOwnerResponsive)
@@ -141,8 +159,8 @@ func NewRouter(d *Deps) *gin.Engine {
 	az := r.Group("/v1/authz", pepMiddleware(d))
 	{
 		az.POST("/check", d.handleCheck)
-		az.POST("/check-instance", d.handleCheckInstance)
-		az.POST("/filter", d.handleFilter)
+		// T2 带体调用：创建 / 存量 body-id / fetch_source 的供材通道（业务持有请求体，材料随请求带到判定点）
+		az.POST("/check-material", d.handleCheckMaterial)
 	}
 
 	// ---- 网关回调（Traefik forwardAuth → PEP→PDP，请求→action 映射）----

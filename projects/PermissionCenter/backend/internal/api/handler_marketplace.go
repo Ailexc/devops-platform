@@ -1,6 +1,7 @@
 package api
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -192,8 +193,8 @@ func (d *Deps) marketplacePrereqs(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{
-		"capability": m,
-		"actions":    items,
+		"capability":      m,
+		"actions":         items,
 		"missing_prereqs": len(items) > 0, // 前端根据 have/prereq 计算
 	})
 }
@@ -225,4 +226,81 @@ func (d *Deps) userActionIDs(uid, appID uint64) []uint64 {
 		out = append(out, id)
 	}
 	return out
+}
+
+// ---- T7 关联推荐（#4）：基于共现推荐，非依赖 ----
+//
+// 同一申请单（含多包单与历史 items）中共同出现过的包 = 强关联信号——
+// "常一起申请"；无共现数据时返回空（不猜、不做热门兜底，推荐是提效不是导购）。
+// GET /api/v1/marketplace/recommend?capability_id=N → top3
+func (d *Deps) marketplaceRecommend(c *gin.Context) {
+	cid, _ := strconv.ParseUint(c.Query("capability_id"), 10, 64)
+	if cid == 0 {
+		c.JSON(400, gin.H{"error": "capability_id required"})
+		return
+	}
+	var reqs []model.AccessRequest
+	d.DB.Where("request_type = ? AND status IN ?",
+		model.RequestApply, []int16{model.ReqApproved, model.ReqPending}).
+		Order("id desc").Limit(500).Find(&reqs)
+	co := map[uint64]int{}
+	for _, r := range reqs {
+		items, _ := r.Items["items"].([]any)
+		ids := make([]uint64, 0, len(items))
+		for _, it := range items {
+			item, _ := it.(map[string]any)
+			if item == nil {
+				continue
+			}
+			switch v := item["capability_id"].(type) {
+			case float64:
+				ids = append(ids, uint64(v))
+			case uint64:
+				ids = append(ids, v)
+			}
+		}
+		has := false
+		for _, id := range ids {
+			if id == cid {
+				has = true
+				break
+			}
+		}
+		if !has || len(ids) < 2 {
+			continue
+		}
+		for _, id := range ids {
+			if id != cid {
+				co[id]++
+			}
+		}
+	}
+	type rec struct {
+		CapabilityID uint64 `json:"capability_id"`
+		Name         string `json:"name"`
+		AppName      string `json:"app_name"`
+		CoCount      int    `json:"co_count"`
+	}
+	out := make([]rec, 0, 3)
+	for id, n := range co {
+		m, err := d.Caps.ByID(id)
+		if err != nil {
+			continue
+		}
+		appName := ""
+		if a, err := d.Apps.ByID(m.AppID); err == nil {
+			appName = a.Name
+		}
+		out = append(out, rec{CapabilityID: id, Name: m.Name, AppName: appName, CoCount: n})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].CoCount != out[j].CoCount {
+			return out[i].CoCount > out[j].CoCount
+		}
+		return out[i].CapabilityID < out[j].CapabilityID
+	})
+	if len(out) > 3 {
+		out = out[:3]
+	}
+	c.JSON(200, gin.H{"items": out})
 }

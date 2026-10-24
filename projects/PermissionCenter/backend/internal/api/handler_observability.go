@@ -2,14 +2,12 @@
 package api
 
 import (
-	"context"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xcy/permission-center/internal/authz"
 	"github.com/xcy/permission-center/internal/model"
-	"github.com/xcy/permission-center/internal/openfga"
 )
 
 // debugResolve PEP 解析工作台（B）：交互式展示 请求→action 的完整解析步骤 + 模拟决策
@@ -53,11 +51,10 @@ func (d *Deps) debugResolve(c *gin.Context) {
 	c.JSON(200, out)
 }
 
-// debugPIP 身份解析图谱（C）：主体 → 组织/组/祖先链 → 组权限 → 个人策略 → OpenFGA 关系
+// debugPIP 身份解析图谱（C）：主体 → 组织/组/祖先链 → 组权限 → 个人策略
 // GET /api/v1/debug/pip/:user
 func (d *Deps) debugPIP(c *gin.Context) {
 	user := c.Param("user")
-	ctx := context.Background()
 
 	// 服务主体（M2M）
 	if len(user) > 7 && user[:7] == "client:" {
@@ -67,13 +64,11 @@ func (d *Deps) debugPIP(c *gin.Context) {
 			c.JSON(404, gin.H{"error": "client not found"})
 			return
 		}
-		rel := d.ofgaRelations(ctx, "service:"+cid)
 		c.JSON(200, gin.H{
-			"subject":        user,
-			"subject_type":   "service",
-			"subject_key":    "s:" + cid,
-			"client":         cli,
-			"ofga_relations": rel,
+			"subject":      user,
+			"subject_type": "service",
+			"subject_key":  "s:" + cid,
+			"client":       cli,
 		})
 		return
 	}
@@ -111,8 +106,7 @@ func (d *Deps) debugPIP(c *gin.Context) {
 	var ps []model.Policy
 	d.DB.Where("subject_type = ? AND subject_id = ? AND status = ?",
 		model.SubjectUser, u.ID, model.PolicyActive).Find(&ps)
-	// OpenFGA 关系（数据级授权物化）
-	rel := d.ofgaRelations(ctx, "user:"+u.Username)
+	// （1.5 T3）OpenFGA 关系面板已随投影机制退役——数据级判定=点查权威行
 
 	// 组装视图
 	directView := make([]gin.H, 0, len(directGroups))
@@ -159,25 +153,8 @@ func (d *Deps) debugPIP(c *gin.Context) {
 		"ancestor_chain":   closureView,
 		"group_actions":    groupActionView,
 		"personal_policies": d.decoratePolicies(ps),
-		"ofga_relations":   rel,
-	})
-}
 
-// ofgaRelations 读取主体在全部资源模型上的 OpenFGA 关系（容错：失败返回空数组）
-func (d *Deps) ofgaRelations(ctx context.Context, subject string) []openfga.RelationTuple {
-	models, err := d.Res.Models()
-	if err != nil {
-		return []openfga.RelationTuple{}
-	}
-	types := make([]string, 0, len(models))
-	for _, m := range models {
-		types = append(types, m.Code)
-	}
-	rel, err := d.OFGA.ReadTuples(ctx, subject, types)
-	if err != nil {
-		return []openfga.RelationTuple{}
-	}
-	return rel
+	})
 }
 
 // listAgents Agent 下发工作台（D）：在线状态 + 本地/中心 bundle 版本对比 + 决策量
@@ -323,46 +300,6 @@ func (d *Deps) debugMetrics(c *gin.Context) {
 	trend := d.Syncs.DecisionTrend(24)
 	topActions := d.Syncs.DecisionByAction(10)
 	c.JSON(200, gin.H{"summary": summary, "trend": trend, "top_actions": topActions})
-}
-
-// debugOfga OpenFGA 数据面图谱（G3）：授权模型 type 定义 + 全部关系 tuple
-// GET /api/v1/debug/ofga
-func (d *Deps) debugOfga(c *gin.Context) {
-	ctx := c.Request.Context()
-	am, err := d.OFGA.LatestModel(ctx)
-	if err != nil {
-		c.JSON(502, gin.H{"error": "openfga: " + err.Error()})
-		return
-	}
-	types := []string{}
-	if ms, err := d.Res.Models(); err == nil {
-		for _, m := range ms {
-			types = append(types, m.Code)
-		}
-	}
-	byType := []gin.H{}
-	totalTuples := 0
-	for _, t := range types {
-		tuples, err := d.OFGA.ReadTypeTuples(ctx, t)
-		if err != nil {
-			continue
-		}
-		byType = append(byType, gin.H{"type": t, "count": len(tuples), "tuples": tuples})
-		totalTuples += len(tuples)
-	}
-	modelID := ""
-	var typeDefs []map[string]any
-	if am != nil {
-		modelID = am.ID
-		typeDefs = am.TypeDefs
-	}
-	c.JSON(200, gin.H{
-		"model_id":    modelID,
-		"type_defs":   typeDefs,
-		"types":       types,
-		"total_tuples": totalTuples,
-		"by_type":     byType,
-	})
 }
 
 // debugOwners owner 巡检视图（G4，只读）：失联提醒中的 owner + 已停用应用

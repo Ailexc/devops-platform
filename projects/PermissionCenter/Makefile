@@ -1,13 +1,14 @@
-.PHONY: up down seed seed-reset reset-all backup restore backend-image frontend-image run run-cmdb run-id run-agent demo web test build tidy clean logs ps
+.PHONY: up down seed seed-reset reset-all backup restore backend-image frontend-image run run-sync run-cmdb run-id run-agent demo web test build tidy clean logs ps
 
 # 目标架构：本地 OrbStack=aarch64(arm64) / 云端 ECS=x86_64(amd64)，用 make ... GOARCH=amd64 覆盖
 GOARCH ?= arm64
 
 # ---- OrbStack 全栈部署（统一管理）----
-backend-image:  # 宿主机交叉编译 4 个 Linux/$(GOARCH) 二进制 + 构建 iam-backend 镜像
-	# macOS 编译产物为 Mach-O，Linux 容器需 ELF → 交叉编译（本地 aarch64 / 云端 x86_64）
+backend-image:  # 宿主机交叉编译 5 个 Linux/$(GOARCH) 二进制 + 构建 iam-backend 镜像（S1 后含 iam-sync）
+	# macOS 编译产物为 Mach-O，Linux 容器需 ELF → 交叉编译（本地 aarch64 /  云端 x86_64）
 	cd backend && mkdir -p bin && \
 	  GOOS=linux GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o bin/iam-server ./cmd/iam-server && \
+	  GOOS=linux GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o bin/iam-sync ./cmd/iam-sync && \
 	  GOOS=linux GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o bin/mock-cmdb ./cmd/mock-cmdb && \
 	  GOOS=linux GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o bin/mock-identity ./cmd/mock-identity && \
 	  GOOS=linux GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o bin/iam-agent ./cmd/iam-agent
@@ -17,7 +18,7 @@ frontend-image:  # 宿主机构建 dist + 构建 iam-frontend 镜像（容器内
 	cd frontend && npm ci && npm run build
 	docker build -f frontend/Dockerfile -t iam-frontend frontend
 
-up:          # 构建镜像并启动全栈（基础设施 + iam-server/mock-cmdb/mock-identity/iam-agent/frontend）
+up:          # 构建镜像并启动全栈（基础设施 + iam-server/iam-sync/mock-cmdb/mock-identity/iam-agent/frontend）
 	$(MAKE) backend-image
 	$(MAKE) frontend-image
 	docker compose -f deploy/docker-compose.yml up -d --build
@@ -51,7 +52,7 @@ restore:     # 从备份恢复（默认取最新）：make restore [FILE=backups
 	if [ -z "$$FILE" ]; then echo "没有可用备份，先执行 make backup"; exit 1; fi; \
 	echo "恢复 $$FILE ..."; \
 	docker exec -i iam-postgres psql -U iam -d iam < $$FILE && \
-	docker compose -f deploy/docker-compose.yml restart iam-server
+        docker compose -f deploy/docker-compose.yml restart iam-server iam-sync
 
 logs:        # 查看全部服务日志
 	docker compose -f deploy/docker-compose.yml logs -f
@@ -62,6 +63,9 @@ ps:          # 查看全部服务状态
 # ---- 本地开发模式（需 make up 已启动基础设施；与容器服务端口冲突时先 stop 对应服务）----
 run:         # 本地启动 iam-server
 	cd backend && go run ./cmd/iam-server
+
+run-sync:    # 本地启动同步组件（S1 拆分——三后台循环在本进程；容器部署用 compose iam-sync）
+	cd backend && go run ./cmd/iam-sync
 
 run-cmdb:    # 本地启动 mock-cmdb
 	cd backend && go run ./cmd/mock-cmdb

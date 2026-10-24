@@ -18,6 +18,7 @@ const routes = [
       { path: 'apps', name: 'apps', component: () => import('../views/Apps.vue'), meta: { title: '应用管理' } },
       { path: 'apps/register', name: 'app-register', component: () => import('../views/AppRegister.vue'), meta: { title: '注册应用', crumb: [{ title: '应用管理', path: '/apps' }, { title: '注册应用' }] } },
       { path: 'apps/:id', name: 'app-detail', component: () => import('../views/AppDetail.vue'), meta: { title: '应用详情', crumb: [{ title: '应用管理', path: '/apps' }, { title: '应用详情' }] } },
+      { path: 'apps/:id/routes', name: 'route-table', component: () => import('../views/RouteTable.vue'), meta: { title: '路由表', crumb: [{ title: '应用管理', path: '/apps' }, { title: '路由表' }] } },
       { path: 'apps/:id/capabilities/:cid', name: 'capability-editor', component: () => import('../views/CapabilityEditor.vue'), meta: { title: '能力详情', crumb: [{ title: '能力管理', path: '/capabilities' }, { title: '能力详情' }] } },
       { path: 'apps/:id/capabilities/:cid/authz', name: 'capability-authz', component: () => import('../views/CapabilityAuthz.vue'), meta: { title: '授权管理', crumb: [{ title: '能力管理', path: '/capabilities' }, { title: '授权管理' }] } },
       { path: 'capabilities', name: 'capabilities', component: () => import('../views/Capabilities.vue'), meta: { title: '能力管理' } },
@@ -37,7 +38,6 @@ const routes = [
       { path: 'observability/pip', name: 'obs-pip', component: () => import('../views/PipExplorer.vue'), meta: { title: '身份解析（PIP）' } },
       { path: 'observability/cache', name: 'obs-cache', component: () => import('../views/ObsCache.vue'), meta: { title: '决策缓存工作台' } },
       { path: 'observability/metrics', name: 'obs-metrics', component: () => import('../views/ObsMetrics.vue'), meta: { title: '鉴权指标面板' } },
-      { path: 'observability/ofga', name: 'obs-ofga', component: () => import('../views/ObsOfga.vue'), meta: { title: '数据面图谱（OpenFGA）' } },
       { path: 'observability/owners', name: 'obs-owners', component: () => import('../views/ObsOwners.vue'), meta: { title: 'Owner 巡检视图' } },
       { path: 'observability/agents', name: 'obs-agents', component: () => import('../views/Agents.vue'), meta: { title: 'Agent · 分发 · 同步' } },
       // 系统知识库（复盘文档 / 面试题库）

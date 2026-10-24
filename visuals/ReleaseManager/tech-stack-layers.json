@@ -1,0 +1,253 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "发布系统 · 技术选型分层落位图",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1380,
+      610
+    ],
+    "views": [
+      {
+        "id": "front-access",
+        "label": "前端与接入",
+        "focus": [
+          "web",
+          "nginx"
+        ],
+        "note": "React 18 + TS + Ant Design 5 中后台；Nginx 静态托管 + /api 反向代理，前后端同源免跨域。"
+      },
+      {
+        "id": "service-layer",
+        "label": "服务层",
+        "focus": [
+          "api",
+          "db"
+        ],
+        "note": "Django 4.2 + DRF 十大 app：发布引擎/审批/权限/应用/部署/审计/制品/配置；SQLite 命名卷零依赖。"
+      },
+      {
+        "id": "exec-auth",
+        "label": "执行层与服务间认证",
+        "focus": [
+          "executor"
+        ],
+        "note": "FastAPI Executor 模拟 spug-lambda：EdDSA 签名 + 请求内容绑定 + jti 防重放——backend 管全部用户鉴权，Executor 只验请求来源可信。"
+      },
+      {
+        "id": "infra",
+        "label": "基础设施",
+        "focus": [
+          "k8s",
+          "demos"
+        ],
+        "note": "kind 集群本地还原真实 K8s：Deployment/Service/Ingress 全套资源；Go/Node/Python 三语言 Demo 应用让发布效果可观测。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "管理台前端",
+      "sublabel": "React 18 + TS + Ant Design 5",
+      "tag": "发布流水线 · 审批中心 · 应用管理",
+      "brand": "react",
+      "pos": [
+        580,
+        40
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "nginx",
+      "type": "external",
+      "label": "Nginx 接入层",
+      "sublabel": "静态托管 + 反向代理",
+      "tag": "/api → release-backend · 同源免跨域",
+      "pos": [
+        580,
+        148
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "业务后端",
+      "sublabel": "Django 4.2 + DRF + SimpleJWT",
+      "tag": "发布引擎 · 审批 · 权限 · 审计 十大 app",
+      "brand": "django",
+      "pos": [
+        580,
+        256
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "命名卷 db-data",
+      "tag": "Demo 零依赖 · 可平滑迁移 PostgreSQL",
+      "pos": [
+        900,
+        262
+      ],
+      "size": [
+        200,
+        68
+      ]
+    },
+    {
+      "id": "executor",
+      "type": "backend",
+      "label": "执行端 Executor",
+      "sublabel": "FastAPI · 模拟 spug-lambda",
+      "tag": "EdDSA 签名认证 · runner 构建部署验证回滚",
+      "pos": [
+        580,
+        376
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "k8s",
+      "type": "cloud",
+      "label": "kind 本地集群",
+      "sublabel": "Kubernetes in Docker",
+      "tag": "Deployment / Service / Ingress / ConfigMap",
+      "pos": [
+        580,
+        496
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "demos",
+      "type": "external",
+      "label": "三语言 Demo 应用",
+      "sublabel": "Go / Node / Python",
+      "tag": "版本号接口 + 健康检查 · 发布效果可观测",
+      "pos": [
+        900,
+        496
+      ],
+      "size": [
+        220,
+        68
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "ReleaseManager Docker Compose 栈（frontend + backend + executor）",
+      "wraps": [
+        "web",
+        "nginx",
+        "api",
+        "db",
+        "executor"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "本地 kind 集群（模拟生产 K8s）",
+      "wraps": [
+        "k8s",
+        "demos"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "from": "web",
+      "to": "nginx",
+      "label": "页面与 API 请求",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        690,
+        122
+      ]
+    },
+    {
+      "from": "nginx",
+      "to": "api",
+      "label": "/api 反向代理",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        690,
+        230
+      ]
+    },
+    {
+      "from": "api",
+      "to": "db",
+      "label": "ORM 读写",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        850,
+        280
+      ]
+    },
+    {
+      "from": "api",
+      "to": "executor",
+      "label": "下发执行指令（EdDSA 签名凭证）",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        690,
+        350
+      ]
+    },
+    {
+      "from": "executor",
+      "to": "k8s",
+      "label": "kubeconfig 操作集群资源",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        690,
+        466
+      ]
+    },
+    {
+      "from": "k8s",
+      "to": "demos",
+      "label": "承载发布对象",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        850,
+        520
+      ]
+    }
+  ]
+}

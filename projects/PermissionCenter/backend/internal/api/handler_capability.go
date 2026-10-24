@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -16,8 +17,8 @@ type capabilityReq struct {
 	DataModel       *string               `json:"data_model"`
 	Description     string                `json:"description"`
 	Visibility      string                `json:"visibility"`       // public | org_visible | hidden（默认 public）
-	GranteeTypes    []string              `json:"grantee_types"`     // 能力包级默认可申请主体
-	EnforcementMode string                `json:"enforcement_mode"`  // gateway | sdk | both
+	GranteeTypes    []string              `json:"grantee_types"`    // 能力包级默认可申请主体
+	EnforcementMode string                `json:"enforcement_mode"` // gateway | sdk | both
 	Actions         []capabilityActionReq `json:"actions"`
 	ModelFields     []map[string]any      `json:"model_fields"`
 	Presets         []map[string]any      `json:"presets"`
@@ -155,15 +156,16 @@ func (d *Deps) updateCapability(c *gin.Context) {
 
 // publishCapability 发布 / 下架（仅 owner；v12 支持预设级上架/下架）
 // body:
-//   { "status": "published|disabled" }                    → 能力包整体（旧语义，兼容）
-//   { "action": "publish|offline", "preset_ids": [...], "all": bool } → 预设级上架/下架
+//
+//	{ "status": "published|disabled" }                    → 能力包整体（旧语义，兼容）
+//	{ "action": "publish|offline", "preset_ids": [...], "all": bool } → 预设级上架/下架
 func (d *Deps) publishCapability(c *gin.Context) {
 	cid, _ := strconv.ParseUint(c.Param("cid"), 10, 64)
 	var req struct {
-		Status    string   `json:"status"`    // published / disabled（整体）
-		Action    string   `json:"action"`    // publish | offline（预设级）
+		Status    string   `json:"status"` // published / disabled（整体）
+		Action    string   `json:"action"` // publish | offline（预设级）
 		PresetIDs []string `json:"preset_ids"`
-		All       bool     `json:"all"`       // 下架整个能力包全部预设
+		All       bool     `json:"all"` // 下架整个能力包全部预设
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "bad request"})
@@ -198,6 +200,13 @@ func (d *Deps) publishCapability(c *gin.Context) {
 		if len(targets) == 0 {
 			c.JSON(400, gin.H{"error": "preset_ids required (or all=true)"})
 			return
+		}
+		if req.Action == "publish" {
+			// A2 注册期门禁（发布时点）：数据级预设必须携带可算的数据契约 + 端点可达自检（失败二分）
+			if cerr := d.ensureDataContracts(m, targets); cerr != nil {
+				c.JSON(cerr.Status, gin.H{"error": cerr.Msg, "retryable": cerr.Retryable})
+				return
+			}
 		}
 		for _, p := range targets {
 			switch req.Action {
@@ -239,6 +248,11 @@ func (d *Deps) publishCapability(c *gin.Context) {
 		acts, _ := d.Caps.Actions(cid)
 		if len(acts) == 0 {
 			c.JSON(400, gin.H{"error": "capability has no actions; cannot publish"})
+			return
+		}
+		// A2 注册期门禁：全部数据级预设必须携带可算的数据契约 + 端点可达自检（失败二分）
+		if cerr := d.ensureDataContracts(m, presetList(m.Presets)); cerr != nil {
+			c.JSON(cerr.Status, gin.H{"error": cerr.Msg, "retryable": cerr.Retryable})
 			return
 		}
 	}
@@ -322,9 +336,9 @@ func (d *Deps) presetScopeMeta(c *gin.Context) {
 	types[model.ScopeOptAll] = gin.H{"ops": []string{}, "field_required": false}
 	types[model.ScopeOptInstance] = gin.H{"ops": []string{}, "field_required": false}
 	c.JSON(200, gin.H{
-		"models":      models,
+		"models":       models,
 		"model_fields": m.ModelFields,
-		"types":       types,
+		"types":        types,
 	})
 }
 
@@ -333,7 +347,7 @@ func (d *Deps) validateScopeOptions(c *gin.Context) {
 	cid, _ := strconv.ParseUint(c.Param("cid"), 10, 64)
 	pid := c.Param("pid")
 	var req struct {
-		ModelCode string          `json:"model_code"`
+		ModelCode string              `json:"model_code"`
 		Options   []model.ScopeOption `json:"options"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.ModelCode == "" {
@@ -445,15 +459,15 @@ func (d *Deps) capabilityAuthz(c *gin.Context) {
 			continue
 		}
 		presets = append(presets, gin.H{
-			"id":          p["id"],
-			"name":        p["name"],
-			"status":      presetStatusOf(p),
+			"id":            p["id"],
+			"name":          p["name"],
+			"status":        presetStatusOf(p),
 			"grantee_types": p["grantee_types"],
-			"apply_scope": p["apply_scope"],
-			"data_control": p["data_control"],
-			"data_models": p["data_models"],
-			"interfaces":  interfacesOf(p),
-			"idx":         i,
+			"apply_scope":   p["apply_scope"],
+			"data_control":  p["data_control"],
+			"data_models":   p["data_models"],
+			"interfaces":    interfacesOf(p),
+			"idx":           i,
 		})
 	}
 	// 授权概况 + 预设级授权钻取：已生效策略（subject_type: 1=user 2=group 3=service）
@@ -503,16 +517,21 @@ func (d *Deps) capabilityAuthz(c *gin.Context) {
 				"dim":  gDim,
 				"name": d.subjectDisplayName(p.SubjectType, p.SubjectID),
 				"sub":  d.subjectCode(p.SubjectType, p.SubjectID),
-				"req_id": func() uint64 { if p.RequestID != nil { return *p.RequestID }; return 0 }(),
+				"req_id": func() uint64 {
+					if p.RequestID != nil {
+						return *p.RequestID
+					}
+					return 0
+				}(),
 				"time": p.CreatedAt.Format("2006-01-02 15:04"),
 			})
 		}
 	}
 	c.JSON(200, gin.H{
-		"capability": m,
-		"presets":    presets,
-		"grants":     gin.H{"total": len(ps), "by_dim": dim},
-		"preset_stats": presetStats,
+		"capability":    m,
+		"presets":       presets,
+		"grants":        gin.H{"total": len(ps), "by_dim": dim},
+		"preset_stats":  presetStats,
 		"preset_grants": presetGrants,
 	})
 }
@@ -674,7 +693,7 @@ func (d *Deps) syncCapabilities(c *gin.Context) {
 			m = &model.CapabilityManifest{
 				AppID: appID, Name: resource + " 管理", DataModel: dm,
 				Description: "由 OpenAPI 自动推断（初值，待 owner 确认）",
-				Version: 1, Status: model.CapDraft,
+				Version:     1, Status: model.CapDraft,
 				CreatedBy: uid, UpdatedBy: uid,
 			}
 			if err := d.Caps.Create(m); err != nil {
@@ -840,9 +859,99 @@ func validatePresets(m *model.CapabilityManifest) error {
 			if !ok || len(dms) == 0 {
 				return fmt.Errorf("preset[%d] data_control=true requires data_models", i)
 			}
+			// 数据契约结构校验（清单 A2：创建/更新时若携带 data_contract 则立即校验；
+			//   "发布必填 + 端点可达自检"在发布链路 ensureDataContracts 二分执行）
+			if raw, has := p["data_contract"]; has {
+				spec, ok := raw.(map[string]any)
+				if !ok {
+					return fmt.Errorf("preset[%d] data_contract must be an object", i)
+				}
+				pid, _ := p["id"].(string)
+				if err := validateDataContractSpec(pid, spec, m); err != nil {
+					return err
+				}
+			}
+			// T6 升级①+②（§4.2）：场景参数联动 + 层级编排（可选字段，缺省=独立+平面——向后兼容）
+			if err := validatePresetLinkage(i, p); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+// validatePresetLinkage T6（§4.2）：场景参数声明 / 联动模式 / data_models 层级树 的结构校验。
+// 层级是编排不是存储——data_models 平面数组仍是参与域权威，树只声明"谁随谁走"。
+func validatePresetLinkage(i int, p map[string]any) error {
+	dms, _ := p["data_models"].([]any)
+	dmSet := map[string]bool{}
+	for _, d := range dms {
+		if s, ok := d.(string); ok {
+			dmSet[s] = true
+		}
+	}
+	// param_linkage 枚举（缺省 independent=现状）
+	if lm, ok := p["param_linkage"].(string); ok && lm != "" && lm != "shared" && lm != "independent" {
+		return fmt.Errorf("preset[%d] param_linkage must be shared|independent", i)
+	}
+	// scenario_params 形状：[{key,label,type(select|input),choices?,required?}]
+	paramKeys := map[string]bool{}
+	if sps, ok := p["scenario_params"].([]any); ok {
+		for j, raw := range sps {
+			sp, ok := raw.(map[string]any)
+			if !ok {
+				return fmt.Errorf("preset[%d] scenario_params[%d] must be an object", i, j)
+			}
+			key, _ := sp["key"].(string)
+			if key == "" {
+				return fmt.Errorf("preset[%d] scenario_params[%d] requires key", i, j)
+			}
+			if paramKeys[key] {
+				return fmt.Errorf("preset[%d] scenario_params key %q duplicated", i, key)
+			}
+			paramKeys[key] = true
+			if t, _ := sp["type"].(string); t != "" && t != "select" && t != "input" {
+				return fmt.Errorf("preset[%d] scenario_params[%d] type must be select|input", i, j)
+			}
+		}
+	}
+	// data_model_tree：引用域 ⊆ data_models、每域至多一父、无环
+	raw, has := p["data_model_tree"]
+	if !has {
+		return nil
+	}
+	tree, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("preset[%d] data_model_tree must be an array", i)
+	}
+	parentOf := map[string]string{}
+	var walk func(nodes []any, parent string) error
+	walk = func(nodes []any, parent string) error {
+		for _, n := range nodes {
+			node, ok := n.(map[string]any)
+			if !ok {
+				return fmt.Errorf("preset[%d] data_model_tree node must be an object", i)
+			}
+			mc, _ := node["model"].(string)
+			if mc == "" {
+				return fmt.Errorf("preset[%d] data_model_tree node requires model", i)
+			}
+			if !dmSet[mc] {
+				return fmt.Errorf("preset[%d] data_model_tree model %q not in data_models", i, mc)
+			}
+			if _, seen := parentOf[mc]; seen {
+				return fmt.Errorf("preset[%d] data_model_tree model %q duplicated", i, mc)
+			}
+			parentOf[mc] = parent
+			if kids, ok := node["children"].([]any); ok {
+				if err := walk(kids, mc); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return walk(tree, "")
 }
 
 // presetList presets JSONAny → []map[string]any
@@ -872,6 +981,128 @@ func presetStatusOf(p map[string]any) string {
 	return model.PresetDraft
 }
 
+// validateDataContractSpec 数据契约结构校验（清单 A2 注册期"字段算不出 → 拒绝 + 算法建议 + 出路"）：
+// 字段白名单 = 能力包资源模型字段（m.ModelFields）∪ 基础判定字段；算法档位 L1/L2/L3；新鲜度承诺 > 0
+func validateDataContractSpec(presetID string, spec map[string]any, m *model.CapabilityManifest) error {
+	fields, _ := spec["fields"].([]any)
+	if len(fields) == 0 {
+		return fmt.Errorf("preset[%s] data_contract.fields required（字段算不出三元素=不可授权；出路：不勾数据级、只发接口级能力包）", presetID)
+	}
+	algo, _ := spec["algorithm"].(string)
+	switch algo {
+	case "L1", "L2", "L3":
+	default:
+		return fmt.Errorf("preset[%s] data_contract.algorithm must be L1|L2|L3（算法菜单：L1 count+max(ts) / L2 集合哈希 / L3 判定字段全量哈希）", presetID)
+	}
+	sla := 0
+	switch v := spec["staleness_sla_sec"].(type) {
+	case float64:
+		sla = int(v)
+	case int:
+		sla = v
+	}
+	if sla <= 0 {
+		return fmt.Errorf("preset[%s] data_contract.staleness_sla_sec must be > 0（新鲜度承诺是 A6 超龄判定的读参）", presetID)
+	}
+	allowed := map[string]bool{"name": true, "owner_id": true, "external_id": true, "updated_at": true}
+	for _, raw := range m.ModelFields {
+		if mf, ok := raw.(map[string]any); ok {
+			if n, ok := mf["name"].(string); ok && n != "" {
+				allowed[n] = true
+			}
+		}
+	}
+	for _, f := range fields {
+		s, ok := f.(string)
+		if !ok || !allowed[s] {
+			return fmt.Errorf("preset[%s] data_contract field %v 不可算（须为模型字段或 name/owner_id/external_id/updated_at）——换可算字段，或只发接口级能力包", presetID, f)
+		}
+	}
+	return nil
+}
+
+// capContractError 发布期契约门禁错误（失败二分，清单 A2：
+// 400=字段/契约不可算 → 拒绝发布；502 retryable=端点不可达 → 可重试提示、**不计契约拒绝**）
+type capContractError struct {
+	Status    int
+	Msg       string
+	Retryable bool
+}
+
+// ensureDataContracts 数据级预设发布门禁 + 契约落库（清单 A2 发布链路钩子）：
+//   - 必填：data_contract{fields,algorithm,staleness_sla_sec}（结构校验复用 validateDataContractSpec）
+//   - 自检①字段可算：结构校验内给出"算法建议 + 出路（只发接口级）"
+//   - 自检②端点可达：数据源为 cmdb 时调发布方指纹端点（2s 超时）——
+//     不可达 → 502 retryable。注册是控制面操作、调外部符合 Sync 既有设计，**不违反数据面解耦红线**
+//   - 通过 → UpsertContract 落 data_contracts（已有契约保留确认制时钟与增量水位）
+func (d *Deps) ensureDataContracts(m *model.CapabilityManifest, presets []map[string]any) *capContractError {
+	appCode := ""
+	if app, err := d.Apps.ByID(m.AppID); err == nil {
+		appCode = app.Code
+	}
+	toInt := func(v any) int {
+		switch t := v.(type) {
+		case float64:
+			return int(t)
+		case int:
+			return t
+		}
+		return 0
+	}
+	for _, p := range presets {
+		dc, _ := p["data_control"].(bool)
+		if !dc {
+			continue
+		}
+		pid, _ := p["id"].(string)
+		raw, has := p["data_contract"]
+		if !has {
+			return &capContractError{Status: 400, Msg: fmt.Sprintf(
+				"preset %q data_control=true requires data_contract{fields,algorithm,staleness_sla_sec}（数据契约发布必填）——不填则不勾数据级、只发接口级", pid)}
+		}
+		spec, ok := raw.(map[string]any)
+		if !ok {
+			return &capContractError{Status: 400, Msg: fmt.Sprintf("preset %q data_contract must be an object", pid)}
+		}
+		if err := validateDataContractSpec(pid, spec, m); err != nil {
+			return &capContractError{Status: 400, Msg: err.Error()}
+		}
+		dms, _ := p["data_models"].([]any)
+		// 端点可达自检（仅 cmdb 数据源有指纹端点；其他接入系统 = 演进方向，跳过）
+		if appCode == "cmdb" && len(dms) > 0 {
+			if mc, ok := dms[0].(string); ok && mc != "" {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				_, ferr := d.CMDBConnector.FetchFingerprint(ctx, mc)
+				cancel()
+				if ferr != nil {
+					return &capContractError{Status: 502, Retryable: true,
+						Msg: fmt.Sprintf("fingerprint endpoint unreachable (%v)——稍后重试；这是可重试提示，不是契约拒绝", ferr)}
+				}
+			}
+		}
+		fields := []string{}
+		for _, f := range spec["fields"].([]any) {
+			if s, ok := f.(string); ok {
+				fields = append(fields, s)
+			}
+		}
+		for _, dm := range dms {
+			mc, ok := dm.(string)
+			if !ok || mc == "" {
+				continue
+			}
+			if _, err := d.Contracts.UpsertContract(&model.DataContract{
+				AppID: m.AppID, ModelCode: mc, Fields: fields,
+				Algorithm:        spec["algorithm"].(string),
+				StalenessSlaSec:  toInt(spec["staleness_sla_sec"]),
+				DegradeMaxAgeSec: toInt(spec["degrade_max_age_sec"]),
+			}); err != nil {
+				return &capContractError{Status: 500, Msg: "persist contract: " + err.Error()}
+			}
+		}
+	}
+	return nil
+}
 func (d *Deps) findCapabilityByDataModel(appID uint64, dm *string) (*model.CapabilityManifest, error) {
 	ms, err := d.Caps.List(appID)
 	if err != nil {

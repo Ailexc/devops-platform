@@ -29,8 +29,11 @@ func Open(dsn string) (*gorm.DB, error) {
 		&model.AccessRequest{}, &model.ApprovalTask{}, &model.RevokeRequest{},
 		&model.CapabilityPublishTask{},
 		&model.ResourceModel{}, &model.ResourceInstance{},
+		&model.DataContract{}, &model.PatrolLog{},
 		&model.SyncJob{}, &model.Bundle{}, &model.AgentStatus{},
 		&model.AuditLog{}, &model.DecisionLog{},
+		// v1.5 T1：路由表版本 / 待确认队列 / 动作码迁移记录
+		&model.RouteVersion{}, &model.RoutePending{}, &model.RouteMigrateLog{},
 	); err != nil {
 		return nil, err
 	}

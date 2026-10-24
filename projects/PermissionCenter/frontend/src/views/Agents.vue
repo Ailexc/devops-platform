@@ -73,7 +73,6 @@
                   <div v-if="b.policy_count > b.policy_preview.length" class="text-secondary" style="font-size:12px;">… 共 {{ b.policy_count }} 条策略（预览前 {{ b.policy_preview.length }} 条）</div>
                 </div>
                 <div v-else class="empty-state">该版本无策略内容</div>
-                <div v-if="b.force_remote?.length" class="force-remote">🔒 强制回源动作：<span v-for="f in b.force_remote" :key="f" class="mono fr-chip">{{ f }}</span></div>
               </td>
             </tr>
           </template>

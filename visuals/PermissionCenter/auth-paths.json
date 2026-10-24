@@ -1,0 +1,349 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "权限中心 · 鉴权路径骨架图（1.5 点查自足）",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1060,
+      460
+    ],
+    "views": [
+      {
+        "id": "path-interface",
+        "label": "① 接口鉴权",
+        "focus": [
+          "user",
+          "app",
+          "gw",
+          "pdp"
+        ],
+        "note": "每个请求的第一跳：请求先到网关 PEP（策略执行点）→ forwardAuth（转发鉴权）回调 PDP → 中心按动作码路由表查表得动作码（纯查表零推断，未登记=默认拒）→ Casbin（动作级引擎）判 allow / 403——deny-by-default（默认拒绝）。"
+      },
+      {
+        "id": "path-data",
+        "label": "② 数据鉴权（点操作）",
+        "focus": [
+          "app",
+          "gw",
+          "pdp",
+          "checkrow",
+          "mock"
+        ],
+        "note": "要动具体数据时：网关按动作码路由表的取材声明抠材料（id 在 URL=零配合）→ PDP 按通用点查约定回调上游取权威行 → CheckRow 谓词求值——行用完即丢不落库，无投影无副本；材料在 body=业务一次带体调用。fail-closed：行缺失/取材失败一律拒。"
+      },
+      {
+        "id": "path-list",
+        "label": "③ 列表判定两步",
+        "focus": [
+          "app",
+          "gw",
+          "pdp"
+        ],
+        "note": "列表请求带范围参数（契约登记的 query 参数）→ 中心先判「带没带」（缺参=非法拒）再判「超没超」（请求值 ∉ 授权集合=拒，元组集合语义）——业务零过滤代码，一次契约测试钉死。"
+      },
+      {
+        "id": "path-m2m",
+        "label": "④ 程序鉴权（M2M）",
+        "focus": [
+          "svc",
+          "oauth",
+          "gw"
+        ],
+        "note": "程序对程序：先到 PDP 的 OAuth 端点换令牌（客户端凭证模式），再凭令牌走路径①——判定主体从「人」换成「程序」；写操作签审批受限令牌（scope + TTL）。"
+      },
+      {
+        "id": "point-query",
+        "label": "⑤ 点查与可用性账",
+        "focus": [
+          "pdp",
+          "checkrow",
+          "mock"
+        ],
+        "note": "中心→上游点查与上游→中心判定互为依赖（对称依赖）——但数据级失败只拒数据级（fail-closed 三态），动作级读策略快照不依赖任何上游；爆炸半径=点操作两跳、创建三跳；应用挂了它的写操作也做不了，不新增风险。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户（管理台）",
+      "sublabel": "登录态 · 人为主体",
+      "tag": "路径①②的发起者",
+      "pos": [
+        40,
+        25
+      ],
+      "size": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "app",
+      "type": "external",
+      "label": "接入应用（云管 / 工单 / 事件）",
+      "sublabel": "业务后端 · 零权限代码",
+      "tag": "接口级走网关 · body 材料带体调用",
+      "pos": [
+        420,
+        25
+      ],
+      "size": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "svc",
+      "type": "external",
+      "label": "程序身份（服务）",
+      "sublabel": "client_id + secret",
+      "tag": "M2M（程序对程序）",
+      "pos": [
+        800,
+        25
+      ],
+      "size": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "gw",
+      "type": "security",
+      "label": "网关 PEP（策略执行点）",
+      "sublabel": "APISIX 设计口径 · Traefik Demo",
+      "tag": "forwardAuth 回调 · 取材声明 · deny-by-default（默认拒绝）",
+      "pos": [
+        40,
+        140
+      ],
+      "size": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "oauth",
+      "type": "security",
+      "label": "OAuth Token 端点",
+      "sublabel": "客户端凭证模式",
+      "tag": "签发 JWT · scope + TTL（生存时间）受限令牌",
+      "pos": [
+        800,
+        140
+      ],
+      "size": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "checkrow",
+      "type": "database",
+      "label": "CheckRow（数据级，自研）",
+      "sublabel": "谓词求值 × 点查客户端",
+      "tag": "fail-closed 三态 · 无副本无关系引擎",
+      "pos": [
+        40,
+        255
+      ],
+      "size": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "pdp",
+      "type": "backend",
+      "label": "PDP 判定（Casbin + CheckRow）",
+      "sublabel": "Go 1.26 + Gin · 无状态",
+      "tag": "动作码路由表纯查表 · deny-overrides",
+      "pos": [
+        420,
+        255
+      ],
+      "size": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PG 策略与审计存储",
+      "sublabel": "policy_versions · decision_logs",
+      "tag": "路由表版本快照 · 审计追加写",
+      "pos": [
+        800,
+        255
+      ],
+      "size": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "mock",
+      "type": "external",
+      "label": "上游系统（权威源）",
+      "sublabel": "mock-cmdb / mock-identity",
+      "tag": "判定时被按约定回调取行 · 数据不进中心",
+      "pos": [
+        40,
+        370
+      ],
+      "size": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "sync",
+      "type": "backend",
+      "label": "Sync 契约登记",
+      "sublabel": "OpenAPI→路由表/模板 · SCIM 身份",
+      "tag": "一次性面：点查约定 / 数据契约 / 动作码",
+      "pos": [
+        420,
+        370
+      ],
+      "size": [
+        220,
+        66
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "三类请求方（用户 / 接入应用 / 程序身份）",
+      "wraps": [
+        "user",
+        "app",
+        "svc"
+      ],
+      "pad": 14
+    },
+    {
+      "kind": "region",
+      "label": "数据面判定与存储（数据不落库——点查取完即丢）",
+      "wraps": [
+        "checkrow",
+        "pdp",
+        "pg"
+      ],
+      "pad": 14
+    }
+  ],
+  "connections": [
+    {
+      "from": "user",
+      "to": "gw",
+      "label": "请求进网关",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        200,
+        120
+      ]
+    },
+    {
+      "from": "app",
+      "to": "gw",
+      "label": "业务请求 · 接口级",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [
+        348,
+        118
+      ]
+    },
+    {
+      "from": "gw",
+      "to": "pdp",
+      "label": "① forwardAuth 回调 · 路由表查表 + Casbin 判",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          150,
+          230
+        ],
+        [
+          400,
+          230
+        ],
+        [
+          400,
+          288
+        ]
+      ],
+      "labelAt": [
+        285,
+        214
+      ]
+    },
+    {
+      "from": "app",
+      "to": "pdp",
+      "label": "带体调用（body 材料 / 创建校验）",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        548,
+        228
+      ]
+    },
+    {
+      "from": "pdp",
+      "to": "checkrow",
+      "label": "数据级：谓词 × 点查行",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [
+        345,
+        312
+      ]
+    },
+    {
+      "from": "checkrow",
+      "to": "mock",
+      "label": "通用点查约定回调取行 · 取完即丢",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        150,
+        358
+      ]
+    },
+    {
+      "from": "pdp",
+      "to": "pg",
+      "label": "读策略快照 · 写审计",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        722,
+        272
+      ]
+    },
+    {
+      "from": "svc",
+      "to": "oauth",
+      "label": "④ 换令牌 · 凭令牌走路径①",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        942,
+        118
+      ]
+    }
+  ],
+  "cards": []
+}

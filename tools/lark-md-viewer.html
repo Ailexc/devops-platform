@@ -51,8 +51,8 @@
 const $ = (s) => document.querySelector(s);
 let current = null;
 
-async function jget(url) { const r = await fetch(url); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.json(); }
-async function tget(url) { const r = await fetch(url); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.text(); }
+async function jget(url) { const r = await fetch(url, {cache: 'no-cache'}); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.json(); }
+async function tget(url) { const r = await fetch(url, {cache: 'no-cache'}); if (!r.ok) throw new Error(url + ' -> ' + r.status); return r.text(); }
 
 function preprocess(md, refmap) {
   const mermaids = [], callouts = [];
@@ -70,7 +70,7 @@ function preprocess(md, refmap) {
     let src = '';
     const h5 = (refmap || {})['html5-block'] || {};
     if (h5[ref]) src = (h5[ref].path || '').replace(/^@\/?/, '/');
-    if (!src && /\.html?$/.test(ref)) src = '/' + ref.replace(/^@\//, '');
+    if (!src && /\.html?$/.test(ref)) src = '/' + ref.replace(/^@\/?/, '');
     return `\n<div class="lark-card"><div class="lark-card-tag">🧩 HTML5 交互块</div>` +
       (src ? `<iframe class="h5frame" src="${src}" loading="lazy" onload="fitH5(this)"></iframe>` : `<div class="miss">资源缺失：${ref}（确认 docs-local 镜像的 reference-map 与 doc-fetch-resources 缓存）</div>`) +
       `<div class="lark-card-cap">${alt}</div></div>\n`;
@@ -84,7 +84,16 @@ function preprocess(md, refmap) {
 }
 
 function fitH5(f) {
-  try { const h = f.contentDocument.documentElement.scrollHeight; if (h > 100) f.style.height = (h + 8) + 'px'; } catch (e) { f.style.height = '700px'; }
+  try {
+    const apply = () => {
+      const d = f.contentDocument;
+      // body.scrollHeight=纯内容高；documentElement.scrollHeight 会被 iframe 视口反向污染（设高后=视口高，正反馈锁死），故 body 优先
+      const h = (d.body ? d.body.scrollHeight : 0) || d.documentElement.scrollHeight;
+      if (h > 100) f.style.height = (h + 8) + 'px';
+    };
+    apply();
+    setTimeout(apply, 150); // 二次校正：首测可能早于壳样式应用/旧值残留
+  } catch (e) { f.style.height = '700px'; }
 }
 
 async function render(key) {
@@ -105,6 +114,14 @@ async function render(key) {
     el.innerHTML = marked.parse(c.inner);
   });
   try { await mermaid.run({ querySelector: '.mermaid' }); } catch (e) { console.warn('mermaid:', e); }
+  // 兜底：html5 块壳内若嵌跨域 viz iframe 且其子请求挂起，外层 onload 永不触发 → fitH5 不执行。
+  // 壳的内容高在子请求挂起时已稳定（内层 iframe 固定高度），故可安全补测：仅对尚无 inline 高度且 body 就绪的块重算。
+  [600, 2500].forEach(t => setTimeout(() => {
+    document.querySelectorAll('iframe.h5frame').forEach(f => {
+      const d = f.contentDocument;
+      if (!f.style.height && d && d.body) fitH5(f);
+    });
+  }, t));
   if (meta) {
     $('#meta').textContent = `rev ${meta.revision_id} · sha ${String(meta.content_sha).slice(0, 12)} · 网页卡片 ${meta.cards.length} · html5 块 ${meta.html5_refs.length}`;
     $('#srcLink').href = `vscode://file/${location.host ? '' : ''}`;

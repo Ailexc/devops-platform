@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "任务编排平台 · 两波次编排状态机",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "task-flow.html",
+    "viewBox": [
+      1080,
+      640
+    ],
+    "views": [
+      {
+        "id": "wave1",
+        "label": "Wave1 资源并行",
+        "focus": [
+          "wave1"
+        ],
+        "note": "账号×区域×资源类型三维度并行同步（EC2/VPC/Subnet/RDS...）；每个子任务完成 HINCRBY 原子计数；部分失败计入失败计数不阻塞波次推进。"
+      },
+      {
+        "id": "wave-switch",
+        "label": "波次切换机制",
+        "focus": [
+          "wave1",
+          "wave2"
+        ],
+        "note": "done ≥ total 触发下一波次；SETNX 防重触发；调度器兜底扫描超时任务防卡死——主流程保证正确、兜底流程保证可用。"
+      },
+      {
+        "id": "wave2",
+        "label": "Wave2 关系计算",
+        "focus": [
+          "wave2",
+          "finalized"
+        ],
+        "note": "从 cmdbstore 读 Wave1 全量资源计算关联关系（EC2→VPC、RDS→VPC）；FINALIZED 收尾释放锁、日聚合、通知前端。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "编排主链路"
+    }
+  ],
+  "states": [
+    {
+      "id": "pending",
+      "type": "start",
+      "label": "待调度",
+      "sublabel": "pending · 锁检测",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "创建"
+    },
+    {
+      "id": "wave1",
+      "type": "active",
+      "label": "资源并行同步",
+      "sublabel": "WAVE1 · 全类型并行",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "HINCRBY 计数"
+    },
+    {
+      "id": "wave2",
+      "type": "active",
+      "label": "关系计算",
+      "sublabel": "WAVE2 · 读全量资源",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "依赖 Wave1"
+    },
+    {
+      "id": "finalized",
+      "type": "success",
+      "label": "收尾完成",
+      "sublabel": "FINALIZED · 汇总释放",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "终态"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "pending",
+      "to": "wave1",
+      "label": "SINTER 锁通过 · 加锁执行",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        171,
+        112
+      ]
+    },
+    {
+      "from": "wave1",
+      "to": "wave2",
+      "label": "done ≥ total · SETNX 防重触发",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        402,
+        112
+      ]
+    },
+    {
+      "from": "wave2",
+      "to": "finalized",
+      "label": "关系计算完成",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        556,
+        112
+      ]
+    }
+  ]
+}
