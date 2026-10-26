@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AiCumi 分层落位图：协作五层 + 执行核心 + 基础设施",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1240, 680],
+    "views": [
+      { "id": "collab-layers", "label": "协作五层", "focus": ["l1", "l2", "l3", "l4", "l5"], "note": "L1 认知 / L2 协调 / L3 编排 / L4 互操作 / L5 共享状态。" },
+      { "id": "exec-core", "label": "执行核心", "focus": ["agentmgr", "tools", "rag"], "note": "AgentManager 流式执行、ToolRegistry 工具调用、RAG 知识链路。" },
+      { "id": "infra", "label": "基础设施", "focus": ["sqlite", "dist"], "note": "SQLite 14 表持久化与 gRPC 分布式 Worker。" }
+    ]
+  },
+  "components": [
+    { "id": "webui", "type": "frontend", "label": "React 工作台", "sublabel": "22 组件 · useChatSocket", "pos": [460, 30], "size": [220, 56] },
+    { "id": "wsapi", "type": "backend", "label": "FastAPI 网关", "sublabel": "REST + WS /ws", "pos": [460, 120], "size": [220, 56] },
+    { "id": "agentmgr", "type": "backend", "label": "AgentManager", "sublabel": "流式执行 · 思考剥离 · 裸 JSON 防御", "tag": "1137 行", "pos": [460, 220], "size": [220, 330] },
+    { "id": "l1", "type": "backend", "label": "L1 团队认知", "sublabel": "花名册注入", "pos": [60, 220], "size": [200, 52] },
+    { "id": "l2", "type": "backend", "label": "L2 会话协调", "sublabel": "群聊三模式", "pos": [60, 284], "size": [200, 52] },
+    { "id": "l3", "type": "backend", "label": "L3 组织编排", "sublabel": "委派 · Supervisor", "pos": [60, 348], "size": [200, 52] },
+    { "id": "l4", "type": "backend", "label": "L4 互操作协议", "sublabel": "A2A Agent Card", "pos": [60, 412], "size": [200, 52] },
+    { "id": "l5", "type": "database", "label": "L5 共享状态", "sublabel": "记忆 private/team", "pos": [60, 476], "size": [200, 52] },
+    { "id": "rag", "type": "backend", "label": "RAG 知识链路", "sublabel": "分块 / 检索 / RRF", "pos": [860, 120], "size": [200, 56] },
+    { "id": "sqlite", "type": "database", "label": "SQLite 持久化", "sublabel": "14 表 · 重启全恢复", "pos": [860, 300], "size": [200, 56] },
+    { "id": "tools", "type": "backend", "label": "ToolRegistry", "sublabel": "6 内置工具 · schema 校验", "pos": [860, 420], "size": [200, 56] },
+    { "id": "dist", "type": "cloud", "label": "gRPC 分布式", "sublabel": "Worker Runtime · 故障转移", "pos": [460, 600], "size": [220, 56] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "协作五层（L1-L5）", "wraps": ["l1", "l2", "l3", "l4", "l5"] }
+  ],
+  "connections": [
+    { "id": "ui-gateway", "from": "webui", "to": "wsapi", "label": "chat.chunk 流式", "labelAt": [570, 103] },
+    { "id": "gw-dm", "from": "wsapi", "to": "agentmgr", "label": "私聊 / 群聊 send", "labelAt": [570, 198] },
+    { "id": "gw-rag", "from": "wsapi", "to": "rag", "label": "RAG 检索注入" },
+    { "id": "l1-mgr", "from": "l1", "to": "agentmgr", "label": "花名册注入", "labelAt": [320, 234] },
+    { "id": "l2-mgr", "from": "l2", "to": "agentmgr", "label": "实例构建", "labelAt": [320, 298] },
+    { "id": "l3-mgr", "from": "l3", "to": "agentmgr", "label": "delegate", "labelAt": [320, 362] },
+    { "id": "l4-mgr", "from": "l4", "to": "agentmgr", "label": "tasks/send", "labelAt": [320, 426] },
+    { "id": "l5-mgr", "from": "l5", "to": "agentmgr", "label": "记忆检索", "labelAt": [320, 490] },
+    { "id": "mgr-db", "from": "agentmgr", "to": "sqlite", "label": "消息落库" },
+    { "id": "mgr-tools", "from": "agentmgr", "to": "tools", "label": "FunctionTool" },
+    { "id": "rag-db", "from": "rag", "to": "sqlite", "label": "索引元数据", "labelAt": [960, 240] },
+    { "id": "dist-mgr", "from": "dist", "to": "agentmgr", "label": "执行回环", "labelAt": [570, 575] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "协作五层（L1-L5）", "items": [
+      "L1 花名册构建即最新；L2 三模式：free / @ / supervisor / parallel",
+      "L3 委派深度 ≤2；L4 A2A 协议执行解耦；L5 记忆 private/team 分域"
+    ] },
+    { "dot": "emerald", "title": "执行核心", "items": [
+      "AgentManager：token 流式 + 双格式思考剥离 + 裸 JSON 防御",
+      "ToolRegistry：schema 校验 + 强制转述；RAG：RRF 混合检索 + 溯源"
+    ] },
+    { "dot": "orange", "title": "基础设施", "items": [
+      "SQLite 14 表重启全恢复；ChromaDB 向量持久化",
+      "gRPC Worker：副本负载均衡 + 健康探针 + 故障重注册"
+    ] }
+  ]
+}

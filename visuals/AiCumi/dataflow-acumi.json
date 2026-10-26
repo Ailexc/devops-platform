@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "AiCumi 核心数据流：一次私聊流式对话的生命周期",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 560],
+    "views": [
+      { "id": "main-path", "label": "主链路", "focus": ["user", "ws", "agentmgr", "llm", "strip", "wsout"], "note": "从用户消息到逐 token 回传的主路径。" },
+      { "id": "memory-loop", "label": "记忆闭环", "focus": ["mem", "agentmgr"], "note": "检索注入与 save_exchange 自动存取（写回见持久化说明）。" },
+      { "id": "rag-path", "label": "RAG 增强路径", "focus": ["rag", "agentmgr"], "note": "knowledge_scope 触发的知识检索注入。" }
+    ]
+  },
+  "stages": [
+    { "label": "接入" },
+    { "label": "检索增强" },
+    { "label": "模型执行" },
+    { "label": "流式回传" },
+    { "label": "持久化" }
+  ],
+  "nodes": [
+    { "id": "ws", "type": "backend", "label": "WS 网关", "sublabel": "/ws · chat.send", "stage": 0, "row": 0, "tag": "流式协议", "height": 58, "yOffset": 7 },
+    { "id": "user", "type": "external", "label": "用户 / 前端", "sublabel": "useChatSocket", "stage": 0, "row": 2, "tag": "24/7", "height": 58 },
+    { "id": "mem", "type": "database", "label": "向量记忆", "sublabel": "ChromaDB 检索", "stage": 1, "row": 0, "tag": "cosine", "height": 58 },
+    { "id": "rag", "type": "database", "label": "知识库检索", "sublabel": "knowledge_chunks", "stage": 1, "row": 2, "tag": "RRF", "height": 58 },
+    { "id": "llm", "type": "cloud", "label": "LLM API", "sublabel": "OpenAI 兼容端点", "stage": 2, "row": 0, "tag": "流式", "height": 58 },
+    { "id": "agentmgr", "type": "backend", "label": "AgentManager", "sublabel": "消息组装 · 实例执行", "stage": 2, "row": 1, "tag": "1137 行", "height": 58 },
+    { "id": "tools", "type": "backend", "label": "ToolRegistry", "sublabel": "6 内置工具", "stage": 2, "row": 2, "tag": "FunctionTool", "height": 58 },
+    { "id": "strip", "type": "backend", "label": "思考剥离", "sublabel": "双格式状态机", "stage": 3, "row": 0, "tag": "reasoning", "height": 58 },
+    { "id": "wsout", "type": "backend", "label": "chat.chunk", "sublabel": "逐 token 推送", "stage": 3, "row": 2, "tag": "独立气泡", "height": 58 },
+    { "id": "db", "type": "database", "label": "SQLite 落库", "sublabel": "消息 / 追踪 / 房间", "stage": 4, "row": 1, "tag": "14 表", "height": 58 }
+  ],
+  "flows": [
+    { "id": "user-send", "from": "user", "to": "ws", "label": "chat.send", "classification": "用户消息", "variant": "emphasis", "labelAt": [100, 271] },
+    { "id": "ws-mem", "from": "ws", "to": "mem", "label": "向量检索", "classification": "长期记忆", "variant": "default" },
+    { "id": "ws-rag", "from": "ws", "to": "rag", "label": "knowledge_scope", "classification": "知识检索", "variant": "default" },
+    { "id": "mem-inject", "from": "mem", "to": "agentmgr", "label": "记忆注入", "classification": "Prompt 增强", "variant": "default" },
+    { "id": "rag-inject", "from": "rag", "to": "agentmgr", "label": "引用块注入", "classification": "Prompt 增强", "variant": "default" },
+    { "id": "mgr-llm", "from": "agentmgr", "to": "llm", "label": "on_messages_stream", "classification": "模型调用", "variant": "emphasis", "labelAt": [530, 214] },
+    { "id": "mgr-tools", "from": "agentmgr", "to": "tools", "label": "调用 / 转述", "classification": "工具往返", "variant": "default", "labelAt": [530, 328] },
+    { "id": "llm-strip", "from": "llm", "to": "strip", "label": "token 流（含思考）", "classification": "流式响应", "variant": "emphasis" },
+    { "id": "strip-out", "from": "strip", "to": "wsout", "label": "剥离后纯回答", "classification": "逐 token", "variant": "default", "labelAt": [745, 265] },
+    { "id": "out-user", "from": "wsout", "to": "user", "label": "逐 token 渲染气泡", "classification": "回传前端", "variant": "emphasis", "route": "bottom-channel" },
+    { "id": "out-db", "from": "wsout", "to": "db", "label": "chat.done 落库", "classification": "持久化", "variant": "default" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "主链路", "items": [
+      "用户消息经记忆 / RAG 增强后进入 AgentManager 执行",
+      "token 流剥离思考内容后逐 token 回传前端独立气泡"
+    ] },
+    { "dot": "emerald", "title": "记忆闭环", "items": [
+      "检索注入：近 10 轮历史 + 长期记忆动态拼接",
+      "save_exchange 自动存取，噪声（空 / 错误 / 裸 JSON）不落库"
+    ] },
+    { "dot": "orange", "title": "持久化", "items": [
+      "chat.done 消息落 SQLite，追踪 / 房间同库重启恢复",
+      "记忆写回 ChromaDB，scope private/team 分域"
+    ] }
+  ]
+}
